@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+    <div class="panel">
+        <sp-heading size="M">Magazine Automation</sp-heading>
+
+        <div class="section">
+            <sp-label>Article</sp-label>
+            <sp-button id="btnLoadArticle" variant="secondary">Load Article</sp-button>
+            <sp-body id="articleFileName" size="S">article.json</sp-body>
+        </div>
+
+        <div class="section">
+            <sp-button id="btnGenerate" variant="cta">Generate</sp-button>
+        </div>
+
+        <div class="section">
+            <sp-label>Status</sp-label>
+            <sp-body id="statusText" size="S">Ready</sp-body>
+        </div>
+    </div>
+
+    <script src="./index.js"></script>
+</body>
+</html>

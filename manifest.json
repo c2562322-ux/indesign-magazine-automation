@@ -1,0 +1,39 @@
+{
+    "id": "com.magazineautomation.panel",
+    "name": "Magazine Automation",
+    "version": "1.0.0",
+    "main": "index.html",
+    "manifestVersion": 5,
+    "host": {
+        "app": "ID",
+        "minVersion": "17.0"
+    },
+    "entrypoints": [
+        {
+            "type": "panel",
+            "id": "magazineAutomationPanel",
+            "label": {
+                "default": "Magazine Automation"
+            },
+            "minimumSize": {
+                "width": 230,
+                "height": 200
+            },
+            "maximumSize": {
+                "width": 2000,
+                "height": 2000
+            },
+            "preferredDockedSize": {
+                "width": 230,
+                "height": 300
+            },
+            "preferredFloatingSize": {
+                "width": 300,
+                "height": 400
+            }
+        }
+    ],
+    "requiredPermissions": {
+        "localFileSystem": "fullAccess"
+    }
+}

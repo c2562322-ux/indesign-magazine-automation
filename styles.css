@@ -1,0 +1,16 @@
+body {
+    margin: 0;
+    padding: 12px;
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
