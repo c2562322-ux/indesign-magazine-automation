@@ -143,3 +143,30 @@
 남은 문제:
 - `docs/TEMPLATE_SPEC.md`의 "Frame 분석 워크시트"는 표 구조와 규칙만 준비되었고 실제 행은 아직 비어 있음 (다음 작업)
 - Inspect Template의 나머지 항목(이미지 개수, 개체 타입 표시, 스타일 목록)과 템플릿 전체 페이지에 대한 동작 여부는 아직 구체적으로 확인되지 않음
+
+---
+
+## 2026-09-22 - Template Inspector 출력 개선 (Frame Name 비어있음 문제 대응)
+
+완료:
+- 실제 템플릿 테스트에서 대부분의 Text Frame에 Frame Name이 비어 있어 역할 식별이 어렵다는 문제를 확인하고, `src/inspector.js`를 읽기 전용을 유지하면서 개선:
+  - Text Frame: name, 텍스트 미리보기(줄바꿈→공백 치환, 50자 초과 시 자름), geometricBounds 출력 추가
+  - Rectangle: name, geometricBounds, 이미지 배치 여부(예/아니오 + 개수) 출력 추가
+  - 각 페이지에 내부 index(`doc.pages.item(i)`의 i)와 실제 `page.name`을 함께 표시
+  - 더 이상 쓰지 않는 `item.constructor.name` 기반 타입 표시 제거 (Text Frame/Rectangle 섹션이 이미 타입을 구분해 표시하므로 불필요)
+- `textFrame.contents`가 Linked Text Frame에서는 프레임 하나가 아니라 연결된 스토리 전체 텍스트를 반환할 수 있다는 점을 코드 주석과 문서에 caveat로 기록
+- `HANDOFF.md` 갱신: 현재 단계를 "시작 페이지 프레임 역할 확정 단계 진행 중"으로 반영, 새로 추가된 출력 항목을 "아직 테스트하지 못한 기능"에 추가, "알려진 문제"에서 더 이상 사실과 맞지 않는 `item.constructor.name` 관련 문구 제거 후 `textFrame.contents`/`geometricBounds` 미검증 항목으로 교체
+- 기존 `Generate`(Hello Magazine), `Load Article` 코드는 수정하지 않음
+- InDesign 문서/템플릿 파일은 수정하지 않음 (코드만 변경)
+
+변경 파일:
+- src/inspector.js
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 없음. 이번에 추가한 텍스트 미리보기/geometricBounds/이미지 배치 여부/페이지 index 출력은 아직 실제 InDesign에서 실행해보지 않았다. 사용자가 "시작 페이지"에서 다시 `Inspect Template`을 실행해 로그를 전달하면 다음 단계(Frame 분석 워크시트 작성)로 진행한다.
+
+남은 문제:
+- 개선된 `Inspect Template` 출력이 실제 InDesign에서 에러 없이 동작하는지 확인 필요 (특히 `textFrame.contents`, `geometricBounds`)
+- "시작 페이지" 템플릿의 실제 로그를 아직 전달받지 못해 `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트는 여전히 비어 있음
