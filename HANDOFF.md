@@ -6,9 +6,9 @@
 
 ## 현재 프로젝트 단계
 
-**MVP 0단계 — UXP 프로젝트 기본 골격 + Template Inspector(읽기 전용) 작성 완료, 실제 InDesign 실행 검증 전.**
+**Template Inspector 실기 테스트 성공, 실제 프레임 구조 식별 단계 진행 중.**
 
-디자이너로부터 실제 InDesign 원본 템플릿(.indd/.idml)과 폰트 파일을 전달받아 `assets/templates/original/`, `assets/fonts/`에 보관하기 시작했다(2026-09-22). 이번에 working 사본을 준비하고 실제 템플릿 구조를 분석하기 위한 `Inspect Template` 기능(읽기 전용)을 추가했지만, `assets/templates/original/`의 원본 파일을 InDesign에서 직접 열어 이 기능으로 분석해본 적은 아직 없다. 실제 기사/템플릿 자동 배치 로직(데이터 매핑, 자동 조판)은 여전히 시작하지 않았다. 현재는 "버튼 클릭 → InDesign 문서에 텍스트 생성 / 구조 읽기"가 되는지를 확인하는 최소 동작 확인 단계다.
+디자이너로부터 받은 실제 InDesign 원본 템플릿(`assets/templates/original/`)의 working 사본을 InDesign에서 열고 `Inspect Template` 버튼을 실행한 결과, 일부 페이지에서 Text Frame / Rectangle이 정상적으로 조회되는 것을 확인했다(2026-09-22). 이 테스트는 사용자가 실제 InDesign/UXP Developer Tool에서 직접 수행하고 결과를 공유한 것이며, Claude Code가 직접 실행·검증한 것은 아니다. 이제 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 실제 페이지/프레임 정보를 채워 넣는 단계로 진행 중이다. Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, 프레임 이름 규칙과 데이터 매핑, 자동 조판 로직은 아직 시작하지 않았다.
 
 ## 완료된 기능
 
@@ -22,22 +22,25 @@
 
 ## 실제 테스트 완료된 기능
 
-**없음.**
+사용자가 실제 InDesign + UXP Developer Tool에서 직접 확인한 내용 (2026-09-22, Claude Code가 아닌 사용자가 실행):
 
-지금까지의 작업은 코드 작성까지만 진행되었고, UXP Developer Tool이나 실제 Adobe InDesign에서 로드/실행해본 적이 없다. 따라서 아래 항목 전부가 "코드는 작성되었지만 동작 여부는 미확인" 상태다.
+- UXP Developer Tool에서 [manifest.json](manifest.json) 로드 및 `Magazine Automation` 패널 표시
+- `Inspect Template` 버튼 클릭 시 에러 없이 실행됨
+- `assets/templates/working/`의 실제 디자이너 템플릿 사본에서, 일부 페이지의 Text Frame / Rectangle 목록이 `page.textFrames` / `page.rectangles`로 정상 조회됨
+
+**아직 확인되지 않은 부분**: 테스트한 페이지가 템플릿 전체 중 일부였는지, 테스트하지 않은 나머지 페이지도 동일하게 동작하는지는 이 문서 작성 시점에 보고받지 못했다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
 ## 아직 테스트하지 못한 기능
 
-- UXP Developer Tool에서 [manifest.json](manifest.json)이 정상적으로 로드되는지
-- InDesign에서 `Magazine Automation` 패널이 정상적으로 표시되는지
-- `Generate` 버튼 클릭 시 `src/indesign.js`의 `app.doScript(...)` 호출이 실제 InDesign UXP API와 시그니처가 맞는지, 에러 없이 텍스트 프레임이 생성되는지
+- `Generate` 버튼 클릭 시 `src/indesign.js`의 `app.doScript(...)` 호출이 실제 InDesign UXP API와 시그니처가 맞는지, 에러 없이 텍스트 프레임이 생성되는지 (이번 테스트에서 별도로 재확인되지 않음)
 - `Load Article` 버튼 (현재 클릭해도 "아직 구현되지 않음" 상태 메시지만 표시, 실제 동작 없음)
-- `Inspect Template` 버튼 전체: `doc.pages`, `page.textFrames`, `page.rectangles`, `rectangle.images`, `pageItem.constructor.name`, `doc.paragraphStyles`, `doc.objectStyles` 등 [src/inspector.js](src/inspector.js)에서 사용한 InDesign DOM 속성이 실제 InDesign UXP 환경에서 문서 그대로 동작하는지
-- `Inspect Template`이 실제 디자이너 템플릿(`assets/templates/original/`을 연 working 사본)에서 의미 있는 결과를 내는지, 특히 Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제로 얼마나 있는지(현재 버전은 이런 항목을 집계하지 않음)
+- `Inspect Template`의 나머지 항목: `rectangle.images`(이미지 포함 개수), `pageItem.constructor.name`(타입 표시), `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록)가 실제로 올바른 값을 보여주는지는 아직 구체적으로 보고되지 않았다
+- `Inspect Template`을 템플릿의 모든 페이지에서 실행했을 때도 동일하게 정상 동작하는지 (지금까지는 "일부 페이지"에서만 확인됨)
+- Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제 템플릿에 얼마나 있는지, 그로 인해 워크시트 작성 시 어떤 항목이 누락되는지 (현재 버전은 이런 항목을 집계하지 않음 — 알려진 문제 참고)
 
 ## 진행 중인 작업
 
-- 없음. 이번 작업은 Template Inspector(읽기 전용) 기능 추가까지 완료했다.
+- [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 `Inspect Template` 결과를 페이지/프레임 단위로 채워 넣는 작업. 아직 실제 행은 채워지지 않았고(표 구조와 작성 규칙만 준비됨), 다음 세션에서 이어서 채운다.
 
 ## 미구현 기능
 
@@ -63,11 +66,11 @@
 
 ## 다음 추천 작업
 
-1. UXP Developer Tool 설치 후 [manifest.json](manifest.json)을 로드해 InDesign에서 패널이 실제로 뜨는지 확인
-2. `Generate`와 `Inspect Template` 버튼을 실제로 클릭해 각각 동작하는지 검증하고, 에러가 나면 `src/indesign.js` / `src/inspector.js`를 수정
-3. 검증 결과를 [WORKLOG.md](WORKLOG.md)와 이 문서의 "실제 테스트 완료된 기능" 항목에 반영
-4. `assets/templates/working/`에 원본 템플릿(`assets/templates/original/`) 작업용 복사본을 만들어 InDesign에서 열고, `Inspect Template`으로 실제 페이지 유형/프레임 이름/스타일을 확인해 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 채우기 시작
-5. 템플릿 분석 완료 후 `src/data.js` (JSON 로드)부터 순서대로 구현
+1. `assets/templates/working/`의 템플릿을 페이지 단위로 돌며 `Inspect Template`을 실행하고, 결과를 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 한 행씩 옮겨 적는다 (Template Type, Page Number, Page Purpose, Frame Role, Current Frame Name, Object Type 등).
+2. 워크시트를 채우면서 `rectangle.images`(이미지 개수), `pageItem.constructor.name`(타입 표시), `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록)가 실제로 올바른 값을 보여주는지 함께 확인하고, 결과를 이 문서의 "실제 테스트 완료된 기능"/"알려진 문제"에 반영한다.
+3. `Generate` 버튼도 다시 클릭해 "Hello Magazine" 기능이 여전히 정상 동작하는지 확인한다 (이번 세션에서는 재검증되지 않았다).
+4. 워크시트가 어느 정도 쌓이면 디자이너와 함께 프레임 Naming Convention, Paragraph/Object Style Naming Convention을 확정하고, [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame Name"/"Data Field Mapping"/"Required / Optional"/"Paragraph Style"/"Object Style" 표(확정판)를 채운다.
+5. 명명 규칙이 확정된 뒤 `src/data.js` (JSON 로드)부터 순서대로 구현
 
 ## 디자이너에게 확인해야 할 사항
 
