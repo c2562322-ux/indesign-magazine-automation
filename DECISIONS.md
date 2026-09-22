@@ -66,3 +66,29 @@ Git의 `.gitignore`는 상위 디렉터리 자체가 무시 대상이면 그 안
 
 변경 조건:
 없음.
+
+---
+
+## D006 - 읽기 전용 기능은 app.doScript로 감싸지 않는다
+
+결정:
+`src/inspector.js`의 `inspectDocument()`는 문서를 조회만 하고 수정하지 않으므로 `src/indesign.js`의 `addHelloText()`와 달리 `app.doScript(...)` 안에서 실행하지 않는다.
+
+이유:
+`app.doScript`는 되돌리기(Undo) 가능한 하나의 작업 단위로 묶기 위한 것으로, 문서를 변경하는 작업에 필요하다. 읽기 전용 조회에는 Undo 단위가 필요 없으므로 감싸지 않는 것이 단순하고 목적에 맞다. InDesign UXP에서 읽기 동작도 반드시 `doScript` 안에서 실행해야 하는지는 실제로 검증되지 않았으며, 만약 그렇다면 이후 수정이 필요하다.
+
+변경 조건:
+UDT/InDesign 실기 테스트에서 `doScript` 없이 읽기 동작이 실패하면 재검토.
+
+---
+
+## D007 - Template Inspector를 별도 모듈(src/inspector.js)로 분리
+
+결정:
+문서 구조 분석 기능을 `src/indesign.js`에 추가하지 않고 새 파일 `src/inspector.js`로 분리했다.
+
+이유:
+`src/indesign.js`의 기존 `addHelloText()`(Generate 기능)를 건드리지 않고 새 기능을 추가하기 위함이다. 두 기능은 읽기 전용 분석과 문서 수정이라는 서로 다른 성격을 가지므로 분리가 자연스럽고, 기존 UI/InDesign 로직 분리 원칙(D002)과도 일관된다.
+
+변경 조건:
+없음.

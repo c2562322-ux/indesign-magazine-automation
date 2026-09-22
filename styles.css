@@ -14,3 +14,18 @@ body {
     flex-direction: column;
     gap: 6px;
 }
+
+.log-area {
+    margin: 0;
+    padding: 8px;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    border: 1px solid var(--spectrum-global-color-gray-300, #ccc);
+    border-radius: 4px;
+    background: var(--spectrum-global-color-gray-75, #f5f5f5);
+}

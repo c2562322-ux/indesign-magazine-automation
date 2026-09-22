@@ -1,8 +1,10 @@
 // UI 이벤트 바인딩과 프로그램 시작점. InDesign 제어 로직은 src/indesign.js에 위임한다.
 
 const { addHelloText } = require("./src/indesign.js");
+const { inspectDocument, formatReport } = require("./src/inspector.js");
 
 const statusText = document.getElementById("statusText");
+const inspectLog = document.getElementById("inspectLog");
 
 function setStatus(message) {
     statusText.textContent = message;
@@ -20,6 +22,21 @@ document.getElementById("btnGenerate").addEventListener("click", async () => {
         setStatus("완료: \"Hello Magazine\" 텍스트 생성됨");
     } catch (err) {
         console.error(err);
+        setStatus(`오류: ${err.message}`);
+    }
+});
+
+document.getElementById("btnInspect").addEventListener("click", () => {
+    try {
+        setStatus("Inspecting...");
+        const report = inspectDocument();
+        const text = formatReport(report);
+        inspectLog.textContent = text;
+        console.log("[Inspect Template]\n" + text);
+        setStatus(`완료: 페이지 ${report.pageCount}개 분석됨 (읽기 전용, 문서 변경 없음)`);
+    } catch (err) {
+        console.error(err);
+        inspectLog.textContent = `오류: ${err.message}`;
         setStatus(`오류: ${err.message}`);
     }
 });

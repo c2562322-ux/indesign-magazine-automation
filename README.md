@@ -8,17 +8,20 @@ Vanilla JavaScript 기반이며 React 등 프레임워크는 사용하지 않는
 
 `Generate` 버튼을 클릭하면 현재 활성화된 InDesign 문서 첫 페이지에 "Hello Magazine" 텍스트 프레임을 생성하는 최소 기능만 구현되어 있다. 실제 기사 데이터/템플릿 매핑 로직은 아직 구현되지 않았다.
 
+`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록, 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 문서를 수정하지 않는다.
+
 ## 폴더 구조
 
 ```text
 indesign-magazine-automation/
 ├─ manifest.json      UXP Plugin 설정 및 InDesign 연결 정보
-├─ index.html         UXP 패널 화면 (Load Article / Generate 버튼)
+├─ index.html         UXP 패널 화면 (Load Article / Generate / Inspect Template 버튼)
 ├─ styles.css         UXP 패널 스타일
 ├─ index.js           버튼 이벤트 바인딩, 프로그램 시작점
 │
 ├─ src/
 │  ├─ indesign.js     InDesign document/page/frame 접근 및 제어 (구현됨)
+│  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
 │  ├─ data.js         JSON 기사 데이터 읽기/파싱 (예정)
 │  ├─ template.js     templateType별 템플릿 처리 (예정)
 │  ├─ text.js         TITLE/BODY 등 텍스트 프레임 처리 (예정)
@@ -59,6 +62,7 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 5. InDesign에서 문서를 하나 새로 만들거나 연다.
 6. InDesign 메뉴 `Plugins`(또는 UDT에서 지정한 위치)에서 `Magazine Automation` 패널을 연다.
 7. 패널에서 `Generate` 버튼을 클릭하면 현재 문서 첫 페이지에 "Hello Magazine" 텍스트 프레임이 생성되는지 확인한다.
-8. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.
+8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보가 `Inspection Log` 영역과 콘솔에 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
+9. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.
 
 `Load Article` 버튼은 아직 동작하지 않으며, 다음 단계에서 `sample/article.json`을 읽어오는 기능을 `src/data.js`에 구현할 예정이다.

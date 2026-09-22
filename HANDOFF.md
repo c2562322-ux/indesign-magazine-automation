@@ -6,9 +6,9 @@
 
 ## 현재 프로젝트 단계
 
-**MVP 0단계 — UXP 프로젝트 기본 골격 작성 완료, 실제 InDesign 실행 검증 전.**
+**MVP 0단계 — UXP 프로젝트 기본 골격 + Template Inspector(읽기 전용) 작성 완료, 실제 InDesign 실행 검증 전.**
 
-디자이너로부터 실제 InDesign 원본 템플릿(.indd/.idml)과 폰트 파일을 전달받아 `assets/templates/original/`, `assets/fonts/`에 보관하기 시작했다(2026-09-22). 다만 아직 템플릿 내용을 분석하거나 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)에 반영하지는 않은 상태이며, 실제 기사/템플릿 자동 배치 로직도 아직 시작하지 않았다. 현재는 "버튼 클릭 → InDesign 문서에 텍스트 생성"이 되는지를 확인하는 최소 동작 확인 단계다.
+디자이너로부터 실제 InDesign 원본 템플릿(.indd/.idml)과 폰트 파일을 전달받아 `assets/templates/original/`, `assets/fonts/`에 보관하기 시작했다(2026-09-22). 이번에 working 사본을 준비하고 실제 템플릿 구조를 분석하기 위한 `Inspect Template` 기능(읽기 전용)을 추가했지만, `assets/templates/original/`의 원본 파일을 InDesign에서 직접 열어 이 기능으로 분석해본 적은 아직 없다. 실제 기사/템플릿 자동 배치 로직(데이터 매핑, 자동 조판)은 여전히 시작하지 않았다. 현재는 "버튼 클릭 → InDesign 문서에 텍스트 생성 / 구조 읽기"가 되는지를 확인하는 최소 동작 확인 단계다.
 
 ## 완료된 기능
 
@@ -18,6 +18,7 @@
 - UI 로직([index.js](index.js))과 InDesign 제어 로직([src/indesign.js](src/indesign.js)) 분리
 - 개발용 샘플 데이터 [sample/article.json](sample/article.json)
 - 디자인 리소스 보관용 폴더 구조 생성 및 디자이너 원본 InDesign 템플릿(.indd/.idml)·폰트 파일 수령 완료 (`assets/templates/original/`, `assets/templates/working/`, `assets/fonts/`, 실제 파일은 Git에는 올리지 않음 — [.gitignore](.gitignore) 참고)
+- `Inspect Template` 버튼 및 읽기 전용 문서 구조 분석 기능 추가 ([src/inspector.js](src/inspector.js)의 `inspectDocument`/`formatReport`): 전체 페이지 수, 페이지별 Page Item 수, Text Frame 목록, Rectangle(이미지 프레임) 목록과 포함된 이미지 개수, 사용 가능한 Paragraph/Object Style 목록을 패널의 `Inspection Log` 영역과 콘솔에 출력. 문서를 수정하는 코드는 없음.
 
 ## 실제 테스트 완료된 기능
 
@@ -31,10 +32,12 @@
 - InDesign에서 `Magazine Automation` 패널이 정상적으로 표시되는지
 - `Generate` 버튼 클릭 시 `src/indesign.js`의 `app.doScript(...)` 호출이 실제 InDesign UXP API와 시그니처가 맞는지, 에러 없이 텍스트 프레임이 생성되는지
 - `Load Article` 버튼 (현재 클릭해도 "아직 구현되지 않음" 상태 메시지만 표시, 실제 동작 없음)
+- `Inspect Template` 버튼 전체: `doc.pages`, `page.textFrames`, `page.rectangles`, `rectangle.images`, `pageItem.constructor.name`, `doc.paragraphStyles`, `doc.objectStyles` 등 [src/inspector.js](src/inspector.js)에서 사용한 InDesign DOM 속성이 실제 InDesign UXP 환경에서 문서 그대로 동작하는지
+- `Inspect Template`이 실제 디자이너 템플릿(`assets/templates/original/`을 연 working 사본)에서 의미 있는 결과를 내는지, 특히 Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제로 얼마나 있는지(현재 버전은 이런 항목을 집계하지 않음)
 
 ## 진행 중인 작업
 
-- 없음. 이번 세션은 문서화 체계([CLAUDE.md](CLAUDE.md), 이 문서, [WORKLOG.md](WORKLOG.md), [DECISIONS.md](DECISIONS.md), [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)) 구축만 진행했다.
+- 없음. 이번 작업은 Template Inspector(읽기 전용) 기능 추가까지 완료했다.
 
 ## 미구현 기능
 
@@ -51,6 +54,8 @@
 
 - `src/indesign.js`의 `app.doScript()` 호출부(인자 순서, `ScriptLanguage`/`UndoModes` 접근 방식)는 Adobe에서 공개한 InDesign UXP 패턴을 참고해 작성했지만, 실제 InDesign에서 실행해 검증한 적이 없다. 버전/환경에 따라 시그니처가 다를 수 있으므로 UDT의 Inspect(콘솔)로 확인 후 필요시 수정해야 한다.
 - `manifest.json`에 `icons` 항목이 없다. 아이콘 파일이 없는 상태에서 값을 채우면 로드 에러가 날 수 있어 의도적으로 생략했다. 아이콘 리소스가 준비되면 추가한다.
+- `src/inspector.js`가 사용하는 `page.textFrames`, `page.rectangles`, `rectangle.images`, `item.constructor.name`, `doc.paragraphStyles`, `doc.objectStyles`는 classic InDesign Scripting DOM 기준으로 작성했으며 InDesign UXP에서 실제 검증되지 않았다. 특히 `item.constructor.name`으로 개체 타입을 식별하는 방식이 UXP 호스트 객체에서도 동일하게 동작하는지는 불확실하다.
+- `src/inspector.js`는 Group으로 묶인 pageItem(중첩 개체)과 Paragraph/Object Style Group 내부의 스타일을 집계하지 않는다. `page.pageItems`/`doc.paragraphStyles`/`doc.objectStyles`가 최상위 항목만 반환하기 때문이며, 디자이너 템플릿이 그룹을 많이 쓴다면 "Page Item 수"와 실제 나열된 Text Frame/Rectangle 개수 사이에 차이가 날 수 있다.
 
 ## 외부 대기 사항
 
@@ -59,9 +64,9 @@
 ## 다음 추천 작업
 
 1. UXP Developer Tool 설치 후 [manifest.json](manifest.json)을 로드해 InDesign에서 패널이 실제로 뜨는지 확인
-2. `Generate` 버튼을 실제로 클릭해 `app.doScript` 호출이 동작하는지 검증하고, 필요하면 `src/indesign.js` 수정
+2. `Generate`와 `Inspect Template` 버튼을 실제로 클릭해 각각 동작하는지 검증하고, 에러가 나면 `src/indesign.js` / `src/inspector.js`를 수정
 3. 검증 결과를 [WORKLOG.md](WORKLOG.md)와 이 문서의 "실제 테스트 완료된 기능" 항목에 반영
-4. `assets/templates/original/`의 원본 템플릿을 InDesign에서 열어 실제 페이지 유형/프레임 이름/스타일을 분석하고, `assets/templates/working/`에 작업용 복사본을 만들어 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 채우기 시작
+4. `assets/templates/working/`에 원본 템플릿(`assets/templates/original/`) 작업용 복사본을 만들어 InDesign에서 열고, `Inspect Template`으로 실제 페이지 유형/프레임 이름/스타일을 확인해 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 채우기 시작
 5. 템플릿 분석 완료 후 `src/data.js` (JSON 로드)부터 순서대로 구현
 
 ## 디자이너에게 확인해야 할 사항
