@@ -1,0 +1,11 @@
+# Design resources from the designer (.indd/.idml/fonts) - binary files, not tracked in Git.
+# Folder contents are ignored, but a .gitkeep in each leaf folder keeps the empty
+# folder structure available after a fresh clone.
+assets/templates/original/*
+!assets/templates/original/.gitkeep
+
+assets/templates/working/*
+!assets/templates/working/.gitkeep
+
+assets/fonts/*
+!assets/fonts/.gitkeep

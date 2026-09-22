@@ -29,10 +29,26 @@ indesign-magazine-automation/
 │  ├─ article.json    개발용 테스트 기사 데이터
 │  └─ images/         개발용 테스트 이미지
 │
+├─ assets/
+│  ├─ templates/
+│  │  ├─ original/    디자이너 전달 원본 .indd/.idml (수정 금지)
+│  │  └─ working/     자동화 개발/테스트용 InDesign 작업 복사본
+│  └─ fonts/          디자이너 전달 폰트 파일
+│
 └─ README.md
 ```
 
 UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)을 분리해서, InDesign API 사용 방식이 바뀌어도 UI 코드를 건드리지 않도록 구성했다.
+
+## assets 폴더
+
+디자이너에게 전달받은 디자인 리소스를 보관하는 폴더다.
+
+- `assets/templates/original/` — 원본 `.indd`/`.idml` 파일. 이 폴더의 파일은 수정하지 않는다.
+- `assets/templates/working/` — 실제 자동화 개발/테스트에 사용하는 InDesign 작업용 복사본.
+- `assets/fonts/` — 디자이너에게 전달받은 폰트 파일.
+
+용량이 큰 바이너리 리소스이므로 `assets/templates/`, `assets/fonts/` 하위 실제 파일은 [.gitignore](.gitignore)에 의해 Git에 커밋되지 않는다. 폴더 구조만 `.gitkeep`으로 유지되며, 새로 clone한 환경에서는 디자이너에게 파일을 별도로 전달받아 해당 폴더에 넣어야 한다.
 
 ## UXP Developer Tool에서 실행하는 방법
 
