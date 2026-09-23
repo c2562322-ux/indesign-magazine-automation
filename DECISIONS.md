@@ -127,3 +127,21 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 검증 로직이 report에 없는 InDesign 정보(예: 페이지 순서 재계산, 실시간 상태)를 필요로 하게 되면 재검토.
+
+---
+
+## D010 - "시작 페이지(사진 없음)" 본문은 bodyColumn1/bodyColumn2 대신 단일 body 필드 사용
+
+결정:
+자동조판 MVP 데이터 계약([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md))에서, 사진 없는 "시작 페이지" 변형의 2단 본문을 `bodyColumn1`/`bodyColumn2` 두 필드로 나눠 받던 기존 설계를 폐기하고, `WITH_PHOTO` 변형과 동일하게 `body` 필드 하나만 사용하기로 했다. 이 값은 텍스트 스레드의 시작 프레임인 `BODY_COLUMN_1`에만 쓰고, `BODY_COLUMN_2`에는 직접 쓰지 않는다.
+
+이유:
+- 애초에 `bodyColumn1`/`bodyColumn2`로 나눴던 이유는 "본문 하나를 코드가 어디서 잘라 두 프레임에 나눠 넣을지 예측할 수 없다"는 것이었다(D008 이전, 2026-09-23 이전 버전 ARTICLE_DATA_SPEC.md).
+- 사용자가 실제 InDesign에서 `Inspect Template`/`src/validation.js`의 연결 검사로 `BODY_COLUMN_1.nextTextFrame` = `BODY_COLUMN_2`, `BODY_COLUMN_2.previousTextFrame` = `BODY_COLUMN_1`임을 확인했다(2026-09-23) — 즉 두 프레임이 InDesign 텍스트 스레드로 이미 연결되어 있다.
+- 텍스트 스레드로 연결된 프레임은 앞쪽 프레임에 본문을 채우면 InDesign이 넘치는 텍스트를 다음 프레임으로 자동으로 흘려보낸다. 따라서 "어디서 자를지"를 코드가 예측할 필요 자체가 없어졌고, 두 필드로 나눌 이유도 사라졌다.
+- `body` 필드 하나로 통일하면 `WITH_PHOTO`/`WITHOUT_PHOTO` 두 variant의 필드 구조가 더 단순해지고(공통 필드로 승격), 데이터를 만드는 쪽이 "이 variant는 본문을 어떻게 나눠야 하지"를 고민할 필요가 없어진다.
+
+이번 결정은 `body`를 `BODY_COLUMN_1.contents`에 쓰면 실제로 `BODY_COLUMN_2`까지 올바르게 흐르는지(자동조판 구현 시점의 실기 검증)까지 확인한 것은 아니다 — 지금 확인된 것은 "두 프레임이 텍스트 스레드로 연결돼 있다"는 사실뿐이다.
+
+변경 조건:
+자동조판 구현 시 `BODY_COLUMN_1.contents = body`가 실제로 `BODY_COLUMN_2`까지 올바르게 흐르지 않는 것으로 확인되면 재검토.

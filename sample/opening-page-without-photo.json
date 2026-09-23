@@ -3,6 +3,5 @@
     "variant": "WITHOUT_PHOTO",
     "title": "새로운 도시를 만드는 사람들 (사진 없음)",
     "pointText": "건축가 5명을 만나다",
-    "bodyColumn1": "본문 왼쪽 단입니다. Lorem ipsum dolor sit amet, consectetur adipiscing elit. 이 필드는 BODY_COLUMN_1 Script Label 프레임에 들어간다.",
-    "bodyColumn2": "본문 오른쪽 단입니다. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 이 필드는 BODY_COLUMN_2 Script Label 프레임에 들어간다."
+    "body": "본문 전체입니다. Lorem ipsum dolor sit amet, consectetur adipiscing elit. 이 값은 BODY_COLUMN_1 Script Label 프레임에 채워지고, InDesign 텍스트 스레드로 BODY_COLUMN_2까지 자동으로 흘러간다. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
 }

@@ -6,7 +6,7 @@
 
 ## 현재 프로젝트 단계
 
-**"시작 페이지" Script Label 검증 실기 테스트 성공. 자동조판 MVP용 기사 JSON 데이터 계약 정의 완료. BODY_COLUMN_1/BODY_COLUMN_2 텍스트 스레드 연결 여부를 읽기 전용으로 확인하는 진단 기능 추가(아직 실기 테스트 전). 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수, JSON을 실제로 읽어 InDesign에 채우는 코드는 아직 없음.**
+**"시작 페이지" Script Label 검증 및 BODY_COLUMN_1/BODY_COLUMN_2 텍스트 스레드 연결 실기 테스트 모두 성공. 이를 근거로 자동조판 MVP용 기사 JSON 데이터 계약을 단순화 완료(WITH_PHOTO/WITHOUT_PHOTO 공통 `body` 필드 하나로 통일). 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수, JSON을 실제로 읽어 InDesign에 채우는 코드는 아직 없음.**
 
 개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
@@ -16,7 +16,11 @@
 
 이 성공을 근거로 자동조판 MVP에서 쓸 기사 JSON 데이터 계약을 정의했다 — [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md). 사진 있음/없음 구분은 `heroImage` 존재 여부로 암묵적으로 추측하지 않고 `variant` 필드(`"WITH_PHOTO"`/`"WITHOUT_PHOTO"`)로 명시하도록 정했고, 본문 2단 구성도 자동 분배 대신 `bodyColumn1`/`bodyColumn2` 두 필드로 명시적으로 받기로 했다. `sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json` 샘플 파일도 만들었다. **이 JSON을 실제로 읽거나 InDesign에 채워 넣는 코드는 아직 없다** — 이번 작업은 데이터 구조 정의와 샘플 파일까지만 진행했다.
 
-이후 사용자가 InDesign UI에서 `보기 > 기타 > 텍스트 스레드 표시`를 켠 상태로도 BODY_COLUMN_1과 BODY_COLUMN_2 사이에 연결선이 보이지 않는다고 보고했다. 두 프레임이 실제로 텍스트 스레드로 연결돼 있는지 코드로 읽기 전용 확인하기 위해 `TextFrame.previousTextFrame`/`nextTextFrame`을 `Inspect Template`에 추가로 출력하도록 [src/inspector.js](src/inspector.js)를 개선하고, `src/validation.js`에 "BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드 연결" 전용 검사를 추가했다(2026-09-23). **`previousTextFrame`/`nextTextFrame`이 이 InDesign UXP 환경에서 실제로 노출되는지, 두 프레임이 실제로 연결돼 있는지는 아직 실기로 확인하지 않았다** — 코드만 작성했다. working .indd의 프레임을 연결하거나 수정하는 코드는 없으며, [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 `bodyColumn1`/`bodyColumn2` 구조도 변경하지 않았다.
+이후 사용자가 InDesign UI에서 `보기 > 기타 > 텍스트 스레드 표시`를 켠 상태로도 BODY_COLUMN_1과 BODY_COLUMN_2 사이에 연결선이 보이지 않는다고 보고했다. 두 프레임이 실제로 텍스트 스레드로 연결돼 있는지 코드로 읽기 전용 확인하기 위해 `TextFrame.previousTextFrame`/`nextTextFrame`을 `Inspect Template`에 추가로 출력하도록 [src/inspector.js](src/inspector.js)를 개선하고, `src/validation.js`에 "BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드 연결" 전용 검사를 추가했다(2026-09-23).
+
+**사용자가 실제 InDesign에서 이 검사를 실행해 두 프레임이 실제로 연결되어 있음을 확인했다**(2026-09-23): `BODY_COLUMN_1.nextTextFrame` → `BODY_COLUMN_2`, `BODY_COLUMN_2.previousTextFrame` → `BODY_COLUMN_1`, "결과: 모두 정상". `previousTextFrame`/`nextTextFrame`이 이 InDesign UXP 환경에서 에러 없이 노출된다는 점도 함께 확인됐다. InDesign UI에 연결선이 보이지 않는다고 보고됐던 것과 달리, 두 프레임은 실제로는 연결돼 있는 것으로 확인됐다.
+
+이 확인을 근거로 자동조판 MVP 데이터 계약을 단순화했다([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md), [DECISIONS.md](DECISIONS.md) D010): 사진 없는 변형도 `bodyColumn1`/`bodyColumn2` 두 필드 대신 `WITH_PHOTO`와 동일하게 `body` 필드 하나만 쓰고, 이 값을 텍스트 스레드의 시작 프레임인 `BODY_COLUMN_1`에만 채워 넣으면 InDesign이 넘치는 텍스트를 `BODY_COLUMN_2`로 자동으로 흘려보낸다(코드가 텍스트를 잘라 나눌 필요가 없어짐). `sample/opening-page-without-photo.json`도 새 구조로 갱신했다. `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트도 이 확인 내용을 반영했다. working .indd의 프레임을 연결하거나 수정하는 코드는 여전히 없으며(문서를 수정하는 작업이 아니라 데이터 계약/문서 정리만 진행), JSON 파일 읽기·`contents` 변경·이미지 배치·`Generate` 자동조판도 아직 구현하지 않았다.
 
 ## 완료된 기능
 
@@ -28,8 +32,8 @@
 - 디자인 리소스 보관용 폴더 구조 생성 및 디자이너 원본 InDesign 템플릿(.indd/.idml)·폰트 파일 수령 완료 (`assets/templates/original/`, `assets/templates/working/`, `assets/fonts/`, 실제 파일은 Git에는 올리지 않음 — [.gitignore](.gitignore) 참고)
 - `Inspect Template` 버튼 및 읽기 전용 문서 구조 분석 기능 추가/개선 ([src/inspector.js](src/inspector.js)의 `inspectDocument`/`formatReport`): 전체 페이지 수, 페이지별 Page Item 수, Text Frame 목록(name, label, 텍스트 미리보기 50자, geometricBounds), Rectangle 목록(name, label, geometricBounds, 이미지 배치 여부), 페이지의 내부 index와 page.name, 사용 가능한 Paragraph/Object Style 목록을 패널의 `Inspection Log` 영역과 콘솔에 출력. 문서를 수정하는 코드는 없음.
 - Script Label 기반 프레임 검증 기능 추가 ([src/validation.js](src/validation.js)의 `validateFrameLabels`/`formatValidationReport`, `index.js`에서 `Inspect Template` 버튼 클릭 시 자동 실행): "시작 페이지" 사진 있음/없음 두 변형 각각에 필요한 Label(TITLE/POINT_TEXT/BODY/HERO_IMAGE 또는 TITLE/POINT_TEXT/BODY_COLUMN_1/BODY_COLUMN_2)이 정확히 1개씩 있는지, 예상 타입(TextFrame/Rectangle)과 일치하는지 검사해 같은 `Inspection Log`/콘솔에 출력. InDesign API를 직접 호출하지 않고 `inspector.js`의 report만 입력으로 사용 (D009). 문서를 수정하지 않음.
-- 자동조판 MVP용 기사 JSON 데이터 계약 정의 ([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)): "시작 페이지" 2개 variant(`WITH_PHOTO`/`WITHOUT_PHOTO`)의 필드, Required/Optional, Script Label 매핑을 정리하고 샘플 파일([sample/opening-page-with-photo.json](sample/opening-page-with-photo.json), [sample/opening-page-without-photo.json](sample/opening-page-without-photo.json))을 작성. JSON을 실제로 읽거나 InDesign에 적용하는 코드는 아직 없음.
-- Text Frame 연결(텍스트 스레드) 읽기 전용 확인 기능 추가: [src/inspector.js](src/inspector.js)에 `TextFrame.previousTextFrame`/`nextTextFrame`을 읽어 `Inspection Log`에 출력하는 기능(`getLinkedFrameInfo`), [src/validation.js](src/validation.js)에 "BODY_COLUMN_1 → BODY_COLUMN_2" 연결 여부를 판정하는 `linkChecks`(`checkFrameLink`)를 추가해 기존 `Inspect Template` 흐름에 포함. 프레임을 연결/수정하는 코드는 없음, 아직 실기 테스트 전.
+- 자동조판 MVP용 기사 JSON 데이터 계약 정의 및 단순화 ([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)): "시작 페이지" 2개 variant(`WITH_PHOTO`/`WITHOUT_PHOTO`)가 `templateType`/`variant`/`title`/`pointText`/`body` 공통 필드를 쓰고, `WITH_PHOTO`만 `heroImage`를 추가로 쓰도록 정리. `WITHOUT_PHOTO`의 `body`는 텍스트 스레드 시작 프레임인 `BODY_COLUMN_1`에만 쓴다. 샘플 파일([sample/opening-page-with-photo.json](sample/opening-page-with-photo.json), [sample/opening-page-without-photo.json](sample/opening-page-without-photo.json))도 갱신. JSON을 실제로 읽거나 InDesign에 적용하는 코드는 아직 없음.
+- Text Frame 연결(텍스트 스레드) 읽기 전용 확인 기능 추가 및 실기 검증 완료: [src/inspector.js](src/inspector.js)에 `TextFrame.previousTextFrame`/`nextTextFrame`을 읽어 `Inspection Log`에 출력하는 기능(`getLinkedFrameInfo`), [src/validation.js](src/validation.js)에 "BODY_COLUMN_1 → BODY_COLUMN_2" 연결 여부를 판정하는 `linkChecks`(`checkFrameLink`)를 추가해 기존 `Inspect Template` 흐름에 포함. 실제 InDesign에서 두 프레임이 연결되어 있음을 확인함(2026-09-23). 프레임을 연결/수정하는 코드는 없음.
 
 ## 실제 테스트 완료된 기능
 
@@ -40,6 +44,7 @@
 - `assets/templates/working/`의 실제 디자이너 템플릿 사본에서, "시작 페이지" 템플릿의 두 페이지 변형(page.name=2/index=3, page.name=3/index=4)에 대해 `Inspect Template`의 개선된 출력(Text Frame의 name/텍스트 미리보기/geometricBounds, Rectangle의 name/geometricBounds/이미지 배치 여부, 페이지 index와 page.name)이 실제로 정상 표시됨을 확인 (2026-09-23) — `src/inspector.js`에서 추가한 `textFrame.contents`, `item.geometricBounds`, `rectangle.images` 기반 출력이 실사용에서 동작한 것으로 확인됨
 - `item.label`(Script Label) 읽기: Text Frame과 Rectangle 모두에서 에러 없이 값을 읽을 수 있음을 확인 (2026-09-23). 이 결과를 근거로 D008(자동화 식별자로 `label` 사용) 결정
 - Script Label 기반 프레임 검증 기능([src/validation.js](src/validation.js)): Script Label이 부여된 실제 working .indd에서 `Inspect Template`을 실행해 page.name=2("시작 페이지(사진 있음)")와 page.name=3("시작 페이지(사진 없음)") 모두 `TITLE`/`POINT_TEXT`/`BODY`/`HERO_IMAGE` 및 `TITLE`/`POINT_TEXT`/`BODY_COLUMN_1`/`BODY_COLUMN_2`가 전부 `[OK]`, "결과: 모두 정상"으로 나옴을 확인 (2026-09-23)
+- `TextFrame.previousTextFrame`/`nextTextFrame` 읽기 및 "BODY_COLUMN_1 → BODY_COLUMN_2" 텍스트 스레드 연결 검사: 실제 InDesign에서 에러 없이 읽혔고, `BODY_COLUMN_1.nextTextFrame`=`BODY_COLUMN_2`, `BODY_COLUMN_2.previousTextFrame`=`BODY_COLUMN_1`로 실제 연결되어 있음을 확인 (2026-09-23) — InDesign UI에 연결선이 안 보인다고 보고됐던 것과 달리 실제로는 연결돼 있었음
 
 **아직 확인되지 않은 부분**: `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록) 출력이 올바른지, "시작 페이지" 외 나머지 페이지(목차/본문 페이지/인터뷰 레이아웃)에서도 동일하게 동작하는지는 아직 보고되지 않았다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
@@ -50,13 +55,12 @@
 - `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록)가 실제로 올바른 값을 보여주는지는 아직 구체적으로 보고되지 않았다
 - `Inspect Template`을 "시작 페이지" 외 나머지 Template Type(목차, 본문 페이지, 인터뷰 레이아웃)에서 실행했을 때도 동일하게 정상 동작하는지
 - Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제 템플릿에 얼마나 있는지, 그로 인해 워크시트 작성 시 어떤 항목이 누락되는지 (현재 버전은 이런 항목을 집계하지 않음 — 알려진 문제 참고)
-- `TextFrame.previousTextFrame`/`nextTextFrame` 읽기 및 "BODY_COLUMN_1 → BODY_COLUMN_2" 연결 검사([src/validation.js](src/validation.js)의 `linkChecks`) 전체: 이 UXP 환경에서 에러 없이 읽히는지, 실제로 "연결됨"/"연결 안 됨" 중 무엇으로 나오는지 아직 확인되지 않았다. 코드만 작성한 상태.
+- `body`를 `BODY_COLUMN_1.contents`에 쓰면 실제로 `BODY_COLUMN_2`까지 올바르게 흐르는지는 아직 확인되지 않았다 — 지금까지 확인된 것은 "두 프레임이 텍스트 스레드로 연결돼 있다"는 사실뿐이고, 실제로 `contents`를 쓰는 코드 자체가 아직 없다.
 
 ## 진행 중인 작업
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(pointText가 원래 handoff 문서의 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다.
-- JSON 데이터 계약([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md))은 정의했지만, 이를 실제로 읽어 InDesign에 적용하는 코드(`src/data.js`, `Load Article`/`Generate` 연동)는 아직 시작하지 않았다.
-- BODY_COLUMN_1/BODY_COLUMN_2가 실제로 텍스트 스레드로 연결돼 있는지 진단하는 읽기 전용 기능을 추가했지만, 사용자가 InDesign에서 다시 `Inspect Template`을 실행해 결과를 확인해주기 전까지는 실제 연결 여부를 알 수 없다.
+- JSON 데이터 계약([docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md))은 단순화까지 정의했지만, 이를 실제로 읽어 InDesign에 적용하는 코드(`src/data.js`, `Load Article`/`Generate` 연동)는 아직 시작하지 않았다.
 
 ## Script Label 부여 및 검증 현황
 
@@ -90,8 +94,8 @@
 - `item.label`(Script Label) 읽기는 실기로 확인되었다(D008). 값을 쓰는 동작은 코드로 작성한 적이 없고, 사용자가 InDesign UI에서 직접 부여했다 — 코드로 쓰는 경우(`label = "..."`)의 동작은 아직 검증되지 않았다.
 - `src/validation.js`의 페이지 유형 판별 로직(`pickProfile`)은 "BODY_COLUMN_1/2가 있으면 사진 없는 변형, HERO_IMAGE나 BODY가 있으면 사진 있는 변형"이라는 휴리스틱이다. "시작 페이지" 두 변형에서는 실제로 올바르게 동작함을 확인했지만(2026-09-23), 다른 페이지(목차 등)에 우연히 같은 Label이 쓰이면 오판할 수 있다. 다른 Template Type을 분석할 때 유의해야 한다.
 - [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 Required/Optional 표시는 이번 MVP 설계를 위한 잠정 결정이며, 디자이너 공식 확인을 거친 것은 아니다. `variant` 값이 잘못되거나 누락됐을 때의 처리 방식도 아직 정의/구현하지 않았다.
-- `TextFrame.previousTextFrame`/`nextTextFrame`은 classic InDesign DOM에 문서화된 속성으로 알려져 있지만(연결 없으면 null 또는 `isValid`가 false인 참조를 반환하는 것으로 알려짐), 이 UXP 환경에서 실제로 동일하게 노출되는지는 미검증이다. `src/inspector.js`의 `getLinkedFrameInfo()`는 두 가지 "연결 없음" 표현(null/`isValid===false`)을 모두 방어적으로 처리하도록 작성했지만, 실제 InDesign이 어떤 형태를 반환하는지는 실기 테스트로만 확인 가능하다.
-- 사용자가 InDesign UI에서 "텍스트 스레드 표시"를 켠 상태로도 BODY_COLUMN_1/BODY_COLUMN_2 사이에 연결선이 보이지 않는다고 보고했다(2026-09-23) — 두 프레임이 실제로 연결되지 않았을 가능성이 있다. 이번에 추가한 검증 기능으로 다음 실기 테스트에서 이를 명확히 확인할 수 있을 것으로 예상하지만, 아직 확인 전이다.
+- `TextFrame.previousTextFrame`/`nextTextFrame`은 실제 InDesign에서 에러 없이 읽힘을 확인했다(2026-09-23). 다만 "연결 없음"을 어떤 형태로 반환하는지(null 또는 `isValid===false`)는 이번 두 프레임이 "연결된" 경우만 확인됐고, "연결 안 된" 프레임에서 실제로 어떤 값이 나오는지는 아직 관찰된 적이 없다 — `src/inspector.js`의 `getLinkedFrameInfo()`는 두 형태를 모두 방어적으로 처리하도록 작성했지만 이 부분은 여전히 이론적 대비이다.
+- 사용자가 InDesign UI에서 "텍스트 스레드 표시"를 켠 상태로도 BODY_COLUMN_1/BODY_COLUMN_2 사이에 연결선이 안 보인다고 보고했었지만, 코드로 확인한 결과 두 프레임은 실제로 연결되어 있었다(2026-09-23). UI에 연결선이 보이지 않았던 원인(예: 프레임이 화면 밖에 있었다거나 표시 설정 문제)은 확인되지 않았다 — 데이터/코드 상으로는 문제가 없다.
 
 ## 외부 대기 사항
 
@@ -99,14 +103,12 @@
 
 ## 다음 추천 작업
 
-1. UDT에서 Reload 후 "사진 없는 시작 페이지"(page.name=3)에서 `Inspect Template`을 실행해, `Inspection Log`에서 "BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드 연결" 검사 결과(`[OK] 연결됨` 또는 `[FAIL] 연결 안 됨` 등)를 확인하고 로그를 전달한다. 이 결과로 두 프레임이 실제로 연결돼 있는지 확정한다.
-2. 위에서 "연결 안 됨"으로 나오면, 디자이너/사용자가 InDesign에서 두 프레임을 실제로 연결할지, 아니면 `docs/ARTICLE_DATA_SPEC.md`의 `bodyColumn1`/`bodyColumn2`를 애초에 서로 독립된 프레임(연결 불필요)으로 취급할지 결정이 필요하다 — 이번 작업 범위 밖.
-3. `src/data.js`에 `sample/opening-page-with-photo.json`/`sample/opening-page-without-photo.json` 같은 JSON 파일을 읽어 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md) 구조로 파싱하는 최소 기능을 구현한다 (아직 `Load Article` 버튼의 실제 파일 선택 UI까지는 아니어도, 고정 경로를 읽는 정도부터 시작 가능).
-4. `variant` 값에 따라 필요한 필드가 다 있는지 검사하는 최소 검증(예: `WITH_PHOTO`인데 `heroImage`가 없으면 오류)을 추가한다 — 이번 작업에서는 이 검증도 구현하지 않았다.
-5. `Generate` 버튼 또는 새 버튼에서 읽은 JSON 데이터를 Script Label로 찾은 프레임의 `contents`에 채워 넣는 최소 자동조판(텍스트만, 이미지 배치 제외)을 시도한다. 문서를 실제로 수정하는 첫 단계이므로 작은 단위로 나눠 진행하고 실기 검증을 거친다.
-6. 이미지 배치(`heroImage` → `HERO_IMAGE` Rectangle)는 텍스트 자동조판이 안정된 뒤 별도 단계로 진행한다.
-7. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
-8. 위 MVP가 "시작 페이지"에서 안정되면 "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해 같은 방식으로 분석·검증·데이터 계약을 확장한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 순서대로 진행한다.
+1. `src/data.js`에 `sample/opening-page-with-photo.json`/`sample/opening-page-without-photo.json`(둘 다 이제 `title`/`pointText`/`body` 공통 구조 + `WITH_PHOTO`만 `heroImage`) 같은 JSON 파일을 읽어 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md) 구조로 파싱하는 최소 기능을 구현한다 (아직 `Load Article` 버튼의 실제 파일 선택 UI까지는 아니어도, 고정 경로를 읽는 정도부터 시작 가능).
+2. `variant` 값에 따라 필요한 필드가 다 있는지 검사하는 최소 검증(예: `WITH_PHOTO`인데 `heroImage`가 없으면 오류)을 추가한다 — 이번 작업에서는 이 검증도 구현하지 않았다.
+3. `Generate` 버튼 또는 새 버튼에서 읽은 JSON 데이터를 Script Label로 찾은 프레임의 `contents`에 채워 넣는 최소 자동조판(텍스트만, 이미지 배치 제외)을 시도한다. `WITHOUT_PHOTO`는 `body`를 `BODY_COLUMN_1.contents`에만 쓰고 `BODY_COLUMN_2`는 건드리지 않는다(텍스트 스레드가 자동 처리). 문서를 실제로 수정하는 첫 단계이므로 작은 단위로 나눠 진행하고 실기 검증을 거친다 — `BODY_COLUMN_1`에 쓴 본문이 실제로 `BODY_COLUMN_2`까지 흐르는지 이 단계에서 처음 확인하게 된다.
+4. 이미지 배치(`heroImage` → `HERO_IMAGE` Rectangle)는 텍스트 자동조판이 안정된 뒤 별도 단계로 진행한다.
+5. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
+6. 위 MVP가 "시작 페이지"에서 안정되면 "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해 같은 방식으로 분석·검증·데이터 계약을 확장한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 순서대로 진행한다.
 
 ## 디자이너에게 확인해야 할 사항
 

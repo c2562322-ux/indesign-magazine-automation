@@ -8,6 +8,8 @@
 
 이후 사용자가 working .indd에 실제로 Script Label(TITLE/POINT_TEXT/BODY/HERO_IMAGE, TITLE/POINT_TEXT/BODY_COLUMN_1/BODY_COLUMN_2)을 부여했고, 읽기 전용 검증 기능([src/validation.js](../src/validation.js))으로 두 페이지 모두 "결과: 모두 정상"임을 실제 InDesign에서 확인했다(2026-09-23). 이를 기반으로 자동조판 MVP용 기사 JSON 데이터 계약을 정의했다 — [docs/ARTICLE_DATA_SPEC.md](ARTICLE_DATA_SPEC.md) 참고.
 
+이어서 `BODY_COLUMN_1`/`BODY_COLUMN_2`가 InDesign 텍스트 스레드로 실제 연결되어 있음을 확인했다(2026-09-23, `src/validation.js`의 연결 검사로 "연결됨" 확인). 이를 근거로 JSON 데이터 계약을 단순화했다 — 사진 없는 변형도 `bodyColumn1`/`bodyColumn2` 두 필드 대신 `body` 필드 하나만 받고, `BODY_COLUMN_1`에만 채워 넣으면 텍스트 스레드로 `BODY_COLUMN_2`까지 자동으로 흐른다([docs/ARTICLE_DATA_SPEC.md](ARTICLE_DATA_SPEC.md), [DECISIONS.md](../DECISIONS.md) D010).
+
 목차/본문 페이지/인터뷰 레이아웃은 아직 분석하지 않았다. **프레임 단위의 이름 규칙(확정판), 데이터 매핑, 스타일 규칙은 아직 디자이너와 공식 확정된 것이 아니다** — "시작 페이지"의 Script Label은 기술적으로 적용/검증되었지만, 이것이 디자이너와 합의된 영구 명명 규칙인지는 별개의 확인 사항으로 남아 있다. 임의로 프레임 이름을 실제로 변경하거나, 확인되지 않은 항목을 추측해서 확정 짓지 않는다.
 
 아래 "Frame 분석 워크시트"에 `Inspect Template` 결과를 페이지/프레임 단위로 옮겨 적으면서 분석을 진행한다. 워크시트가 충분히 채워지고 디자이너와 확인이 끝나면, 그 내용을 일반화해 뒤쪽의 "Frame Name" / "Data Field Mapping" / "Required / Optional" / "Paragraph Style" / "Object Style" 표(템플릿 전체에 적용되는 확정 규칙)를 채운다. (관련 요청 사항은 [HANDOFF.md](../HANDOFF.md)의 "디자이너에게 확인해야 할 사항" 참고)
@@ -42,8 +44,8 @@
 | 시작 페이지 | 2 (index=3) | 사진 있는 시작 페이지 | 템플릿 제작 안내 문구 (데이터 필드 아님) | (이름 없음) | 해당 없음 (데이터 필드로 자동화하지 않음) | TextFrame | 없음 | 해당 없음 | 텍스트 "대표이미지" — 사용자가 직접 "템플릿 안내용 문구, 기사 데이터 필드가 아님"으로 확인함. Script Label도 부여하지 않은 것으로 보임(실기 로그로 재확인 필요). 실제 자동 조판 시 이 프레임을 무시/삭제해야 하는지는 확인 필요 |
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 제목 | (이름 없음) | (적용됨) `TITLE` | TextFrame | `title` (docs/ARTICLE_DATA_SPEC.md) | Required (MVP 잠정) | 텍스트 미리보기 "매거진 시작 메인 페이지 (사진X)"로 식별. Script Label 실제 부여 및 검증 완료(2026-09-23) |
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 부제 / 포인트 문구 | (이름 없음) | (적용됨) `POINT_TEXT` | TextFrame | `pointText` (docs/ARTICLE_DATA_SPEC.md) | Required (MVP 잠정) | 텍스트 미리보기 "캡션 혹은 부제나 간단한 포인트 문구..."로 식별. Script Label 실제 부여 및 검증 완료(2026-09-23) |
-| 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (왼쪽 단) | (이름 없음) | (적용됨) `BODY_COLUMN_1` | TextFrame | `bodyColumn1` — 자동 2단 분배 대신 별도 필드로 확정 (docs/ARTICLE_DATA_SPEC.md) | `variant: "WITHOUT_PHOTO"`일 때 Required | 왼쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23) |
-| 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (오른쪽 단) | (이름 없음) | (적용됨) `BODY_COLUMN_2` | TextFrame | `bodyColumn2` — 자동 2단 분배 대신 별도 필드로 확정 (docs/ARTICLE_DATA_SPEC.md) | `variant: "WITHOUT_PHOTO"`일 때 Required | 오른쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23) |
+| 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (왼쪽 단, 텍스트 스레드 시작점) | (이름 없음) | (적용됨) `BODY_COLUMN_1` | TextFrame | `body` — 이 프레임에만 쓴다 (docs/ARTICLE_DATA_SPEC.md) | `variant: "WITHOUT_PHOTO"`일 때 Required | 왼쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23). **`BODY_COLUMN_1.nextTextFrame`이 `BODY_COLUMN_2`를 가리키는 텍스트 스레드로 실제 연결되어 있음을 확인**(2026-09-23, `src/validation.js` linkChecks로 "연결됨" 확인) — 여기 채운 본문이 넘치면 InDesign이 자동으로 BODY_COLUMN_2로 흘려보낸다 |
+| 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (오른쪽 단, 텍스트 스레드로 자동 연결) | (이름 없음) | (적용됨) `BODY_COLUMN_2` | TextFrame | 없음 — 데이터로 직접 쓰지 않음 (docs/ARTICLE_DATA_SPEC.md) | 해당 없음 (직접 채우는 대상이 아님) | 오른쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23). `BODY_COLUMN_2.previousTextFrame`이 `BODY_COLUMN_1`을 가리키는 텍스트 스레드로 연결되어 있어(확인됨 2026-09-23) `BODY_COLUMN_1`에 채운 본문이 넘치면 자동으로 이어짐 |
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | (대표 이미지 프레임 없음) | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 (`heroImage`는 `WITHOUT_PHOTO`에서 사용 안 함) | 해당 없음 (프레임 자체가 없음) | 이 페이지 변형에는 HERO_IMAGE에 대응하는 Rectangle이 존재하지 않음 — "사진 없는 시작 페이지"의 특징으로 사용자가 직접 확인함 |
 
 열 설명:

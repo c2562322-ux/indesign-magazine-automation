@@ -338,3 +338,31 @@
 남은 문제:
 - `previousTextFrame`/`nextTextFrame` 읽기 자체가 이 환경에서 에러 없이 되는지 확인 필요
 - BODY_COLUMN_1 → BODY_COLUMN_2 연결 여부(사용자가 InDesign UI에서 연결선을 못 봤다고 보고한 것과 일치하는 결과가 나올지) 확인 필요
+
+---
+
+## 2026-09-23 - 텍스트 스레드 연결 확인 + JSON 데이터 계약 단순화 (bodyColumn1/2 → 단일 body)
+
+완료:
+- 사용자가 실제 InDesign에서 "BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드 연결" 검사를 실행한 결과를 확인해 전달: `BODY_COLUMN_1.nextTextFrame`=`BODY_COLUMN_2`, `BODY_COLUMN_2.previousTextFrame`=`BODY_COLUMN_1`, "결과: 모두 정상" — `previousTextFrame`/`nextTextFrame` 읽기 자체도 에러 없이 동작함을 확인. InDesign UI에 연결선이 안 보인다고 보고됐던 것과 달리 실제로는 연결돼 있었음
+- 이 확인을 근거로 `docs/ARTICLE_DATA_SPEC.md`를 단순화: `bodyColumn1`/`bodyColumn2` 두 필드를 폐기하고, `WITH_PHOTO`/`WITHOUT_PHOTO` 두 variant 모두 공통으로 `templateType`/`variant`/`title`/`pointText`/`body`를 쓰도록 통일. `WITH_PHOTO`만 `heroImage`를 추가로 요구. `WITHOUT_PHOTO`의 `body`는 텍스트 스레드 시작 프레임인 `BODY_COLUMN_1`에만 쓰고 `BODY_COLUMN_2`는 직접 쓰지 않는다는 점을 명시(텍스트가 자동으로 흘러감)
+- "왜 bodyColumn1/2 대신 body인가" 섹션을 문서에 추가해, 최초 설계 이유(코드가 텍스트를 어디서 자를지 예측 불가)와 이번에 바뀐 이유(텍스트 스레드가 이미 연결되어 있어 InDesign이 자동으로 흘려보냄)를 모두 기록
+- `sample/opening-page-without-photo.json`을 `bodyColumn1`/`bodyColumn2` 구조에서 단일 `body` 구조로 갱신. `sample/opening-page-with-photo.json`은 이미 `body` 구조였으므로 변경 없음
+- `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트 갱신: BODY_COLUMN_1 행에 "Data Field: body, 이 프레임에만 쓴다"와 텍스트 스레드 연결 확인 사실 기록, BODY_COLUMN_2 행에 "직접 쓰지 않음, 텍스트 스레드로 자동 연결" 기록. "현재 상태" 도입부에도 이번 확인/단순화 내용 반영
+- `DECISIONS.md`에 D010 기록: bodyColumn1/bodyColumn2 → 단일 body로 단순화한 결정과 근거, 그리고 아직 확인되지 않은 것(실제 `contents` 쓰기 시 스레드가 올바르게 작동하는지는 자동조판 구현 시점에 별도 검증 필요)을 명시
+- `HANDOFF.md` 갱신: 현재 단계/완료된 기능/실제 테스트 완료된 기능/아직 테스트하지 못한 기능/알려진 문제/다음 추천 작업을 이번 확인과 단순화 결과에 맞춰 전체 갱신
+- 이번 작업에서 하지 않은 것 (요청받은 범위 밖): JSON 파일을 실제로 읽는 코드, `contents` 변경, 이미지 배치, `Generate` 자동조판 — 전부 미구현 상태 유지. InDesign 파일도 수정하지 않음(데이터 계약/문서/샘플 정리만 진행)
+
+변경 파일:
+- docs/ARTICLE_DATA_SPEC.md
+- docs/TEMPLATE_SPEC.md
+- sample/opening-page-without-photo.json
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 텍스트 스레드 연결 검사는 사용자가 실제 InDesign에서 실행해 "모두 정상"을 확인함 (2026-09-23, 사용자가 직접 수행). 데이터 계약 단순화/샘플 파일 갱신 자체는 문서·JSON 정리이므로 코드 테스트 대상이 아님.
+
+남은 문제:
+- `body`를 실제로 `BODY_COLUMN_1.contents`에 쓰는 코드는 아직 없어, 쓴 값이 실제로 `BODY_COLUMN_2`까지 올바르게 흐르는지는 자동조판 구현 단계에서 별도로 확인해야 함
