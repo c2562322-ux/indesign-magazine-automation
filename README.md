@@ -10,6 +10,8 @@ Vanilla JavaScript 기반이며 React 등 프레임워크는 사용하지 않는
 
 `Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록(name, label, 텍스트 미리보기, geometricBounds), 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 같은 버튼 클릭 한 번으로 "시작 페이지"에 필요한 Script Label(TITLE/POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE)이 정확히 1개씩 존재하는지, 타입이 예상과 맞는지도 함께 검증해 같은 로그에 이어서 출력한다 ([src/validation.js](src/validation.js)). 문서를 수정하지 않는다.
 
+`Load Article` 버튼을 클릭하면 로컬 파일(JSON)을 선택할 수 있는 파일 선택 대화상자가 뜬다. 선택한 파일을 읽어 `JSON.parse`한 뒤, [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 `OPENING_PAGE` 계약(templateType/variant/title/pointText/body, WITH_PHOTO일 때 heroImage)을 만족하는지 검사해서 `Article Log` 영역과 콘솔에 결과를 출력한다. 검증을 통과하면 데이터를 메모리에 보관한다(아직 다른 기능과 연결되지 않음). 이 단계에서도 InDesign 문서는 전혀 건드리지 않는다 — 로컬 파일을 읽고 검증만 한다.
+
 ## 폴더 구조
 
 ```text
@@ -22,11 +24,11 @@ indesign-magazine-automation/
 ├─ src/
 │  ├─ indesign.js     InDesign document/page/frame 접근 및 제어 (구현됨)
 │  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
-│  ├─ data.js         JSON 기사 데이터 읽기/파싱 (예정)
+│  ├─ data.js         JSON 파일 선택/읽기(require("uxp").storage) (구현됨, 미검증)
 │  ├─ template.js     templateType별 템플릿 처리 (예정)
 │  ├─ text.js         TITLE/BODY 등 텍스트 프레임 처리 (예정)
 │  ├─ image.js         HERO_IMAGE/IMAGE_01 등 이미지 처리 (예정)
-│  └─ validation.js   Script Label 기준 "시작 페이지" 필수 프레임 존재/타입 검사 (읽기 전용, 구현됨, 미검증). 이미지 누락/Overset 검사는 예정
+│  └─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
 │
 ├─ sample/
 │  ├─ article.json                   개발용 테스트 기사 데이터 (FEATURE 예시, 이번 작업과 무관)
@@ -57,7 +59,7 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 
 ## 기사 데이터 규격
 
-자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. 아직 이 JSON을 실제로 읽어 InDesign에 채워 넣는 코드는 구현되지 않았다.
+자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. `Load Article` 버튼으로 이 JSON을 선택/읽기/검증하는 기능은 구현됐지만, 검증을 통과한 데이터를 InDesign 프레임에 실제로 채워 넣는 코드(`contents` 변경, 이미지 배치, `Generate` 연동)는 아직 구현되지 않았다.
 
 ## UXP Developer Tool에서 실행하는 방법
 
@@ -69,6 +71,5 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 6. InDesign 메뉴 `Plugins`(또는 UDT에서 지정한 위치)에서 `Magazine Automation` 패널을 연다.
 7. 패널에서 `Generate` 버튼을 클릭하면 현재 문서 첫 페이지에 "Hello Magazine" 텍스트 프레임이 생성되는지 확인한다.
 8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보와 함께, Script Label 기준 "시작 페이지" 필수 프레임 검증 결과(`=== Script Label 기반 프레임 검증 ===`로 시작하는 부분)가 `Inspection Log` 영역과 콘솔에 이어서 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
-9. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.
-
-`Load Article` 버튼은 아직 동작하지 않으며, 다음 단계에서 `sample/article.json`을 읽어오는 기능을 `src/data.js`에 구현할 예정이다.
+9. 패널에서 `Load Article` 버튼을 클릭하면 파일 선택 대화상자가 뜨는지, `sample/opening-page-with-photo.json`이나 `sample/opening-page-without-photo.json`을 선택했을 때 `Article Log` 영역에 `=== Load Article 데이터 검증 ===`로 시작하는 결과가 출력되고 "결과: 검증 통과"로 끝나는지 확인한다. 문서 내용은 변경되지 않아야 한다.
+10. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.

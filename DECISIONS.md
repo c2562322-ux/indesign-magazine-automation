@@ -145,3 +145,20 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 자동조판 구현 시 `BODY_COLUMN_1.contents = body`가 실제로 `BODY_COLUMN_2`까지 올바르게 흐르지 않는 것으로 확인되면 재검토.
+
+---
+
+## D011 - 파일 선택/읽기는 "indesign"이 아니라 UXP 플랫폼 공통 "uxp" 모듈(storage.localFileSystem) 사용
+
+결정:
+`src/data.js`의 `Load Article` 파일 선택/읽기는 `require("indesign")`이 아니라 `require("uxp").storage.localFileSystem`(`getFileForOpening()`, `Entry.read()`)을 사용한다. 파일 형식 필터(`getFileForOpening`의 `types` 옵션)는 사용하지 않고, 사용자가 아무 파일이나 선택할 수 있게 둔 뒤 JSON이 아니면 `JSON.parse` 단계에서 오류로 처리한다.
+
+이유:
+- 파일 선택/읽기는 InDesign 문서나 InDesign 고유 기능과 무관한, UXP 플랫폼 전반에서 공통으로 제공하는 로컬 파일 시스템 접근 기능이다. Adobe UXP 공식 문서에서 이 기능은 앱별 모듈(`indesign`, `photoshop` 등)이 아니라 플랫폼 공통 `uxp` 모듈의 `storage` 네임스페이스로 제공된다.
+- `manifest.json`에 이미 `requiredPermissions.localFileSystem: "fullAccess"`가 설정되어 있어(README 작성 시점부터 이 기능을 염두에 두고 미리 추가함), 별도 매니페스트 변경 없이 사용할 수 있다.
+- `getFileForOpening()`의 파일 형식 필터 옵션(`types`)이 정확히 어떤 값 형태(단순 확장자 배열인지, `{name, extensions}` 객체인지 등)를 요구하는지는 이 프로젝트에서 실제로 확인된 적이 없다. 잘못된 형태를 넘기면 예외가 날 수 있어, 이번에는 옵션을 생략해 위험을 줄이고 파일 형식 검증은 이미 만들어둔 `JSON.parse` 오류 처리로 대신했다.
+
+`uxp` 모듈 자체를 이 프로젝트에서 처음 사용하는 것이라, `getFileForOpening()`/`Entry.read()`가 이 InDesign UXP 환경에서 문서와 동일하게 동작하는지는 아직 실기로 검증되지 않았다.
+
+변경 조건:
+실기 테스트에서 `getFileForOpening()`/`read()`가 예상과 다르게 동작하면(예: 반환값 형태가 다르거나 파일 형식 필터가 필요해지면) 재검토.

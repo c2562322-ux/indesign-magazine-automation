@@ -366,3 +366,33 @@
 
 남은 문제:
 - `body`를 실제로 `BODY_COLUMN_1.contents`에 쓰는 코드는 아직 없어, 쓴 값이 실제로 `BODY_COLUMN_2`까지 올바르게 흐르는지는 자동조판 구현 단계에서 별도로 확인해야 함
+
+---
+
+## 2026-09-23 - Load Article: JSON 파일 선택/읽기/검증 구현
+
+완료:
+- `src/data.js` 신규 구현: `loadArticleFile()`이 `require("uxp").storage.localFileSystem.getFileForOpening()`으로 파일 선택 대화상자를 띄우고, 선택된 파일을 `Entry.read()`로 읽은 뒤 `JSON.parse` 시도. 취소/파일 읽기 실패/JSON 문법 오류/정상 로드 네 가지 상태를 구분해서 반환. `indesign` 모듈이 아니라 UXP 플랫폼 공통 `uxp` 모듈을 쓴 것은 파일 선택/읽기가 InDesign 고유 기능이 아니기 때문 (DECISIONS.md D011). `getFileForOpening()`의 파일 형식 필터(`types`)는 정확한 옵션 형태가 불확실해 생략하고, 형식 검증은 JSON.parse 실패로 대신 처리
+- `src/validation.js`에 `validateArticleData(data)`/`formatArticleValidationReport(fileName, validation)` 추가: docs/ARTICLE_DATA_SPEC.md의 OPENING_PAGE 계약대로 templateType(="OPENING_PAGE" 여부)/variant(enum)/title/pointText/body 존재를 검사하고, variant가 정확히 "WITH_PHOTO"일 때만 heroImage 존재를 추가로 검사. 기존 Script Label 프레임 검증과 완전히 분리된 순수 데이터 검증(InDesign API 미사용)
+- `index.js`의 `Load Article` 버튼 핸들러 구현: 파일 선택 → 읽기 → 파싱 → 검증까지 순서대로 실행하고, 각 실패 케이스(취소/읽기 실패/파싱 실패/검증 실패)를 구분해서 Status와 새로 추가한 `Article Log` 영역(`index.html`)에 표시. 검증을 통과한 데이터만 모듈 스코프 변수 `currentArticleData`에 보관(다른 기능과는 아직 연결하지 않음). 검증 실패 시 어떤 필드가 문제인지(`[FAIL] 필드명 - 사유`) 명확히 표시
+- `index.html`에 `Article Log` `<pre>` 영역 추가, `articleFileName` 초기 텍스트를 "(선택된 파일 없음)"으로 변경
+- `DECISIONS.md`에 D011 기록 (uxp storage 모듈 선택 이유, types 옵션 생략 이유)
+- `README.md`/`HANDOFF.md` 갱신: `Load Article` 기능 설명, 폴더 구조의 `src/data.js` 상태, UDT 테스트 절차, 완료/미구현/알려진 문제/다음 추천 작업 반영
+- 요청받은 범위만 구현: `TextFrame.contents` 변경, `BODY_COLUMN_1`에 body 입력, TITLE/POINT_TEXT 입력, 이미지 배치, `Generate` 자동조판, InDesign 문서 수정은 전혀 하지 않음 — 이번 코드는 로컬 파일을 읽고 메모리에서 검증하는 것까지만 수행하며 InDesign API를 전혀 호출하지 않음(indesign 모듈 require 없음)
+
+변경 파일:
+- src/data.js
+- src/validation.js
+- index.js
+- index.html
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- 없음. `require("uxp").storage.localFileSystem`을 이 프로젝트에서 처음 호출하는 코드라 실제 InDesign UXP 환경에서 파일 선택 대화상자가 뜨는지, 읽기가 되는지 전혀 검증되지 않았다. UDT에서 Reload 후 `Load Article` 버튼을 클릭해 확인하는 것이 다음 단계.
+
+남은 문제:
+- `require("uxp").storage.localFileSystem.getFileForOpening()`/`Entry.read()`가 이 환경에서 에러 없이 동작하는지 확인 필요
+- 정상 케이스(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`)와 실패 케이스(잘못된 JSON, 필드 누락) 모두 실기로 확인 필요

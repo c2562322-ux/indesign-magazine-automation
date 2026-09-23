@@ -2,18 +2,79 @@
 
 const { addHelloText } = require("./src/indesign.js");
 const { inspectDocument, formatReport } = require("./src/inspector.js");
-const { validateFrameLabels, formatValidationReport } = require("./src/validation.js");
+const {
+    validateFrameLabels,
+    formatValidationReport,
+    validateArticleData,
+    formatArticleValidationReport,
+} = require("./src/validation.js");
+const { loadArticleFile } = require("./src/data.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
+const articleFileName = document.getElementById("articleFileName");
+const articleLog = document.getElementById("articleLog");
+
+// 검증을 통과한 기사 데이터만 메모리에 보관한다. 아직 Generate 등 다른 기능과 연결하지 않는다.
+let currentArticleData = null;
 
 function setStatus(message) {
     statusText.textContent = message;
 }
 
-document.getElementById("btnLoadArticle").addEventListener("click", () => {
-    // TODO: sample/article.json 로드 기능은 다음 단계에서 구현 (src/data.js)
-    setStatus("Load Article: 아직 구현되지 않음");
+document.getElementById("btnLoadArticle").addEventListener("click", async () => {
+    try {
+        setStatus("Load Article: 파일 선택 중...");
+        const loadResult = await loadArticleFile();
+
+        if (loadResult.status === "cancelled") {
+            setStatus("Load Article: 파일 선택이 취소되었습니다.");
+            return;
+        }
+
+        if (loadResult.status === "read-error") {
+            currentArticleData = null;
+            articleFileName.textContent = loadResult.fileName ? `${loadResult.fileName} (읽기 실패)` : "(읽기 실패)";
+            articleLog.textContent = `파일 읽기 실패: ${loadResult.message}`;
+            setStatus(`Load Article 오류 (파일 읽기 실패): ${loadResult.message}`);
+            return;
+        }
+
+        if (loadResult.status === "parse-error") {
+            currentArticleData = null;
+            articleFileName.textContent = `${loadResult.fileName} (JSON 문법 오류)`;
+            articleLog.textContent = `JSON 문법 오류: ${loadResult.message}`;
+            setStatus(`Load Article 오류 (JSON 문법 오류): ${loadResult.fileName}`);
+            return;
+        }
+
+        // loadResult.status === "loaded"
+        const validation = validateArticleData(loadResult.data);
+        const reportText = formatArticleValidationReport(loadResult.fileName, validation);
+        articleLog.textContent = reportText;
+        console.log("[Load Article]\n" + reportText);
+
+        if (validation.ok) {
+            currentArticleData = loadResult.data;
+            articleFileName.textContent = `${loadResult.fileName} (검증 통과)`;
+            setStatus(
+                `Load Article 완료: ${loadResult.fileName} — templateType=${validation.templateType}, ` +
+                    `variant=${validation.variant}, 검증 통과`
+            );
+        } else {
+            currentArticleData = null;
+            const failedFields = validation.checks
+                .filter((c) => c.status !== "정상")
+                .map((c) => c.field)
+                .join(", ");
+            articleFileName.textContent = `${loadResult.fileName} (검증 실패)`;
+            setStatus(`Load Article 오류: 검증 실패 — 문제 필드: ${failedFields}`);
+        }
+    } catch (err) {
+        console.error(err);
+        currentArticleData = null;
+        setStatus(`Load Article 오류: ${err.message}`);
+    }
 });
 
 document.getElementById("btnGenerate").addEventListener("click", async () => {

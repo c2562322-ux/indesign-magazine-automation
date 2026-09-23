@@ -1,10 +1,13 @@
-// Script Label(item.label) 기준으로 "시작 페이지" 템플릿에 필요한 프레임이 정확히
-// 존재하는지 읽기 전용으로 검사한다. InDesign API를 직접 호출하지 않고,
-// src/inspector.js의 inspectDocument()가 만든 report(문서 구조 스냅샷)만 입력으로 받는다.
-// 문서를 수정하는 코드는 없다.
+// 두 가지 읽기 전용 검증을 담당한다. 문서를 수정하는 코드는 없다.
 //
-// "시작 페이지"의 실제 Script Label은 working .indd에 사용자가 InDesign에서 직접
-// 부여했다(2026-09-23). 아래 규칙은 그 결과를 기준으로 작성했다.
+// 1) Script Label(item.label) 기준으로 "시작 페이지" 템플릿에 필요한 프레임이 정확히
+//    존재하는지 검사한다. InDesign API를 직접 호출하지 않고, src/inspector.js의
+//    inspectDocument()가 만든 report(문서 구조 스냅샷)만 입력으로 받는다.
+//    "시작 페이지"의 실제 Script Label은 working .indd에 사용자가 InDesign에서 직접
+//    부여했다(2026-09-23). 아래 규칙은 그 결과를 기준으로 작성했다.
+//
+// 2) 기사 JSON 데이터(OPENING_PAGE)가 docs/ARTICLE_DATA_SPEC.md 계약을 만족하는지 검사한다
+//    (파일 아래쪽 validateArticleData). InDesign API와 무관한 순수 데이터 검증이다.
 
 const OPENING_WITH_PHOTO = {
     key: "OPENING_WITH_PHOTO",
@@ -240,7 +243,105 @@ function formatValidationReport(results) {
     return lines.join("\n");
 }
 
+// ---------------------------------------------------------------------------
+// 기사 JSON 데이터(OPENING_PAGE) 검증. docs/ARTICLE_DATA_SPEC.md 계약을 기준으로 한다.
+// InDesign API를 전혀 사용하지 않는 순수 데이터 검증이며, 이미 파싱된 JS 객체만 받는다.
+// JSON 문법 오류 자체는 이 함수의 대상이 아니다 — src/data.js의 loadArticleFile()이
+// JSON.parse 단계에서 별도로 처리한다.
+// ---------------------------------------------------------------------------
+
+function hasNonEmptyString(value) {
+    return typeof value === "string" && value.length > 0;
+}
+
+// data: JSON.parse로 이미 파싱된 객체. { ok, templateType, variant, checks } 를 반환한다.
+function validateArticleData(data) {
+    const checks = [];
+    const addCheck = (field, status, message) => {
+        checks.push({ field, status, message: message || null });
+    };
+
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+        addCheck("(전체)", "값 오류", "최상위 데이터가 JSON 객체가 아닙니다.");
+        return { ok: false, templateType: undefined, variant: undefined, checks };
+    }
+
+    if (!("templateType" in data)) {
+        addCheck("templateType", "누락", "templateType 필드가 없습니다.");
+    } else if (data.templateType !== "OPENING_PAGE") {
+        addCheck("templateType", "값 오류", `templateType은 "OPENING_PAGE"여야 하는데 "${data.templateType}"입니다.`);
+    } else {
+        addCheck("templateType", "정상");
+    }
+
+    const VALID_VARIANTS = ["WITH_PHOTO", "WITHOUT_PHOTO"];
+    let variantValid = false;
+    if (!("variant" in data)) {
+        addCheck("variant", "누락", "variant 필드가 없습니다.");
+    } else if (!VALID_VARIANTS.includes(data.variant)) {
+        addCheck(
+            "variant",
+            "값 오류",
+            `variant는 "WITH_PHOTO" 또는 "WITHOUT_PHOTO"여야 하는데 "${data.variant}"입니다.`
+        );
+    } else {
+        addCheck("variant", "정상");
+        variantValid = true;
+    }
+
+    ["title", "pointText", "body"].forEach((field) => {
+        if (!(field in data)) {
+            addCheck(field, "누락", `${field} 필드가 없습니다.`);
+        } else if (!hasNonEmptyString(data[field])) {
+            addCheck(field, "값 오류", `${field}는 비어 있지 않은 문자열이어야 합니다.`);
+        } else {
+            addCheck(field, "정상");
+        }
+    });
+
+    // heroImage는 variant가 확실히 WITH_PHOTO일 때만 필수로 검사한다.
+    // variant 자체가 잘못됐으면(variantValid === false) heroImage 필요 여부를 판단할 수 없으므로 건너뛴다.
+    if (variantValid && data.variant === "WITH_PHOTO") {
+        if (!("heroImage" in data)) {
+            addCheck("heroImage", "누락", "variant가 WITH_PHOTO일 때 heroImage 필드가 필요합니다.");
+        } else if (!hasNonEmptyString(data.heroImage)) {
+            addCheck("heroImage", "값 오류", "heroImage는 비어 있지 않은 문자열이어야 합니다.");
+        } else {
+            addCheck("heroImage", "정상");
+        }
+    }
+
+    return {
+        ok: checks.every((c) => c.status === "정상"),
+        templateType: data.templateType,
+        variant: data.variant,
+        checks,
+    };
+}
+
+function formatArticleValidationReport(fileName, validation) {
+    const lines = [];
+    lines.push("=== Load Article 데이터 검증 (읽기 전용, 문서 변경 없음) ===");
+    lines.push(`파일: ${fileName}`);
+    lines.push(`templateType: ${validation.templateType}`);
+    lines.push(`variant: ${validation.variant}`);
+    lines.push("");
+
+    validation.checks.forEach((check) => {
+        const mark = check.status === "정상" ? "OK" : "FAIL";
+        const detail = check.message ? ` - ${check.message}` : "";
+        lines.push(`  [${mark}] ${check.field}${detail}`);
+    });
+
+    lines.push("");
+    lines.push(validation.ok ? "결과: 검증 통과" : "결과: 검증 실패");
+
+    return lines.join("\n");
+}
+
 module.exports = {
     validateFrameLabels,
     formatValidationReport,
+    validateArticleData,
+    formatArticleValidationReport,
 };
