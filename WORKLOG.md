@@ -313,3 +313,28 @@
 
 남은 문제:
 - 없음. 다음 단계(`src/data.js` JSON 로드 구현)는 이번 작업 범위 밖으로 HANDOFF.md "다음 추천 작업"에 남겨둠.
+
+---
+
+## 2026-09-23 - BODY_COLUMN_1/BODY_COLUMN_2 텍스트 스레드 연결 여부 읽기 전용 진단 추가
+
+완료:
+- 사용자가 InDesign UI에서 "텍스트 스레드 표시"를 켠 상태로도 BODY_COLUMN_1/BODY_COLUMN_2 사이에 연결선이 보이지 않는다고 보고 — 실제로 연결돼 있는지 코드로 읽기 전용 확인하는 기능 요청받음
+- `src/inspector.js` 개선 (읽기 전용 그대로): `TextFrame.previousTextFrame`/`nextTextFrame`을 읽는 `getLinkedFrameInfo()` 추가. 연결 없음(null 또는 `isValid===false`)/읽기 에러/연결됨(연결된 프레임의 label·name) 세 가지 경우를 모두 방어적으로 처리. 모든 Text Frame의 리포트에 `previousFrame`/`nextFrame` 필드 추가, `formatReport()`에 "이전/다음 연결 프레임" 줄 출력 추가
+- `src/validation.js` 개선: `collectLabeledFrames()`가 Text Frame의 `previousFrame`/`nextFrame`도 함께 옮기도록 확장, `checkFrameLink()` 신규 추가(두 label이 서로의 previous/next로 실제 연결돼 있는지 label 문자열 비교로 판정: 연결됨/연결 안 됨/일부만 연결됨/확인 불가), `OPENING_WITHOUT_PHOTO` 프로필에 `linkChecks: [{ fromLabel: "BODY_COLUMN_1", toLabel: "BODY_COLUMN_2", ... }]` 추가(`OPENING_WITH_PHOTO`는 해당 없어 빈 배열). `formatValidationReport()`가 link 검사 결과도 `[OK]`/`[FAIL]`로 출력하고, 페이지별 "결과: N건 문제 발견" 집계에도 포함
+- `index.js`는 변경 없음 — 기존 `Inspect Template` 버튼 흐름에서 자동으로 새 검사가 함께 출력됨
+- InDesign API를 새로 추가했지만 전부 읽기 전용(`previousTextFrame`/`nextTextFrame`은 속성 읽기만). 프레임을 실제로 연결하거나 수정하는 코드는 작성하지 않음. `docs/ARTICLE_DATA_SPEC.md`의 `bodyColumn1`/`bodyColumn2` 구조도 변경하지 않음
+- `HANDOFF.md` 갱신: 현재 단계/완료된 기능/아직 테스트하지 못한 기능/알려진 문제/진행 중인 작업/다음 추천 작업에 이번 진단 기능과 실기 테스트 필요성 반영
+
+변경 파일:
+- src/inspector.js
+- src/validation.js
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 없음. `TextFrame.previousTextFrame`/`nextTextFrame`이 이 InDesign UXP 환경에서 실제로 노출되는지, BODY_COLUMN_1/BODY_COLUMN_2가 실제로 연결돼 있는지는 아직 실기로 확인되지 않았다. 사용자가 "사진 없는 시작 페이지"에서 `Inspect Template`을 다시 실행해 로그를 전달하면 확인 가능.
+
+남은 문제:
+- `previousTextFrame`/`nextTextFrame` 읽기 자체가 이 환경에서 에러 없이 되는지 확인 필요
+- BODY_COLUMN_1 → BODY_COLUMN_2 연결 여부(사용자가 InDesign UI에서 연결선을 못 봤다고 보고한 것과 일치하는 결과가 나올지) 확인 필요

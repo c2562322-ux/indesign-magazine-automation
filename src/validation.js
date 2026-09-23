@@ -15,6 +15,7 @@ const OPENING_WITH_PHOTO = {
         { label: "BODY", expectedType: "TextFrame" },
         { label: "HERO_IMAGE", expectedType: "Rectangle" },
     ],
+    linkChecks: [],
 };
 
 const OPENING_WITHOUT_PHOTO = {
@@ -26,30 +27,105 @@ const OPENING_WITHOUT_PHOTO = {
         { label: "BODY_COLUMN_1", expectedType: "TextFrame" },
         { label: "BODY_COLUMN_2", expectedType: "TextFrame" },
     ],
+    // BODY_COLUMN_1 → BODY_COLUMN_2가 텍스트 스레드로 실제 연결돼 있는지 확인한다.
+    // (InDesign UI에서 연결선이 안 보인다는 보고가 있어 읽기 전용으로 직접 확인하기 위해 추가)
+    linkChecks: [
+        { fromLabel: "BODY_COLUMN_1", toLabel: "BODY_COLUMN_2", description: "본문 왼쪽 단 → 오른쪽 단 텍스트 스레드 연결" },
+    ],
 };
 
 function isRealLabel(label) {
     return Boolean(label) && label !== "(label 없음)" && !label.startsWith("(label 읽기 실패");
 }
 
-// 페이지 안의 Text Frame/Rectangle을 label별로 묶는다. { [label]: [{ type, name }] }
+// 페이지 안의 Text Frame/Rectangle을 label별로 묶는다.
+// { [label]: [{ type, name, previousFrame?, nextFrame? }] }
+// previousFrame/nextFrame은 Text Frame에만 있으며 src/inspector.js의 getLinkedFrameInfo() 결과를 그대로 옮긴 것이다.
 function collectLabeledFrames(page) {
     const byLabel = {};
 
-    const add = (label, type, name) => {
+    const add = (label, type, name, extra) => {
         if (!isRealLabel(label)) {
             return;
         }
         if (!byLabel[label]) {
             byLabel[label] = [];
         }
-        byLabel[label].push({ type, name: name || "(이름 없음)" });
+        byLabel[label].push({ type, name: name || "(이름 없음)", ...extra });
     };
 
-    page.textFrames.forEach((f) => add(f.label, "TextFrame", f.name));
-    page.rectangles.forEach((r) => add(r.label, "Rectangle", r.name));
+    page.textFrames.forEach((f) =>
+        add(f.label, "TextFrame", f.name, { previousFrame: f.previousFrame, nextFrame: f.nextFrame })
+    );
+    page.rectangles.forEach((r) => add(r.label, "Rectangle", r.name, {}));
 
     return byLabel;
+}
+
+function describeLinkInfo(info) {
+    if (!info) {
+        return "(정보 없음)";
+    }
+    if (info.status === "none") {
+        return "연결 없음";
+    }
+    if (info.status === "error") {
+        return `읽기 실패: ${info.message}`;
+    }
+    return info.name ? `label=${info.label}, name=${info.name}` : `label=${info.label}`;
+}
+
+// fromLabel 프레임의 nextTextFrame이 toLabel 프레임을 가리키는지, toLabel 프레임의
+// previousTextFrame이 fromLabel 프레임을 가리키는지 label 기준으로 확인한다(읽기 전용).
+function checkFrameLink(byLabel, linkCheck) {
+    const fromItems = byLabel[linkCheck.fromLabel] || [];
+    const toItems = byLabel[linkCheck.toLabel] || [];
+
+    if (fromItems.length !== 1 || toItems.length !== 1) {
+        return {
+            description: linkCheck.description,
+            fromLabel: linkCheck.fromLabel,
+            toLabel: linkCheck.toLabel,
+            status: "확인 불가 (두 프레임이 각각 정확히 1개씩 있어야 확인 가능)",
+            forwardInfo: null,
+            backwardInfo: null,
+        };
+    }
+
+    const from = fromItems[0];
+    const to = toItems[0];
+    const forwardInfo = from.nextFrame || null;
+    const backwardInfo = to.previousFrame || null;
+
+    const forwardError = forwardInfo && forwardInfo.status === "error" ? forwardInfo.message : null;
+    const backwardError = backwardInfo && backwardInfo.status === "error" ? backwardInfo.message : null;
+
+    const forwardLinked = Boolean(
+        forwardInfo && forwardInfo.status === "linked" && forwardInfo.label === linkCheck.toLabel
+    );
+    const backwardLinked = Boolean(
+        backwardInfo && backwardInfo.status === "linked" && backwardInfo.label === linkCheck.fromLabel
+    );
+
+    let status;
+    if (forwardError || backwardError) {
+        status = `확인 불가 (API 읽기 실패: ${forwardError || backwardError})`;
+    } else if (forwardLinked && backwardLinked) {
+        status = "연결됨";
+    } else if (!forwardLinked && !backwardLinked) {
+        status = "연결 안 됨";
+    } else {
+        status = "일부만 연결됨 (확인 필요)";
+    }
+
+    return {
+        description: linkCheck.description,
+        fromLabel: linkCheck.fromLabel,
+        toLabel: linkCheck.toLabel,
+        status,
+        forwardInfo,
+        backwardInfo,
+    };
 }
 
 // BODY_COLUMN_1/2는 "사진 없음" 변형에만 존재하는 것으로 확인되어 우선 판별 기준으로 쓴다.
@@ -96,6 +172,7 @@ function validatePage(page) {
             pageName: page.pageName,
             profile: null,
             checks: [],
+            linkChecks: [],
         };
     }
 
@@ -104,6 +181,7 @@ function validatePage(page) {
         pageName: page.pageName,
         profile,
         checks: profile.requiredFrames.map((req) => checkRequiredFrame(byLabel, req)),
+        linkChecks: (profile.linkChecks || []).map((lc) => checkFrameLink(byLabel, lc)),
     };
 }
 
@@ -145,7 +223,16 @@ function formatValidationReport(results) {
             }
         });
 
-        const failCount = result.checks.filter((c) => c.status !== "정상").length;
+        (result.linkChecks || []).forEach((lc) => {
+            const mark = lc.status === "연결됨" ? "OK" : "FAIL";
+            lines.push(`  [${mark}] ${lc.description} (${lc.fromLabel} → ${lc.toLabel}) - ${lc.status}`);
+            lines.push(`      - ${lc.fromLabel}.nextTextFrame: ${describeLinkInfo(lc.forwardInfo)}`);
+            lines.push(`      - ${lc.toLabel}.previousTextFrame: ${describeLinkInfo(lc.backwardInfo)}`);
+        });
+
+        const checkFailCount = result.checks.filter((c) => c.status !== "정상").length;
+        const linkFailCount = (result.linkChecks || []).filter((lc) => lc.status !== "연결됨").length;
+        const failCount = checkFailCount + linkFailCount;
         lines.push(failCount === 0 ? "  결과: 모두 정상" : `  결과: ${failCount}건 문제 발견`);
         lines.push("");
     });

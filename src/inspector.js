@@ -13,6 +13,11 @@
 // item.label(Script Label)은 이번에 새로 추가한 읽기 전용 출력이다. 목적은 자동화 식별자로
 // name 대신 label을 쓸 수 있는지 판단하기 위해, 현재 InDesign UXP 환경에서 label 속성에
 // 에러 없이 접근 가능한지 확인하는 것이다. label에 값을 쓰는 코드는 아직 없다.
+//
+// TextFrame.previousTextFrame / nextTextFrame은 classic InDesign DOM에서 텍스트 스레드(이어진
+// 프레임) 연결을 나타내는 속성으로 알려져 있다(연결이 없으면 null 또는 isValid가 false인 참조를
+// 반환하는 것으로 알려짐). 이 UXP 환경에서 실제로 동일하게 노출되는지는 이번에 처음 읽어보는
+// 것이라 미검증이며, 프레임을 연결하거나 수정하는 코드는 없다(읽기 전용).
 
 const indesign = require("indesign");
 const app = indesign.app;
@@ -66,12 +71,49 @@ function getLabelText(item) {
     return typeof label === "string" && label.length > 0 ? label : "(label 없음)";
 }
 
+// TextFrame의 previousTextFrame/nextTextFrame을 읽기 전용으로 확인한다. 연결된 프레임이
+// 없으면 { status: "none" }, 읽는 도중 에러가 나면 { status: "error", message }, 연결된
+// 프레임이 있으면 그 프레임의 label/name을 { status: "linked", label, name }으로 반환한다.
+function getLinkedFrameInfo(frame, propertyName) {
+    let linked;
+    try {
+        linked = frame[propertyName];
+    } catch (err) {
+        return { status: "error", message: err.message };
+    }
+
+    if (!linked || (typeof linked.isValid === "boolean" && linked.isValid === false)) {
+        return { status: "none" };
+    }
+
+    return {
+        status: "linked",
+        label: getLabelText(linked),
+        name: linked.name && linked.name.length > 0 ? linked.name : null,
+    };
+}
+
+function formatLinkedFrameInfo(info) {
+    if (!info) {
+        return "(정보 없음)";
+    }
+    if (info.status === "none") {
+        return "(연결 없음)";
+    }
+    if (info.status === "error") {
+        return `(읽기 실패: ${info.message})`;
+    }
+    return info.name ? `label=${info.label}, name=${info.name}` : `label=${info.label}`;
+}
+
 function inspectTextFrame(frame) {
     return {
         name: frame.name && frame.name.length > 0 ? frame.name : null,
         label: getLabelText(frame),
         preview: getTextPreview(frame),
         bounds: getBoundsText(frame),
+        previousFrame: getLinkedFrameInfo(frame, "previousTextFrame"),
+        nextFrame: getLinkedFrameInfo(frame, "nextTextFrame"),
     };
 }
 
@@ -159,6 +201,8 @@ function formatReport(report) {
                 lines.push(`    label: ${t.label}`);
                 lines.push(`    text: "${t.preview}"`);
                 lines.push(`    bounds: ${t.bounds}`);
+                lines.push(`    이전 연결 프레임(previousTextFrame): ${formatLinkedFrameInfo(t.previousFrame)}`);
+                lines.push(`    다음 연결 프레임(nextTextFrame): ${formatLinkedFrameInfo(t.nextFrame)}`);
             });
         }
 
