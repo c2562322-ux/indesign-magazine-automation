@@ -218,3 +218,31 @@
 남은 문제:
 - `item.label` 접근이 이 InDesign UXP 환경에서 에러 없이 되는지 미확인 (다음 실기 테스트로 확인 필요)
 - label 접근이 확인되면, 자동화 식별자를 `name`/`label` 중 무엇으로 할지(또는 병행할지)를 DECISIONS.md에 아직 기록하지 않음 — 실기 확인 후 결정할 사항
+
+---
+
+## 2026-09-23 - 자동화 식별자 방식을 Script Label(label)로 결정
+
+완료:
+- 사용자가 실제 InDesign에서 "시작 페이지"의 Text Frame과 Rectangle 모두에 대해 `item.label`이 에러 없이 읽힘을 확인해 전달함
+- `DECISIONS.md`에 D008 기록: 자동화 대상 프레임 식별은 `name` 대신 Script Label(`label`)을 1차 기준으로 사용한다. 근거로 (1) 실제 템플릿에서 `name`이 대부분 비어 있음을 실기로 확인한 사실, (2) `label`이 InDesign DOM에서 애초에 스크립트 전용으로 제공되는 메커니즘이라는 점, (3) 이번에 `label` 읽기가 실제 환경에서 에러 없이 동작함을 확인한 사실을 명시. 아직 결정되지 않은 것(Script Label 실제 부여 여부/방법, `insertLabel`/`extractLabel` 구조화 사용 여부, `name` 병행 여부)도 명확히 구분해 기록
+- `HANDOFF.md` 갱신: 현재 단계에 "자동화 식별자 방식 결정 완료" 반영, `item.label` 읽기를 "실제 테스트 완료된 기능"으로 이동, "알려진 문제"를 "읽기는 확인됨, 쓰기는 미검증"으로 갱신
+- `HANDOFF.md`에 "Script Label 부여 제안" 섹션 신규 추가: "시작 페이지" 두 변형의 프레임별 제안 Script Label 표(TITLE/POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE, 안내 문구 프레임은 부여 안 함)와 실행 방법 두 가지 후보((A) 사용자가 InDesign에서 직접 입력, (B) Claude Code가 1회성 스크립트로 부여) 제시. 어느 쪽으로 할지는 아직 결정되지 않았고, InDesign 파일을 수정하는 작업이므로 실행 전 사용자 승인이 필요함을 명시
+- `WORKLOG.md`에 이번 작업 기록
+
+이번 작업에서 하지 않은 것 (요청받은 범위 밖):
+- working .indd에 실제로 Script Label 값을 쓰는 작업 (제안만 하고 실행하지 않음)
+- Frame Name 실제 변경
+- 자동조판 코드 구현
+
+변경 파일:
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 해당 없음 (문서화 작업만 진행, 코드/InDesign 파일은 수정하지 않음). 이번에 반영한 "label 읽기 확인" 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- Script Label 부여 실행 방식(A/B) 미결정 — 사용자 결정 대기
+- 실제로 Script Label을 부여한 뒤 파일 저장/재오픈 후에도 값이 유지되는지는 아직 확인되지 않음

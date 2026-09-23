@@ -92,3 +92,23 @@ UDT/InDesign 실기 테스트에서 `doScript` 없이 읽기 동작이 실패하
 
 변경 조건:
 없음.
+
+---
+
+## D008 - 자동화 대상 프레임 식별은 name이 아니라 Script Label(label)을 1차 기준으로 사용
+
+결정:
+InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 Script Label(`PageItem.label`)을 1차 식별자로 사용한다.
+
+이유:
+- 실제 디자이너 템플릿("시작 페이지")을 `Inspect Template`으로 확인한 결과, 대부분의 Text Frame/Rectangle에서 `name`이 비어 있음을 실기로 확인했다 (2026-09-23, [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) Frame 분석 워크시트 참고). `name`은 Layers 패널에 노출되는 범용 표시 속성이라 디자인 작업 중 관리되지 않는 경우가 많아, 자동화가 의존할 안정적인 값으로 보기 어렵다.
+- `label`(Script Label)은 InDesign 스크립팅 DOM에서 애초에 스크립트/자동화 전용 식별자로 제공되는 메커니즘이며, Layers 패널 이름과 분리되어 있어 디자이너의 일반 작업 중 실수로 바뀔 가능성이 낮다.
+- `src/inspector.js`에 `label`을 읽기 전용으로 출력하도록 추가한 뒤 실제 InDesign UXP 환경에서 테스트한 결과, Text Frame과 Rectangle 모두에서 `item.label`에 에러 없이 접근 가능함을 사용자가 실기로 확인했다 (2026-09-23). 즉 이 프로젝트의 InDesign/UXP 버전에서 `label` 속성이 정상적으로 노출된다는 점이 검증되었다.
+
+이번 결정은 "어떤 속성을 읽어 식별자로 쓸 것인가"까지만 확정한 것이며, 아래는 아직 결정되지 않았다:
+- working .indd의 실제 프레임에 TITLE/POINT_TEXT/BODY/HERO_IMAGE 등 Script Label 값을 실제로 부여하는 작업 (다음 작업으로 HANDOFF.md에 제안됨, 아직 미실행)
+- `insertLabel`/`extractLabel`(구조화된 key-value 라벨)을 쓸지, 단순 문자열 `label` 하나만 쓸지 여부 — 지금은 단순 문자열 `label`만 검증했다
+- `name`을 완전히 버릴지, 사람이 InDesign에서 눈으로 확인할 수 있도록 보조적으로 함께 채울지 여부
+
+변경 조건:
+실제로 Script Label을 부여하고 읽어보는 다음 단계에서 문제가 발견되면(예: 특정 개체 타입에서 label 저장이 유지되지 않는 등) 재검토.

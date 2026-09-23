@@ -6,11 +6,11 @@
 
 ## 현재 프로젝트 단계
 
-**"시작 페이지" 템플릿 1차 프레임 매핑 초안 작성 완료. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.**
+**자동화 식별자 방식 결정 완료(Script Label 사용). "시작 페이지" 템플릿 1차 프레임 매핑 초안 작성 완료. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.**
 
 개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
-`name`이 대부분 비어 있다는 문제 때문에, 자동화 식별자로 `name` 대신 InDesign의 Script Label(`label`)을 쓸 수 있는지 검토 중이다(분석 결과는 대화 로그 참고, 아직 이 문서에 별도 요약 문서는 없음). 이번 단계로 `Inspect Template`이 `label`도 읽기 전용으로 함께 출력하도록 개선했다(2026-09-23, 코드만 수정, 아직 재테스트 전). Script Label에 실제로 값을 쓰거나 `name`을 바꾸는 작업은 아직 하지 않았고, `label` 접근 자체가 이 UXP 환경에서 에러 없이 되는지부터 확인하는 단계다.
+`name`이 대부분 비어 있다는 문제 때문에 자동화 식별자로 `name` 대신 Script Label(`label`)을 검토했고, `Inspect Template`에 `label`을 읽기 전용으로 출력하도록 추가한 뒤 사용자가 실제 InDesign에서 실행해 Text Frame과 Rectangle 모두 `label`에 에러 없이 접근됨을 확인했다(2026-09-23). 이를 근거로 **자동화 대상 프레임 식별은 Script Label(`label`)을 1차 기준으로 사용하기로 결정**했다([DECISIONS.md](DECISIONS.md) D008). 단, 이 결정은 "어떤 속성을 읽을지"만 정한 것이고, working .indd의 실제 프레임에 TITLE/POINT_TEXT/BODY/HERO_IMAGE 같은 Script Label 값을 실제로 써넣는 작업은 아직 하지 않았다(아래 "다음 추천 작업" 참고, 실행에는 사용자 승인 필요).
 
 ## 완료된 기능
 
@@ -29,6 +29,7 @@
 - UXP Developer Tool에서 [manifest.json](manifest.json) 로드 및 `Magazine Automation` 패널 표시 (2026-09-22)
 - `Inspect Template` 버튼 클릭 시 에러 없이 실행됨 (2026-09-22, 2026-09-23 두 차례)
 - `assets/templates/working/`의 실제 디자이너 템플릿 사본에서, "시작 페이지" 템플릿의 두 페이지 변형(page.name=2/index=3, page.name=3/index=4)에 대해 `Inspect Template`의 개선된 출력(Text Frame의 name/텍스트 미리보기/geometricBounds, Rectangle의 name/geometricBounds/이미지 배치 여부, 페이지 index와 page.name)이 실제로 정상 표시됨을 확인 (2026-09-23) — `src/inspector.js`에서 추가한 `textFrame.contents`, `item.geometricBounds`, `rectangle.images` 기반 출력이 실사용에서 동작한 것으로 확인됨
+- `item.label`(Script Label) 읽기: Text Frame과 Rectangle 모두에서 에러 없이 값을 읽을 수 있음을 확인 (2026-09-23). 이 결과를 근거로 D008(자동화 식별자로 `label` 사용) 결정
 
 **아직 확인되지 않은 부분**: `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록) 출력이 올바른지, "시작 페이지" 외 나머지 페이지(목차/본문 페이지/인터뷰 레이아웃)에서도 동일하게 동작하는지는 아직 보고되지 않았다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
@@ -37,15 +38,37 @@
 - `Generate` 버튼 클릭 시 `src/indesign.js`의 `app.doScript(...)` 호출이 실제 InDesign UXP API와 시그니처가 맞는지, 에러 없이 텍스트 프레임이 생성되는지 (이번 테스트에서 별도로 재확인되지 않음)
 - `Load Article` 버튼 (현재 클릭해도 "아직 구현되지 않음" 상태 메시지만 표시, 실제 동작 없음)
 - `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록)가 실제로 올바른 값을 보여주는지는 아직 구체적으로 보고되지 않았다
-- `item.label`(Script Label) 읽기: `Inspect Template`에 방금 추가한 출력이며, 이 UXP 환경에서 `label` 속성에 에러 없이 접근 가능한지 아직 실제로 확인되지 않았다. 자동화 식별자로 `name` 대신 `label`을 쓸 수 있을지 판단하기 위한 테스트다.
+- Script Label에 실제로 값을 쓰는 동작(`label = "TITLE"` 등)은 아직 코드로 작성한 적도, 테스트한 적도 없다. 지금까지 확인된 것은 "읽기"만이다.
 - `Inspect Template`을 "시작 페이지" 외 나머지 Template Type(목차, 본문 페이지, 인터뷰 레이아웃)에서 실행했을 때도 동일하게 정상 동작하는지
 - Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제 템플릿에 얼마나 있는지, 그로 인해 워크시트 작성 시 어떤 항목이 누락되는지 (현재 버전은 이런 항목을 집계하지 않음 — 알려진 문제 참고)
 
 ## 진행 중인 작업
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(POINT_TEXT가 `subtitle`과 같은 필드인지, 2단 본문을 하나의 `body` 필드로 자동 분배할지 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다.
-- 자동화 식별자로 `name` 대신 Script Label(`label`)을 쓸 수 있는지 검증하는 중. `Inspect Template`이 `label`을 읽기 전용으로 출력하도록 방금 수정했고, "시작 페이지"에서 재실행해 에러 없이 값이 나오는지 확인하는 게 다음 순서다. `label`에 실제 값을 쓰는 작업, `name` 변경, 자동 조판 구현은 이 결정이 나기 전까지 하지 않는다.
-- 위 확인이 끝나면 "목차" 템플릿부터 같은 방식(Inspect Template 실행 → 로그 전달 → 워크시트 기록)으로 분석을 이어간다.
+- 자동화 식별자 방식은 Script Label(`label`)로 결정됐다(D008). 다음 단계로 working .indd의 "시작 페이지" 프레임에 실제 Script Label 값을 부여하는 작업을 제안한다(아래 "다음 추천 작업" 1번). 아직 실행하지 않았고, InDesign 파일을 수정하는 작업이므로 실행 전 사용자 승인이 필요하다.
+
+## Script Label 부여 제안 (실행 전 승인 필요)
+
+"시작 페이지" [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 워크시트의 Proposed Automation Name(후보) 값을 그대로 Script Label로 부여하는 안을 제안한다.
+
+| 페이지 | 프레임(텍스트 미리보기/bounds로 식별) | 제안하는 Script Label |
+|---|---|---|
+| page.name=2 (사진 있음) | "매거진 시작 메인 페이지" Text Frame | `TITLE` |
+| page.name=2 (사진 있음) | "캡션 혹은 부제나…" Text Frame | `POINT_TEXT` |
+| page.name=2 (사진 있음) | Lorem ipsum 본문 Text Frame | `BODY` |
+| page.name=2 (사진 있음) | bounds `[22.07, 116, 287, 201]` Rectangle | `HERO_IMAGE` |
+| page.name=2 (사진 있음) | "대표이미지" 안내 문구 Text Frame | 부여하지 않음 (데이터 필드 아님) |
+| page.name=3 (사진 없음) | "매거진 시작 메인 페이지 (사진X)" Text Frame | `TITLE` |
+| page.name=3 (사진 없음) | "캡션 혹은 부제나…" Text Frame | `POINT_TEXT` |
+| page.name=3 (사진 없음) | 왼쪽 본문 Text Frame | `BODY_COLUMN_1` |
+| page.name=3 (사진 없음) | 오른쪽 본문 Text Frame | `BODY_COLUMN_2` |
+
+실행 방법 후보 (아직 결정 안 됨, 사용자 선택 필요):
+
+- **(A) 사용자가 InDesign에서 직접**: `Window > Utilities > Script Label` 패널로 각 프레임을 선택해 수동으로 값을 입력. 가장 안전하지만 프레임 수가 늘어나면 반복 작업이 늘어난다.
+- **(B) Claude Code가 1회성 스크립트로 자동 부여**: `src/`에 임시 스크립트(또는 UXP 패널의 임시 버튼)를 만들어 위 표의 값을 한 번에 써넣는다. 빠르지만 InDesign 파일을 코드가 직접 수정하는 첫 사례이므로, 실행 전 반드시 working 사본에서만 시도하고 결과를 InDesign에서 직접 확인해야 한다.
+
+어느 방식으로 진행할지 결정되면 그에 맞춰 코드(옵션 B의 경우) 또는 안내(옵션 A의 경우)를 준비하겠다. **이 표는 제안일 뿐이며, 이번 작업에서는 실행하지 않았다.**
 
 ## 미구현 기능
 
@@ -65,7 +88,7 @@
 - `src/inspector.js`가 사용하는 `page.textFrames`, `page.rectangles`, `rectangle.images`, `item.geometricBounds`, `textFrame.contents`, `doc.paragraphStyles`, `doc.objectStyles`는 classic InDesign Scripting DOM 기준으로 작성했으며 InDesign UXP에서 실제 검증되지 않았다.
 - `src/inspector.js`는 Group으로 묶인 pageItem(중첩 개체)과 Paragraph/Object Style Group 내부의 스타일을 집계하지 않는다. `page.pageItems`/`doc.paragraphStyles`/`doc.objectStyles`가 최상위 항목만 반환하기 때문이며, 디자이너 템플릿이 그룹을 많이 쓴다면 "Page Item 수"와 실제 나열된 Text Frame/Rectangle 개수 사이에 차이가 날 수 있다.
 - `textFrame.contents`는 classic InDesign DOM 기준으로 그 프레임이 속한 스토리 전체 텍스트를 반환하는 것으로 알려져 있다. Linked Text Frame으로 여러 프레임이 이어져 있다면, 텍스트 미리보기가 "그 프레임에 보이는 내용"이 아니라 "연결된 스토리 전체의 앞부분"일 수 있다 (미검증, 실기 테스트로 확인 필요).
-- `item.label`(Script Label)은 classic InDesign DOM에 오래 문서화된 속성이지만, 이 프로젝트의 InDesign UXP 환경에서 실제로 동일하게 노출되는지는 아직 테스트한 적이 없다. `name`과 달리 지금까지 코드에 없던 속성이라 새로 추가한 부분이다.
+- `item.label`(Script Label) 읽기는 실기로 확인되었지만(D008), **쓰기는 아직 검증되지 않았다.** `label = "TITLE"`처럼 값을 실제로 저장하는 동작, 저장한 값이 파일 저장/재오픈 후에도 유지되는지는 다음 단계에서 확인이 필요하다.
 
 ## 외부 대기 사항
 
@@ -73,7 +96,7 @@
 
 ## 다음 추천 작업
 
-1. UDT에서 Reload 후 "시작 페이지" 템플릿에서 `Inspect Template`을 다시 실행해, 새로 추가된 `label` 출력이 에러 없이 표시되는지 확인하고 로그를 전달한다. 이 결과로 자동화 식별자를 `name`/`label` 중 무엇으로 할지(또는 병행할지) 판단해 [DECISIONS.md](DECISIONS.md)에 기록한다.
+1. 위 "Script Label 부여 제안" 표를 검토하고, 실행 방식(A: 사용자가 직접 InDesign에서 입력 / B: Claude Code가 1회성 스크립트로 부여)을 정한다. 결정되면 working .indd의 "시작 페이지" 프레임에 실제로 Script Label을 부여하고, 부여한 값이 `Inspect Template`으로 다시 읽히는지 확인한다 — 이 작업은 InDesign 파일을 수정하므로 실행 전 사용자 승인이 필요하다.
 2. "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해, "시작 페이지"와 같은 방식으로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 워크시트에 행을 추가한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 같은 방식으로 분석한다.
 3. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(POINT_TEXT ↔ `subtitle` 필드 동일 여부, BODY_COLUMN_1/2를 `body` 하나로 자동 분배할지 여부, HERO_IMAGE의 Required/Optional, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
 4. `doc.paragraphStyles`/`doc.objectStyles` 출력이 실제로 올바른지, "시작 페이지" 외 다른 템플릿에서도 `Inspect Template`이 에러 없이 동작하는지 확인하고 결과를 이 문서에 반영한다.
