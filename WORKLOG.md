@@ -170,3 +170,28 @@
 남은 문제:
 - 개선된 `Inspect Template` 출력이 실제 InDesign에서 에러 없이 동작하는지 확인 필요 (특히 `textFrame.contents`, `geometricBounds`)
 - "시작 페이지" 템플릿의 실제 로그를 아직 전달받지 못해 `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트는 여전히 비어 있음
+
+---
+
+## 2026-09-23 - "시작 페이지" 프레임 매핑 초안 작성
+
+완료:
+- 사용자가 실제 InDesign에서 "시작 페이지" 템플릿의 두 페이지 변형(사진 있음: page.name=2/index=3, 사진 없음: page.name=3/index=4)에 대해 개선된 `Inspect Template` 로그를 전달함 — 텍스트 미리보기/geometricBounds/이미지 배치 여부 출력이 실제로 정상 동작함을 확인
+- `docs/TEMPLATE_SPEC.md`의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 행으로 기록: 제목→TITLE(후보), 부제/포인트 문구→POINT_TEXT(후보), 본문→BODY(후보, 사진 없는 버전은 BODY_COLUMN_1/BODY_COLUMN_2로 2단 구성), 대표 이미지 Rectangle→HERO_IMAGE(후보). "대표이미지" 텍스트는 사용자 확인대로 템플릿 제작 안내 문구로 별도 표시(데이터 필드 아님)하고 자동화 이름을 부여하지 않음
+- Current Frame Name은 전부 "(이름 없음)"으로 기록 (실제 로그에 이름이 없었음, 텍스트 미리보기/bounds로만 식별)
+- Required/Optional, Data Field 매핑 등 불확실한 항목은 임의로 확정하지 않고 전부 "확인 필요"로 남김. 단 HERO_IMAGE는 사진 없는 변형에 프레임 자체가 없다는 사실을 근거로 "선택(Optional)일 가능성 높음 — 확인 필요"로 기록
+- "Template Type" 표의 "시작 페이지" 행에 사진 유무에 따른 2가지 변형이 실제로 존재한다는 설명 추가
+- `HANDOFF.md` 갱신: 현재 단계를 "'시작 페이지' 템플릿 1차 프레임 매핑 초안 작성 완료"로 반영, 개선된 Inspect Template 출력(텍스트 미리보기/geometricBounds/이미지 배치 여부)이 실사용에서 동작함을 "실제 테스트 완료된 기능"으로 이동, "다음 추천 작업"을 목차 등 나머지 Template Type 분석으로 갱신
+- InDesign 파일 수정 없음, Frame Name 실제 변경 없음, 자동조판 코드 구현 없음, 시작 페이지 외 템플릿은 분석하지 않음 (요청받은 범위만 수행)
+
+변경 파일:
+- docs/TEMPLATE_SPEC.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 이번 세션에서 Claude Code가 직접 실행한 테스트는 없음 (문서화 작업만 수행). 문서에 반영한 Inspect Template 동작 확인은 사용자가 실제 InDesign에서 수행하고 전달한 로그를 근거로 함.
+
+남은 문제:
+- "시작 페이지" 워크시트에 "확인 필요"로 남은 항목이 다수 있어(POINT_TEXT/subtitle 동일 여부, BODY_COLUMN 자동 분배 방식, HERO_IMAGE Required/Optional, 안내 문구 프레임 처리 방식) 디자이너 확인 전까지 Frame Name/Data Field Mapping 등 확정판 표는 채우지 않음
+- 목차, 본문 페이지, 인터뷰 레이아웃은 아직 분석하지 않음

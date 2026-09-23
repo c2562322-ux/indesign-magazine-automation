@@ -2,13 +2,13 @@
 
 이 문서 하나만 읽어도 현재 프로젝트 상태를 파악할 수 있도록 작성한다. 구조와 용어는 프로젝트 루트의 인수인계서(원본 요청 문서) 및 [README.md](README.md)를 따른다.
 
-마지막 업데이트: 2026-09-22
+마지막 업데이트: 2026-09-23
 
 ## 현재 프로젝트 단계
 
-**Template Inspector 실기 테스트 성공, 실제 프레임 구조 식별 단계 진행 중.**
+**"시작 페이지" 템플릿 1차 프레임 매핑 초안 작성 완료. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.**
 
-디자이너로부터 받은 실제 InDesign 원본 템플릿(`assets/templates/original/`)의 working 사본을 InDesign에서 열고 `Inspect Template` 버튼을 실행한 결과, 일부 페이지에서 Text Frame / Rectangle이 정상적으로 조회되는 것을 확인했다(2026-09-22). 이 테스트는 사용자가 실제 InDesign/UXP Developer Tool에서 직접 수행하고 결과를 공유한 것이며, Claude Code가 직접 실행·검증한 것은 아니다. 다만 실제 템플릿의 Text Frame 대부분이 Frame Name이 비어 있어 역할 식별이 어렵다는 문제가 확인되어, `Inspect Template`이 각 Text Frame의 텍스트 내용 미리보기·geometricBounds·페이지 내부 index를, 각 Rectangle의 geometricBounds·이미지 배치 여부를 추가로 출력하도록 개선했다(2026-09-22, 코드만 수정, 아직 재테스트 전). "시작 페이지" 템플릿 하나를 대상으로 프레임 역할을 확정하는 분석이 이제 다음 단계다. Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, 프레임 이름 규칙과 데이터 매핑, 자동 조판 로직은 아직 시작하지 않았다.
+개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
 ## 완료된 기능
 
@@ -22,27 +22,26 @@
 
 ## 실제 테스트 완료된 기능
 
-사용자가 실제 InDesign + UXP Developer Tool에서 직접 확인한 내용 (2026-09-22, Claude Code가 아닌 사용자가 실행):
+사용자가 실제 InDesign + UXP Developer Tool에서 직접 확인한 내용 (Claude Code가 아닌 사용자가 실행):
 
-- UXP Developer Tool에서 [manifest.json](manifest.json) 로드 및 `Magazine Automation` 패널 표시
-- `Inspect Template` 버튼 클릭 시 에러 없이 실행됨
-- `assets/templates/working/`의 실제 디자이너 템플릿 사본에서, 일부 페이지의 Text Frame / Rectangle 목록이 `page.textFrames` / `page.rectangles`로 정상 조회됨
+- UXP Developer Tool에서 [manifest.json](manifest.json) 로드 및 `Magazine Automation` 패널 표시 (2026-09-22)
+- `Inspect Template` 버튼 클릭 시 에러 없이 실행됨 (2026-09-22, 2026-09-23 두 차례)
+- `assets/templates/working/`의 실제 디자이너 템플릿 사본에서, "시작 페이지" 템플릿의 두 페이지 변형(page.name=2/index=3, page.name=3/index=4)에 대해 `Inspect Template`의 개선된 출력(Text Frame의 name/텍스트 미리보기/geometricBounds, Rectangle의 name/geometricBounds/이미지 배치 여부, 페이지 index와 page.name)이 실제로 정상 표시됨을 확인 (2026-09-23) — `src/inspector.js`에서 추가한 `textFrame.contents`, `item.geometricBounds`, `rectangle.images` 기반 출력이 실사용에서 동작한 것으로 확인됨
 
-**아직 확인되지 않은 부분**: 테스트한 페이지가 템플릿 전체 중 일부였는지, 테스트하지 않은 나머지 페이지도 동일하게 동작하는지는 이 문서 작성 시점에 보고받지 못했다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
+**아직 확인되지 않은 부분**: `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록) 출력이 올바른지, "시작 페이지" 외 나머지 페이지(목차/본문 페이지/인터뷰 레이아웃)에서도 동일하게 동작하는지는 아직 보고되지 않았다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
 ## 아직 테스트하지 못한 기능
 
 - `Generate` 버튼 클릭 시 `src/indesign.js`의 `app.doScript(...)` 호출이 실제 InDesign UXP API와 시그니처가 맞는지, 에러 없이 텍스트 프레임이 생성되는지 (이번 테스트에서 별도로 재확인되지 않음)
 - `Load Article` 버튼 (현재 클릭해도 "아직 구현되지 않음" 상태 메시지만 표시, 실제 동작 없음)
-- `Inspect Template`에 새로 추가된 출력 전부: Text Frame의 `contents`(텍스트 미리보기), `geometricBounds`(Text Frame/Rectangle 모두), Rectangle의 이미지 배치 여부, 페이지 내부 index. 코드만 작성했고 실제 InDesign에서 실행해본 적은 아직 없다.
 - `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록)가 실제로 올바른 값을 보여주는지는 아직 구체적으로 보고되지 않았다
-- `Inspect Template`을 템플릿의 모든 페이지에서 실행했을 때도 동일하게 정상 동작하는지 (지금까지는 "일부 페이지"에서만 확인됨)
+- `Inspect Template`을 "시작 페이지" 외 나머지 Template Type(목차, 본문 페이지, 인터뷰 레이아웃)에서 실행했을 때도 동일하게 정상 동작하는지
 - Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제 템플릿에 얼마나 있는지, 그로 인해 워크시트 작성 시 어떤 항목이 누락되는지 (현재 버전은 이런 항목을 집계하지 않음 — 알려진 문제 참고)
 
 ## 진행 중인 작업
 
-- "시작 페이지" 템플릿 하나를 대상으로 프레임 역할을 확정하는 작업. 사용자가 개선된 `Inspect Template`로 "시작 페이지"의 실제 로그를 확인해 전달하면, 그 로그를 기준으로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 Current Frame Name / Proposed Automation Name(후보) / Object Type / Data Field 등을 채운다. 아직 로그를 전달받지 못해 워크시트 행은 비어 있다.
-- Proposed Automation Name 후보는 사용자가 제시한 TITLE/SUBTITLE/AUTHOR/CATEGORY/HERO_IMAGE/BODY/CAPTION_01을 기준으로 하되, 실제 템플릿에 없는 항목은 임의로 만들지 않는다.
+- "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(POINT_TEXT가 `subtitle`과 같은 필드인지, 2단 본문을 하나의 `body` 필드로 자동 분배할지 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다.
+- 다음으로 "목차" 템플릿부터 같은 방식(Inspect Template 실행 → 로그 전달 → 워크시트 기록)으로 분석을 이어간다.
 
 ## 미구현 기능
 
@@ -69,11 +68,10 @@
 
 ## 다음 추천 작업
 
-1. UDT에서 Reload 후 "시작 페이지" 템플릿에서 `Inspect Template`을 다시 실행해, 개선된 출력(텍스트 미리보기, geometricBounds, 이미지 배치 여부, 페이지 index)이 에러 없이 정상 표시되는지 확인한다.
-2. 그 로그를 Claude Code에 전달해 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 "시작 페이지" 행을 채운다 (Current Frame Name, Proposed Automation Name 후보, Object Type, Data Field, Required/Optional, 모호한 부분은 "확인 필요"로 표시).
-3. 위 테스트 결과를 이 문서의 "실제 테스트 완료된 기능"/"알려진 문제"(특히 `textFrame.contents`의 Linked Text Frame 관련 caveat)에 반영한다.
-4. "시작 페이지" 분석이 끝나면 나머지 Template Type(목차, 본문 페이지, 인터뷰 레이아웃)도 같은 방식으로 순서대로 분석한다.
-5. 전체 프레임 이름 규칙이 디자이너와 확정되면 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame Name"/"Data Field Mapping"/"Required / Optional"/"Paragraph Style"/"Object Style" 표(확정판)를 채우고, 이후 `src/data.js`(JSON 로드)부터 자동 조판 구현을 시작한다.
+1. "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해, "시작 페이지"와 같은 방식으로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md) 워크시트에 행을 추가한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 같은 방식으로 분석한다.
+2. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(POINT_TEXT ↔ `subtitle` 필드 동일 여부, BODY_COLUMN_1/2를 `body` 하나로 자동 분배할지 여부, HERO_IMAGE의 Required/Optional, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
+3. `doc.paragraphStyles`/`doc.objectStyles` 출력이 실제로 올바른지, "시작 페이지" 외 다른 템플릿에서도 `Inspect Template`이 에러 없이 동작하는지 확인하고 결과를 이 문서에 반영한다.
+4. 모든 Template Type의 워크시트 분석과 디자이너 확인이 끝나면 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame Name"/"Data Field Mapping"/"Required / Optional"/"Paragraph Style"/"Object Style" 표(확정판)를 채우고, 이후 `src/data.js`(JSON 로드)부터 자동 조판 구현을 시작한다.
 
 ## 디자이너에게 확인해야 할 사항
 
