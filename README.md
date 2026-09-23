@@ -29,8 +29,10 @@ indesign-magazine-automation/
 │  └─ validation.js   Script Label 기준 "시작 페이지" 필수 프레임 존재/타입 검사 (읽기 전용, 구현됨, 미검증). 이미지 누락/Overset 검사는 예정
 │
 ├─ sample/
-│  ├─ article.json    개발용 테스트 기사 데이터
-│  └─ images/         개발용 테스트 이미지
+│  ├─ article.json                   개발용 테스트 기사 데이터 (FEATURE 예시, 이번 작업과 무관)
+│  ├─ opening-page-with-photo.json    "시작 페이지"(사진 있음) 샘플 데이터
+│  ├─ opening-page-without-photo.json "시작 페이지"(사진 없음) 샘플 데이터
+│  └─ images/                        개발용 테스트 이미지
 │
 ├─ assets/
 │  ├─ templates/
@@ -52,6 +54,10 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 - `assets/fonts/` — 디자이너에게 전달받은 폰트 파일.
 
 용량이 큰 바이너리 리소스이므로 `assets/templates/`, `assets/fonts/` 하위 실제 파일은 [.gitignore](.gitignore)에 의해 Git에 커밋되지 않는다. 폴더 구조만 `.gitkeep`으로 유지되며, 새로 clone한 환경에서는 디자이너에게 파일을 별도로 전달받아 해당 폴더에 넣어야 한다.
+
+## 기사 데이터 규격
+
+자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. 아직 이 JSON을 실제로 읽어 InDesign에 채워 넣는 코드는 구현되지 않았다.
 
 ## UXP Developer Tool에서 실행하는 방법
 

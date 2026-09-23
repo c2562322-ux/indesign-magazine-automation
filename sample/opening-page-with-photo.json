@@ -1,0 +1,8 @@
+{
+    "templateType": "OPENING_PAGE",
+    "variant": "WITH_PHOTO",
+    "title": "새로운 도시를 만드는 사람들",
+    "pointText": "건축가 5명을 만나다",
+    "body": "기사 본문입니다. Lorem ipsum dolor sit amet, consectetur adipiscing elit. 이 필드는 시작 페이지(사진 있음)의 BODY Script Label 프레임에 들어간다.",
+    "heroImage": "hero.jpg"
+}

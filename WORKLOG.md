@@ -278,3 +278,38 @@
 남은 문제:
 - Script Label 기반 검증 기능이 실제 InDesign에서 에러 없이 동작하는지, "정상" 판정이 실제로 나오는지 확인 필요
 - `pickProfile`의 페이지 유형 판별 휴리스틱이 "시작 페이지" 외 다른 Template Type에서도 안전한지는 그 템플릿을 분석할 때 재검토 필요
+
+---
+
+## 2026-09-23 - Script Label 검증 실기 테스트 성공 확인 + 기사 JSON 데이터 계약 정의
+
+완료:
+- 사용자가 실제 InDesign에서 Script Label 기반 프레임 검증을 실행한 결과를 확인해 전달: page.name=2("시작 페이지 사진 있음")와 page.name=3("시작 페이지 사진 없음") 모두 필요한 Label이 전부 `[OK]`, "결과: 모두 정상"으로 나옴
+- `HANDOFF.md`/`WORKLOG.md`에 이 성공 결과 반영: "실제 테스트 완료된 기능"으로 이동, "Script Label 부여 및 검증 현황" 표에 검증 결과 열 추가, "아직 테스트하지 못한 기능"에서 해당 항목 제거
+- 자동조판 MVP용 기사 JSON 데이터 계약을 새 문서 `docs/ARTICLE_DATA_SPEC.md`에 정의:
+  - 공통 필드: `templateType`(`"OPENING_PAGE"` 고정), `variant`(`"WITH_PHOTO"` | `"WITHOUT_PHOTO"`), `title`, `pointText` — 모두 Required(MVP 잠정)
+  - `variant: "WITH_PHOTO"` 전용: `body`, `heroImage` — Required
+  - `variant: "WITHOUT_PHOTO"` 전용: `bodyColumn1`, `bodyColumn2` — Required
+  - 사진 있음/없음 구분은 `heroImage` 유무로 암묵 추측하지 않고 `variant` 필드로 명시하도록 결정(데이터 계약을 명확히 하기 위함)
+  - 본문 2단 구성도 `body` 하나를 코드가 자동 분배하지 않고 `bodyColumn1`/`bodyColumn2` 두 필드로 명시적으로 받기로 결정(텍스트가 어디서 잘려야 자연스러운지는 InDesign이 실제 조판해봐야 알 수 있어 코드가 예측하기 어렵기 때문)
+  - JSON 필드 ↔ Script Label 매핑표 작성 (title→TITLE, pointText→POINT_TEXT, body→BODY, heroImage→HERO_IMAGE, bodyColumn1→BODY_COLUMN_1, bodyColumn2→BODY_COLUMN_2)
+- 샘플 파일 2개 신규 작성: `sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`
+- `docs/TEMPLATE_SPEC.md` 갱신: 상태 문구를 "Script Label 적용 및 검증 완료, JSON 데이터 계약 정의 완료"로 반영, "Template Type" 표의 "시작 페이지" 행에 자동화용 식별자 `OPENING_PAGE` 확정 기록, Frame 분석 워크시트의 "(후보)" 표시를 실제 적용/검증 완료를 반영해 "(적용됨)"으로 갱신, Data Field 열에 `docs/ARTICLE_DATA_SPEC.md`에서 확정한 필드명(pointText, bodyColumn1/2 등) 반영, 열 설명 갱신
+- `HANDOFF.md`: 현재 단계/완료된 기능/진행 중인 작업/미구현 기능/알려진 문제/다음 추천 작업을 새 JSON 계약과 검증 성공 결과에 맞춰 갱신
+- `README.md`: 기사 데이터 규격 섹션 신규 추가(`docs/ARTICLE_DATA_SPEC.md` 링크), 폴더 구조에 새 샘플 파일 2개 반영
+- 이번 작업에서 하지 않은 것 (요청받은 범위 밖): `Load Article` 버튼의 실제 파일 선택, JSON 파일을 코드로 읽는 기능(`src/data.js`는 여전히 빈 스텁), InDesign `contents` 변경, 이미지 배치, `Generate` 자동조판. InDesign API나 동작을 추측해서 구현하지 않음 — 이번 작업은 데이터 계약/샘플 정의까지만 진행
+
+변경 파일:
+- docs/ARTICLE_DATA_SPEC.md (신규)
+- sample/opening-page-with-photo.json (신규)
+- sample/opening-page-without-photo.json (신규)
+- docs/TEMPLATE_SPEC.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- Script Label 검증 기능은 사용자가 실제 InDesign에서 실행해 "모두 정상"을 확인함 (2026-09-23, 사용자가 직접 수행). JSON 데이터 계약/샘플 파일 자체는 아직 코드로 읽거나 InDesign에 적용해본 적이 없음 — 문서와 샘플 데이터 정의만 진행했으므로 "코드 테스트"의 대상이 아직 없음.
+
+남은 문제:
+- 없음. 다음 단계(`src/data.js` JSON 로드 구현)는 이번 작업 범위 밖으로 HANDOFF.md "다음 추천 작업"에 남겨둠.
