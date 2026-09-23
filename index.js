@@ -2,6 +2,7 @@
 
 const { addHelloText } = require("./src/indesign.js");
 const { inspectDocument, formatReport } = require("./src/inspector.js");
+const { validateFrameLabels, formatValidationReport } = require("./src/validation.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
@@ -30,10 +31,15 @@ document.getElementById("btnInspect").addEventListener("click", () => {
     try {
         setStatus("Inspecting...");
         const report = inspectDocument();
-        const text = formatReport(report);
-        inspectLog.textContent = text;
-        console.log("[Inspect Template]\n" + text);
-        setStatus(`완료: 페이지 ${report.pageCount}개 분석됨 (읽기 전용, 문서 변경 없음)`);
+        const inspectionText = formatReport(report);
+
+        const validationResults = validateFrameLabels(report);
+        const validationText = formatValidationReport(validationResults);
+
+        const combinedText = `${inspectionText}\n\n${validationText}`;
+        inspectLog.textContent = combinedText;
+        console.log("[Inspect Template]\n" + combinedText);
+        setStatus(`완료: 페이지 ${report.pageCount}개 분석 + Label 검증 (읽기 전용, 문서 변경 없음)`);
     } catch (err) {
         console.error(err);
         inspectLog.textContent = `오류: ${err.message}`;

@@ -8,7 +8,7 @@ Vanilla JavaScript 기반이며 React 등 프레임워크는 사용하지 않는
 
 `Generate` 버튼을 클릭하면 현재 활성화된 InDesign 문서 첫 페이지에 "Hello Magazine" 텍스트 프레임을 생성하는 최소 기능만 구현되어 있다. 실제 기사 데이터/템플릿 매핑 로직은 아직 구현되지 않았다.
 
-`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록, 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 문서를 수정하지 않는다.
+`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록(name, label, 텍스트 미리보기, geometricBounds), 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 같은 버튼 클릭 한 번으로 "시작 페이지"에 필요한 Script Label(TITLE/POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE)이 정확히 1개씩 존재하는지, 타입이 예상과 맞는지도 함께 검증해 같은 로그에 이어서 출력한다 ([src/validation.js](src/validation.js)). 문서를 수정하지 않는다.
 
 ## 폴더 구조
 
@@ -26,7 +26,7 @@ indesign-magazine-automation/
 │  ├─ template.js     templateType별 템플릿 처리 (예정)
 │  ├─ text.js         TITLE/BODY 등 텍스트 프레임 처리 (예정)
 │  ├─ image.js         HERO_IMAGE/IMAGE_01 등 이미지 처리 (예정)
-│  └─ validation.js   필수 데이터/이미지 누락, Overset 등 오류 검사 (예정)
+│  └─ validation.js   Script Label 기준 "시작 페이지" 필수 프레임 존재/타입 검사 (읽기 전용, 구현됨, 미검증). 이미지 누락/Overset 검사는 예정
 │
 ├─ sample/
 │  ├─ article.json    개발용 테스트 기사 데이터
@@ -62,7 +62,7 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 5. InDesign에서 문서를 하나 새로 만들거나 연다.
 6. InDesign 메뉴 `Plugins`(또는 UDT에서 지정한 위치)에서 `Magazine Automation` 패널을 연다.
 7. 패널에서 `Generate` 버튼을 클릭하면 현재 문서 첫 페이지에 "Hello Magazine" 텍스트 프레임이 생성되는지 확인한다.
-8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보가 `Inspection Log` 영역과 콘솔에 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
+8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보와 함께, Script Label 기준 "시작 페이지" 필수 프레임 검증 결과(`=== Script Label 기반 프레임 검증 ===`로 시작하는 부분)가 `Inspection Log` 영역과 콘솔에 이어서 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
 9. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.
 
 `Load Article` 버튼은 아직 동작하지 않으며, 다음 단계에서 `sample/article.json`을 읽어오는 기능을 `src/data.js`에 구현할 예정이다.

@@ -112,3 +112,18 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 실제로 Script Label을 부여하고 읽어보는 다음 단계에서 문제가 발견되면(예: 특정 개체 타입에서 label 저장이 유지되지 않는 등) 재검토.
+
+---
+
+## D009 - src/validation.js는 InDesign API를 직접 호출하지 않고 inspector.js의 report를 입력으로 받는다
+
+결정:
+`src/validation.js`(Script Label 기준 프레임 검증)는 `require("indesign")`을 호출하지 않는다. 대신 `src/inspector.js`의 `inspectDocument()`가 만든 `report` 객체를 함수 인자로 받아, 그 안의 `label`/`name`/textFrames·rectangles 배열만 가지고 검증한다.
+
+이유:
+- InDesign DOM을 다시 순회하지 않아도 되므로 `Inspect Template` 버튼 클릭 한 번으로 문서를 두 번 읽는 비효율을 피한다.
+- InDesign API 접근을 `src/inspector.js` 한 곳에만 두면, API 사용 방식이 바뀌어도 검증 로직(`src/validation.js`)은 건드릴 필요가 없다. 기존 UI/InDesign 로직 분리 원칙(D002)과 Template Inspector 분리 원칙(D007)의 연장선이다.
+- `report`가 이미 `label`/`name`/타입(어느 배열에서 나왔는지)을 담고 있어 검증에 필요한 정보가 충분하다.
+
+변경 조건:
+검증 로직이 report에 없는 InDesign 정보(예: 페이지 순서 재계산, 실시간 상태)를 필요로 하게 되면 재검토.

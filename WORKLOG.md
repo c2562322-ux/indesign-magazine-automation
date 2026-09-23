@@ -246,3 +246,35 @@
 남은 문제:
 - Script Label 부여 실행 방식(A/B) 미결정 — 사용자 결정 대기
 - 실제로 Script Label을 부여한 뒤 파일 저장/재오픈 후에도 값이 유지되는지는 아직 확인되지 않음
+
+---
+
+## 2026-09-23 - Script Label 기반 프레임 검증 기능 구현
+
+완료:
+- 사용자가 working .indd의 "시작 페이지" 두 변형에 Script Label을 실제로 부여함을 확인해 전달: 사진 있음(page.name=2) → TITLE/POINT_TEXT/BODY/HERO_IMAGE, 사진 없음(page.name=3) → TITLE/POINT_TEXT/BODY_COLUMN_1/BODY_COLUMN_2
+- `src/validation.js` 신규 구현 (읽기 전용, InDesign API를 직접 호출하지 않고 `src/inspector.js`의 report만 입력으로 사용 — D009):
+  - `OPENING_WITH_PHOTO`/`OPENING_WITHOUT_PHOTO` 두 프로필로 필수 Label과 기대 타입(TextFrame/Rectangle) 정의
+  - `pickProfile()`: 페이지에 있는 Label 조합(BODY_COLUMN_1/2 유무, HERO_IMAGE/BODY 유무)으로 어느 변형인지 판별
+  - `validateFrameLabels(report)`: 페이지별로 필수 Label이 정확히 1개씩 있는지(누락/중복 판정), 예상 타입과 일치하는지(타입 불일치 판정) 검사
+  - `formatValidationReport()`: 페이지별로 `[OK]`/`[FAIL]` 표시, 누락/중복 시 실제로 발견된 프레임의 타입/name을 나열, 페이지별 "결과: 모두 정상" 또는 "N건 문제 발견" 요약
+- `index.js`의 기존 `Inspect Template` 버튼 핸들러에서 `inspectDocument()` 결과로 `validateFrameLabels()`를 이어서 호출하고, 검증 결과를 기존 문서 분석 결과 뒤에 이어 붙여 같은 `Inspection Log`/콘솔에 출력 (새 버튼 추가하지 않음)
+- `DECISIONS.md`에 D009 기록 (validation.js가 InDesign API를 직접 호출하지 않는 이유)
+- `HANDOFF.md`에 Script Label이 실제로 부여됐다는 사실과 새 검증 기능을 반영: "완료된 기능"에 추가, "아직 테스트하지 못한 기능"에 이 기능 전체를 추가, "Script Label 부여 현황" 섹션으로 기존 제안 섹션을 대체, "알려진 문제"에 `pickProfile`의 휴리스틱 한계 기록
+- `README.md`의 `Inspect Template` 설명과 `src/validation.js` 폴더 구조 설명, 실행 방법 8번을 갱신
+- InDesign 문서/템플릿 파일 수정 없음, 기사 JSON 로딩·contents 변경·이미지 배치·Generate 자동조판 미구현 (요청받은 범위만 수행)
+
+변경 파일:
+- src/validation.js
+- index.js
+- README.md
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 없음. 이번에 구현한 검증 기능은 아직 실제 InDesign에서 실행해보지 않았다. UDT에서 Reload 후 "시작 페이지" 두 변형에서 `Inspect Template`을 실행해 "결과: 모두 정상"이 나오는지 확인하는 것이 다음 단계.
+
+남은 문제:
+- Script Label 기반 검증 기능이 실제 InDesign에서 에러 없이 동작하는지, "정상" 판정이 실제로 나오는지 확인 필요
+- `pickProfile`의 페이지 유형 판별 휴리스틱이 "시작 페이지" 외 다른 Template Type에서도 안전한지는 그 템플릿을 분석할 때 재검토 필요
