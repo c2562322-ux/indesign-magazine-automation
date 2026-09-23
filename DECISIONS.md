@@ -162,3 +162,20 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 실기 테스트에서 `getFileForOpening()`/`read()`가 예상과 다르게 동작하면(예: 반환값 형태가 다르거나 파일 형식 필터가 필요해지면) 재검토.
+
+---
+
+## D012 - 첫 자동조판(TITLE 입력): 대상 페이지는 Script Label 프로필 재사용, 탐색+쓰기는 doScript 하나로 묶음
+
+결정:
+`src/text.js`의 `applyTitleOnly()`(기사 데이터의 `title`을 TITLE Script Label Text Frame에 쓰는 첫 자동조판 코드)는 두 가지를 결정했다:
+1. variant에 맞는 "시작 페이지"를 `page.name`/`page` index 하드코딩으로 찾지 않고, `src/validation.js`의 `OPENING_PROFILES_BY_VARIANT`(읽기 전용 Script Label 검증에 쓰던 것과 동일한 `requiredFrames` 정의)를 그대로 가져와, 그 variant에 필요한 Script Label을 모두 가진 페이지를 문서에서 찾는다.
+2. 대상 페이지/TITLE 프레임 탐색과 `contents` 쓰기를 모두 하나의 `app.doScript` 콜백 안에서 수행한다. 탐색을 `doScript` 밖에서 먼저 하고 찾은 프레임 참조를 `doScript` 안에서 쓰는 방식은 시도하지 않았다.
+
+이유:
+- Script Label 프로필을 재사용하면 "어떤 프레임 조합이 WITH_PHOTO/WITHOUT_PHOTO 페이지인가"에 대한 기준이 읽기 전용 검증과 실제 쓰기 대상 판별에서 단 하나로 유지된다. 페이지 번호를 하드코딩하면 템플릿이 바뀌거나 페이지 순서가 바뀔 때 조용히 틀린 페이지에 쓸 위험이 있다.
+- 탐색과 쓰기를 같은 `doScript` 안에 두면, "`doScript` 밖에서 얻은 객체 참조가 `doScript` 안에서도 유효한가"라는 이 프로젝트에서 아직 확인된 적 없는 질문 자체를 피할 수 있다. 안전 검사(대상 페이지/TITLE 프레임 존재·개수·타입)에서 하나라도 실패하면 `contents` 대입 줄에 도달하기 전에 예외가 발생하므로, 검사 로직이 `doScript` 안에 있어도 실패 시 문서가 수정되지 않는다는 보장은 그대로 유지된다.
+- 기존 `src/indesign.js`의 `addHelloText()`(Hello Magazine 텍스트 생성)는 `Generate` 버튼과의 연결을 끊었지만 함수 자체는 삭제하지 않았다. 이번 목적("문제없이 동작한다는 걸 보여준 첫 `doScript` 예제")이 끝났다고 완전히 안 쓰이게 될지 아직 확신이 없어, 되돌리기 쉬운 선택(연결만 끊기)을 우선했다.
+
+변경 조건:
+실기 테스트에서 탐색+쓰기를 한 `doScript`에 묶는 것이 불필요하거나 문제를 일으키는 것으로 확인되면(예: 대량의 프레임 탐색이 `doScript` 안에서 성능 문제를 일으키면) 재검토.

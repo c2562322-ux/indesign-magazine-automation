@@ -1,6 +1,5 @@
 // UI 이벤트 바인딩과 프로그램 시작점. InDesign 제어 로직은 src/indesign.js에 위임한다.
 
-const { addHelloText } = require("./src/indesign.js");
 const { inspectDocument, formatReport } = require("./src/inspector.js");
 const {
     validateFrameLabels,
@@ -9,6 +8,7 @@ const {
     formatArticleValidationReport,
 } = require("./src/validation.js");
 const { loadArticleFile } = require("./src/data.js");
+const { applyTitleOnly } = require("./src/text.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
@@ -78,13 +78,24 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
 });
 
 document.getElementById("btnGenerate").addEventListener("click", async () => {
+    // 안전 검사 1: Load Article로 검증을 통과한 데이터가 없으면 아무것도 하지 않는다.
+    if (!currentArticleData) {
+        setStatus("Generate 중단: 먼저 Load Article로 기사 데이터를 불러와 검증을 통과해야 합니다.");
+        return;
+    }
+
     try {
-        setStatus("Generating...");
-        await addHelloText();
-        setStatus("완료: \"Hello Magazine\" 텍스트 생성됨");
+        setStatus("Generate: TITLE 입력 중...");
+        // 대상 페이지 탐색, TITLE 프레임 존재/개수/타입 검사는 applyTitleOnly 내부에서 수행하며,
+        // 문제가 있으면 문서를 수정하지 않고 Error를 던진다. 이번 단계는 title 하나만 다룬다.
+        await applyTitleOnly(currentArticleData);
+        setStatus(
+            `Generate 완료: TITLE에 "${currentArticleData.title}" 입력됨 ` +
+                `(variant=${currentArticleData.variant})`
+        );
     } catch (err) {
         console.error(err);
-        setStatus(`오류: ${err.message}`);
+        setStatus(`Generate 중단: ${err.message}`);
     }
 });
 

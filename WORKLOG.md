@@ -396,3 +396,36 @@
 남은 문제:
 - `require("uxp").storage.localFileSystem.getFileForOpening()`/`Entry.read()`가 이 환경에서 에러 없이 동작하는지 확인 필요
 - 정상 케이스(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`)와 실패 케이스(잘못된 JSON, 필드 누락) 모두 실기로 확인 필요
+
+---
+
+## 2026-09-23 - Load Article 실기 테스트 성공 확인 + 첫 자동조판 쓰기(TITLE만) 구현
+
+완료:
+- 사용자가 `sample/opening-page-with-photo.json`/`sample/opening-page-without-photo.json` 둘 다 `Load Article`로 불러와 실제 InDesign에서 "결과: 검증 통과"를 확인해 전달. `require("uxp").storage.localFileSystem`이 이 환경에서 정상 동작함을 확인. `HANDOFF.md`/`WORKLOG.md`의 "아직 테스트하지 못한 기능"에서 해당 항목을 "실제 테스트 완료된 기능"으로 이동
+- `src/validation.js`에 `OPENING_PROFILES_BY_VARIANT`(variant 문자열 → 프로필) export 추가: 기존 `OPENING_WITH_PHOTO`/`OPENING_WITHOUT_PHOTO`를 그대로 재사용할 수 있게 함(읽기 전용 검증과 실제 쓰기 대상 판별이 같은 기준을 쓰도록)
+- `src/text.js` 신규 구현: `applyTitleOnly(articleData)`
+  - `collectLiveLabeledItems(page)`: 페이지의 Text Frame/Rectangle을 label별로 묶되 실제 InDesign 객체 참조를 보관(읽기 전용 report가 아님)
+  - `findTitleFrameForVariant(doc, variant)`: `OPENING_PROFILES_BY_VARIANT`에서 variant에 필요한 Script Label 목록을 가져와, 그 Label을 모두 가진 페이지를 문서에서 찾음. 페이지가 0개/2개 이상이면 Error. 찾은 페이지에서 TITLE Label 프레임이 0개/2개 이상/TextFrame이 아니면 Error
+  - `applyTitleOnly`: `currentArticleData` 존재, `templateType === "OPENING_PAGE"`, `title` 존재를 먼저 확인한 뒤, 대상 페이지 탐색과 TITLE `contents` 쓰기를 하나의 `app.doScript` 콜백 안에서 함께 수행(탐색을 doScript 밖에서 먼저 하는 방식은 검증되지 않아 피함 — DECISIONS.md D012)
+- `index.js`의 `Generate` 버튼 핸들러 재작성: 기존 `addHelloText()` 호출 제거, `currentArticleData`가 없으면 문서를 건드리지 않고 즉시 중단(Status에 사유 표시), 있으면 `applyTitleOnly()` 호출 후 성공/실패를 Status와 콘솔에 표시. `src/indesign.js`의 `addHelloText` 함수 자체는 삭제하지 않고 `Generate`와의 연결만 끊음(D012)
+- `DECISIONS.md`에 D012 기록: 대상 페이지 판별에 Script Label 프로필을 재사용하는 이유, 탐색+쓰기를 하나의 doScript로 묶은 이유, addHelloText를 삭제 대신 연결만 끊은 이유
+- `README.md`/`HANDOFF.md` 갱신: `Generate`의 새 동작, 안전 검사 목록, 테스트 절차, 완료/미구현/알려진 문제 반영
+- 요청받은 범위만 구현: POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력, HERO_IMAGE 이미지 배치, 페이지 생성/복제, PDF Export는 전혀 구현하지 않음
+
+변경 파일:
+- src/text.js (신규)
+- src/validation.js
+- index.js
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- `Load Article` 정상 케이스는 사용자가 실제 InDesign에서 확인함(2026-09-23, 사용자가 직접 수행). `Generate`의 TITLE 자동 입력 기능은 이번에 코드만 작성했고 아직 실제 InDesign에서 실행해본 적이 없다 — InDesign 문서를 실제로 수정하는 이 프로젝트의 첫 코드이므로 실기 테스트 전까지는 성공으로 기록하지 않는다.
+
+남은 문제:
+- `applyTitleOnly()`가 실제 InDesign에서 에러 없이 동작하는지, WITH_PHOTO/WITHOUT_PHOTO 각각에서 올바른 페이지만 바뀌고 반대쪽은 그대로인지 확인 필요
+- 안전 검사 실패 케이스(Article 미로드, TITLE 없음/중복 등)에서 문서가 실제로 수정되지 않는지 확인 필요
+- doScript 콜백 안에서 여러 페이지를 순회하며 읽기 작업을 하는 패턴 자체가 이 프로젝트에서 처음이라 미검증

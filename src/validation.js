@@ -37,6 +37,14 @@ const OPENING_WITHOUT_PHOTO = {
     ],
 };
 
+// variant 문자열("WITH_PHOTO"/"WITHOUT_PHOTO") → 프로필. src/text.js가 자동조판 시
+// "이 variant에는 어떤 Script Label이 필요한가"를 판단할 때 이 프로필을 그대로 재사용한다
+// — 읽기 전용 검증과 실제 쓰기 대상 페이지 판별이 같은 기준(requiredFrames)을 쓰도록 하기 위함.
+const OPENING_PROFILES_BY_VARIANT = {
+    WITH_PHOTO: OPENING_WITH_PHOTO,
+    WITHOUT_PHOTO: OPENING_WITHOUT_PHOTO,
+};
+
 function isRealLabel(label) {
     return Boolean(label) && label !== "(label 없음)" && !label.startsWith("(label 읽기 실패");
 }
@@ -344,4 +352,5 @@ module.exports = {
     formatValidationReport,
     validateArticleData,
     formatArticleValidationReport,
+    OPENING_PROFILES_BY_VARIANT,
 };
