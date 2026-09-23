@@ -429,3 +429,26 @@
 - `applyTitleOnly()`가 실제 InDesign에서 에러 없이 동작하는지, WITH_PHOTO/WITHOUT_PHOTO 각각에서 올바른 페이지만 바뀌고 반대쪽은 그대로인지 확인 필요
 - 안전 검사 실패 케이스(Article 미로드, TITLE 없음/중복 등)에서 문서가 실제로 수정되지 않는지 확인 필요
 - doScript 콜백 안에서 여러 페이지를 순회하며 읽기 작업을 하는 패턴 자체가 이 프로젝트에서 처음이라 미검증
+
+---
+
+## 2026-09-23 - TITLE 자동 입력 실기 테스트 성공 확인
+
+완료:
+- 사용자가 실제 InDesign에서 TITLE 자동 입력 기능을 두 variant 모두 테스트한 결과를 확인해 전달:
+  - `opening-page-with-photo.json` Load Article 검증 통과 → Generate 실행 → "사진 있는 시작 페이지"의 TITLE만 JSON의 `title`로 변경됨, "사진 없는 시작 페이지"의 TITLE은 변경되지 않음, POINT_TEXT/BODY/HERO_IMAGE 등 다른 요소도 변경되지 않음
+  - `opening-page-without-photo.json` Load Article 검증 통과 → Generate 실행 → "사진 없는 시작 페이지"의 TITLE만 변경됨, "사진 있는 시작 페이지"의 TITLE은 변경되지 않음, 다른 요소도 변경되지 않음
+  - 안전 검사 실패 케이스(Article 미로드 등)는 이번에 테스트되지 않음
+- `HANDOFF.md` 갱신: 현재 단계를 "첫 자동조판 쓰기(TITLE) 실기 테스트 성공"으로 반영. "완료된 기능"의 `applyTitleOnly` 항목을 실기 검증 완료로 갱신. "실제 테스트 완료된 기능"에 이번 결과를 상세히 추가(어느 페이지가 바뀌고 어느 페이지가 안 바뀌었는지, 다른 요소는 그대로였는지 모두 기록). "아직 테스트하지 못한 기능"에서 TITLE 관련 일반 항목을 제거하고, 아직 확인 안 된 안전 검사 실패 경로만 남김. "미구현 기능"의 `src/text.js` 설명에서 "(미검증)" 제거. "알려진 문제"의 D012 관련 항목을 "패턴 자체는 실기 확인됨, 예외 경로만 미확인"으로 갱신. "다음 추천 작업"에서 완료된 테스트 항목 제거, 안전 검사 테스트를 선택 항목으로 낮추고 POINT_TEXT/BODY 구현을 다음 우선순위로 승격
+- `WORKLOG.md`에 이번 확인 결과 기록
+
+변경 파일:
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(문서화 작업만 수행). 문서에 반영한 TITLE 자동 입력 성공 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- 안전 검사 실패 케이스(Article 미로드, TITLE 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
+- POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전
