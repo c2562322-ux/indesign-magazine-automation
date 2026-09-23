@@ -9,6 +9,10 @@
 // TextFrame.contents는 classic InDesign DOM 기준으로 그 프레임이 속한 스토리(story) 전체
 // 텍스트를 반환하는 것으로 알려져 있다. 즉 Linked Text Frame으로 연결된 프레임이라면 미리보기가
 // "이 프레임에 보이는 텍스트"가 아니라 "연결된 스토리 전체의 앞부분"일 수 있다. (미검증, 참고용)
+//
+// item.label(Script Label)은 이번에 새로 추가한 읽기 전용 출력이다. 목적은 자동화 식별자로
+// name 대신 label을 쓸 수 있는지 판단하기 위해, 현재 InDesign UXP 환경에서 label 속성에
+// 에러 없이 접근 가능한지 확인하는 것이다. label에 값을 쓰는 코드는 아직 없다.
 
 const indesign = require("indesign");
 const app = indesign.app;
@@ -51,9 +55,21 @@ function getBoundsText(item) {
     }
 }
 
+function getLabelText(item) {
+    let label;
+    try {
+        label = item.label;
+    } catch (err) {
+        return `(label 읽기 실패: ${err.message})`;
+    }
+
+    return typeof label === "string" && label.length > 0 ? label : "(label 없음)";
+}
+
 function inspectTextFrame(frame) {
     return {
         name: frame.name && frame.name.length > 0 ? frame.name : null,
+        label: getLabelText(frame),
         preview: getTextPreview(frame),
         bounds: getBoundsText(frame),
     };
@@ -63,6 +79,7 @@ function inspectRectangle(rect) {
     const imageCount = rect.images ? rect.images.length : 0;
     return {
         name: rect.name && rect.name.length > 0 ? rect.name : null,
+        label: getLabelText(rect),
         bounds: getBoundsText(rect),
         hasImage: imageCount > 0,
         imageCount,
@@ -139,6 +156,7 @@ function formatReport(report) {
             page.textFrames.forEach((t) => {
                 const nameLabel = t.name ? t.name : "(이름 없음)";
                 lines.push(`  - name: ${nameLabel}`);
+                lines.push(`    label: ${t.label}`);
                 lines.push(`    text: "${t.preview}"`);
                 lines.push(`    bounds: ${t.bounds}`);
             });
@@ -152,6 +170,7 @@ function formatReport(report) {
                 const nameLabel = r.name ? r.name : "(이름 없음)";
                 const imageInfo = r.hasImage ? `있음 (${r.imageCount}개)` : "없음";
                 lines.push(`  - name: ${nameLabel}`);
+                lines.push(`    label: ${r.label}`);
                 lines.push(`    bounds: ${r.bounds}`);
                 lines.push(`    이미지 배치 여부: ${imageInfo}`);
             });

@@ -195,3 +195,26 @@
 남은 문제:
 - "시작 페이지" 워크시트에 "확인 필요"로 남은 항목이 다수 있어(POINT_TEXT/subtitle 동일 여부, BODY_COLUMN 자동 분배 방식, HERO_IMAGE Required/Optional, 안내 문구 프레임 처리 방식) 디자이너 확인 전까지 Frame Name/Data Field Mapping 등 확정판 표는 채우지 않음
 - 목차, 본문 페이지, 인터뷰 레이아웃은 아직 분석하지 않음
+
+---
+
+## 2026-09-23 - Template Inspector에 Script Label(label) 읽기 전용 출력 추가
+
+완료:
+- `name`이 대부분 비어 있어 프레임 역할 식별이 어렵다는 문제에 대해, `name` 대신 InDesign Script Label(`label`)을 자동화 식별자로 쓸 수 있는지 분석해 보고함 (대화 로그): `name`은 Layers 패널에 노출되는 범용 속성이라 불안정하고, `label`은 스크립팅 전용으로 설계된 메커니즘이라 더 안정적일 가능성이 높다는 결론. 다만 이 UXP 환경에서 `label` 접근이 실제로 되는지는 미검증이라는 점을 명시함
+- 이를 검증하기 위해 `src/inspector.js`를 읽기 전용 그대로 개선: Text Frame과 Rectangle 각각에 `label`(Script Label) 값을 추가로 읽어 `Inspection Log`/콘솔에 출력 (`getLabelText()` 헬퍼 추가, `item.label` 접근 실패 시 에러 메시지를 그대로 표시하도록 try/catch 처리)
+- Script Label에 값을 쓰는 코드, `name`을 바꾸는 코드, 자동조판 코드는 추가하지 않음
+- InDesign 파일(원본/working) 수정 없음, Frame Name 실제 변경 없음
+- `HANDOFF.md` 갱신: 현재 진행 중인 작업에 "자동화 식별자로 name 대신 label 사용 가능 여부 검증 중"을 추가, "완료된 기능"/"아직 테스트하지 못한 기능"/"알려진 문제"/"다음 추천 작업"에 label 관련 항목 반영 (1순위: 시작 페이지에서 Inspect Template 재실행해 label 출력 확인)
+
+변경 파일:
+- src/inspector.js
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 없음. 이번에 추가한 `label` 출력은 아직 실제 InDesign에서 실행해보지 않았다. UDT에서 Reload 후 "시작 페이지"에서 `Inspect Template`을 다시 실행해 에러 없이 `label` 값(대부분 "(label 없음)"으로 예상)이 나오는지 확인하는 것이 다음 단계.
+
+남은 문제:
+- `item.label` 접근이 이 InDesign UXP 환경에서 에러 없이 되는지 미확인 (다음 실기 테스트로 확인 필요)
+- label 접근이 확인되면, 자동화 식별자를 `name`/`label` 중 무엇으로 할지(또는 병행할지)를 DECISIONS.md에 아직 기록하지 않음 — 실기 확인 후 결정할 사항
