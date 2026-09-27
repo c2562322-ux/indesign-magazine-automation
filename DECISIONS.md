@@ -179,3 +179,18 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 실기 테스트에서 탐색+쓰기를 한 `doScript`에 묶는 것이 불필요하거나 문제를 일으키는 것으로 확인되면(예: 대량의 프레임 탐색이 `doScript` 안에서 성능 문제를 일으키면) 재검토.
+
+---
+
+## D013 - POINT_TEXT 입력 추가 시 대상 프레임 탐색 로직을 공유 함수로 일반화
+
+결정:
+`src/text.js`의 `findTitleFrameForVariant(doc, variant)`(TITLE 전용, 실기 검증 완료)를 그대로 복사해 `findPointTextFrameForVariant`를 새로 만드는 대신, 두 함수가 공통으로 쓰는 탐색 로직을 `findLabeledFrameForVariant(doc, variant, targetLabel, expectedType)`로 일반화하고 `findTitleFrameForVariant`/`findPointTextFrameForVariant`는 이 함수를 각자의 label/타입으로 호출하는 얇은 래퍼로 다시 작성했다. `applyTitleOnly`/`applyPointTextOnly`(각각 안전 검사 → `app.doScript` 안에서 탐색+쓰기)는 기존 TITLE 패턴을 그대로 반복한다.
+
+이유:
+- 안전 검사 로직(대상 페이지 0개/2개 이상, 대상 Label 0개/2개 이상, 타입 불일치)이 TITLE/POINT_TEXT에서 완전히 동일하다 — 필드명과 기대 타입만 다르다. 이 로직을 복붙하면 나중에 검사 하나를 고칠 때 두 곳을 항상 같이 고쳐야 하고, 실수로 하나만 고치면 조용히 어긋난다.
+- `findLabeledFrameForVariant`로 일반화해도 실기 검증이 끝난 TITLE의 동작은 그대로 유지된다 — `findTitleFrameForVariant(doc, variant)`는 이제 `findLabeledFrameForVariant(doc, variant, "TITLE", "TextFrame")`을 호출할 뿐이며, 실행되는 코드 경로와 에러 메시지 형식은 기존과 동일하다.
+- `applyTitleOnly`/`applyPointTextOnly`는 각각 독립적인 `app.doScript` 호출로 남겨뒀다(하나로 합치지 않음) — `Generate`가 TITLE을 먼저 쓰고 성공했을 때만 POINT_TEXT를 쓰도록, 필드 단위로 안전 검사와 쓰기를 계속 분리해 두기 위함이다.
+
+변경 조건:
+BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE를 추가할 때도 이 패턴(공유 탐색 함수 + 필드별 독립 `apply*Only` 함수)을 계속 따른다. 프레임 종류가 Rectangle(HERO_IMAGE)인 경우도 `expectedType` 파라미터로 이미 대응 가능하다.

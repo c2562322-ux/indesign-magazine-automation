@@ -1,5 +1,5 @@
 // 검증된 기사 데이터를 InDesign 텍스트 프레임에 실제로 채워 넣는 모듈.
-// 이번 단계에서는 TITLE 하나만 다룬다 — POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과
+// 지금까지 TITLE, POINT_TEXT를 다룬다 — BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과
 // HERO_IMAGE 이미지 배치는 아직 구현하지 않는다 (다음 단계).
 //
 // 대상 페이지 판별은 src/validation.js의 OPENING_PROFILES_BY_VARIANT(읽기 전용 검증에 쓰는
@@ -60,12 +60,14 @@ function pageHasAllRequiredLabels(byLabel, requiredFrames) {
     return requiredFrames.every((req) => byLabel[req.label] && byLabel[req.label].length > 0);
 }
 
-// variant에 맞는 "시작 페이지"를 문서에서 찾고, 그 페이지의 Script Label TITLE 프레임을
-// 정확히 하나 찾아 반환한다. 아래 중 하나라도 어긋나면 문서를 건드리지 않고 Error를 던진다:
+// variant에 맞는 "시작 페이지"를 문서에서 찾고, 그 페이지의 targetLabel Script Label
+// 프레임을 정확히 하나 찾아 반환한다. 아래 중 하나라도 어긋나면 문서를 건드리지 않고 Error를
+// 던진다. TITLE/POINT_TEXT 등 여러 입력 기능이 공유하는 탐색 로직이다(같은 페이지 판별 기준을
+// 계속 재사용하기 위함, D012 연장선):
 //   - variant에 대응하는 프로필이 없음
 //   - variant에 필요한 Script Label을 모두 가진 페이지가 하나도 없음 / 2개 이상임
-//   - 대상 페이지에 TITLE Script Label이 없음 / 2개 이상임 / TextFrame이 아님
-function findTitleFrameForVariant(doc, variant) {
+//   - 대상 페이지에 targetLabel Script Label이 없음 / 2개 이상임 / expectedType이 아님
+function findLabeledFrameForVariant(doc, variant, targetLabel, expectedType) {
     const profile = OPENING_PROFILES_BY_VARIANT[variant];
     if (!profile) {
         throw new Error(`알 수 없는 variant입니다: ${variant}`);
@@ -97,25 +99,35 @@ function findTitleFrameForVariant(doc, variant) {
     }
 
     const targetPage = matchingPages[0];
-    const titleItems = targetPage.byLabel.TITLE || [];
+    const items = targetPage.byLabel[targetLabel] || [];
 
-    if (titleItems.length === 0) {
-        throw new Error(`대상 페이지(${targetPage.pageName})에서 TITLE Script Label을 가진 프레임을 찾지 못했습니다.`);
-    }
-    if (titleItems.length > 1) {
+    if (items.length === 0) {
         throw new Error(
-            `대상 페이지(${targetPage.pageName})에 TITLE Script Label을 가진 프레임이 ` +
-                `${titleItems.length}개 있어 특정할 수 없습니다.`
+            `대상 페이지(${targetPage.pageName})에서 ${targetLabel} Script Label을 가진 프레임을 찾지 못했습니다.`
         );
     }
-    if (titleItems[0].type !== "TextFrame") {
+    if (items.length > 1) {
         throw new Error(
-            `대상 페이지(${targetPage.pageName})의 TITLE Script Label이 TextFrame이 아니라 ` +
-                `${titleItems[0].type}입니다.`
+            `대상 페이지(${targetPage.pageName})에 ${targetLabel} Script Label을 가진 프레임이 ` +
+                `${items.length}개 있어 특정할 수 없습니다.`
+        );
+    }
+    if (items[0].type !== expectedType) {
+        throw new Error(
+            `대상 페이지(${targetPage.pageName})의 ${targetLabel} Script Label이 ${expectedType}이 아니라 ` +
+                `${items[0].type}입니다.`
         );
     }
 
-    return titleItems[0].item;
+    return items[0].item;
+}
+
+function findTitleFrameForVariant(doc, variant) {
+    return findLabeledFrameForVariant(doc, variant, "TITLE", "TextFrame");
+}
+
+function findPointTextFrameForVariant(doc, variant) {
+    return findLabeledFrameForVariant(doc, variant, "POINT_TEXT", "TextFrame");
 }
 
 // 검증을 통과한 OPENING_PAGE 기사 데이터의 title만 TITLE 프레임에 채운다.
@@ -148,6 +160,35 @@ async function applyTitleOnly(articleData) {
     );
 }
 
+// 검증을 통과한 OPENING_PAGE 기사 데이터의 pointText만 POINT_TEXT 프레임에 채운다.
+// applyTitleOnly와 완전히 같은 패턴(검사 → doScript 안에서 탐색+쓰기)이며, TITLE/BODY 등
+// 다른 필드는 이 함수에서 전혀 건드리지 않는다.
+async function applyPointTextOnly(articleData) {
+    if (!articleData) {
+        throw new Error("Load Article로 먼저 검증된 기사 데이터를 불러와야 합니다.");
+    }
+    if (articleData.templateType !== "OPENING_PAGE") {
+        throw new Error(`templateType이 OPENING_PAGE가 아닙니다: ${articleData.templateType}`);
+    }
+    if (typeof articleData.pointText !== "string" || articleData.pointText.length === 0) {
+        throw new Error("article 데이터에 pointText가 없습니다.");
+    }
+
+    const doc = getActiveDocument();
+
+    await app.doScript(
+        () => {
+            const pointTextFrame = findPointTextFrameForVariant(doc, articleData.variant);
+            pointTextFrame.contents = articleData.pointText;
+        },
+        indesign.ScriptLanguage.JAVASCRIPT,
+        [],
+        indesign.UndoModes.ENTIRE_SCRIPT,
+        "Apply Point Text to Opening Page"
+    );
+}
+
 module.exports = {
     applyTitleOnly,
+    applyPointTextOnly,
 };

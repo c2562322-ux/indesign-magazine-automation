@@ -452,3 +452,31 @@
 남은 문제:
 - 안전 검사 실패 케이스(Article 미로드, TITLE 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
 - POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전
+
+---
+
+## 2026-09-28 - POINT_TEXT 자동 입력 추가 (TITLE 패턴 재사용)
+
+완료:
+- `src/text.js`에 `applyPointTextOnly(articleData)` 신규 구현: `currentArticleData.pointText`를 POINT_TEXT Script Label Text Frame의 `contents`에 채운다. `applyTitleOnly`와 완전히 같은 패턴(검사 → `app.doScript` 안에서 대상 페이지/프레임 탐색 → `contents` 대입)
+- 기존 `findTitleFrameForVariant(doc, variant)`를 `findLabeledFrameForVariant(doc, variant, targetLabel, expectedType)`로 일반화하고, `findTitleFrameForVariant`/`findPointTextFrameForVariant`는 이 함수를 각각 `("TITLE", "TextFrame")`/`("POINT_TEXT", "TextFrame")`로 호출하는 얇은 래퍼로 재작성. TITLE의 실행 경로·에러 메시지는 그대로 유지됨(로직 변경 없이 파라미터화만 함)
+- 안전 검사(TITLE과 동일한 5가지 기준을 POINT_TEXT에도 적용): (1) `currentArticleData` 없음, (2) `templateType`이 OPENING_PAGE가 아니거나 `pointText` 없음, (3) variant에 필요한 Script Label을 모두 가진 페이지가 0개/2개 이상, (4) 대상 페이지에 POINT_TEXT Label 프레임이 0개/2개 이상, (5) POINT_TEXT가 TextFrame이 아님. 모두 통과해야만 POINT_TEXT를 쓴다
+- `index.js`의 `Generate` 핸들러 갱신: `applyTitleOnly` 성공 후 이어서 `applyPointTextOnly` 호출, Status에 TITLE/POINT_TEXT 둘 다 입력된 값을 표시
+- `DECISIONS.md`에 D013 기록: 탐색 로직을 공유 함수로 일반화한 이유, TITLE 동작이 바뀌지 않았다고 판단하는 근거, `apply*Only` 함수를 필드별로 독립시킨 이유
+- `HANDOFF.md`/`WORKLOG.md` 갱신: 현재 단계, 완료된 기능, 아직 테스트하지 못한 기능(POINT_TEXT 전체 미검증 명시), 진행 중인 작업, 미구현 기능, 알려진 문제(리팩터링 이후 TITLE 재확인 필요 포함), 다음 추천 작업을 반영
+- 요청받은 범위만 구현: BODY, BODY_COLUMN_1, BODY_COLUMN_2, HERO_IMAGE는 이번에도 구현/수정하지 않음. 기존 TITLE 기능은 유지(호출부 시그니처 동일)
+
+변경 파일:
+- src/text.js
+- index.js
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- 없음. `applyPointTextOnly()`와 리팩터링된 탐색 로직 모두 아직 실제 InDesign에서 실행해본 적이 없다. **이번 작업은 실기 테스트 전이므로 문서에 "성공"으로 기록하지 않았다.**
+
+남은 문제:
+- `applyPointTextOnly()`가 실제 InDesign에서 에러 없이 동작하는지, WITH_PHOTO/WITHOUT_PHOTO 각각에서 올바른 페이지의 POINT_TEXT만 바뀌고 다른 요소·반대쪽 페이지는 그대로인지 확인 필요
+- 탐색 로직 일반화(`findLabeledFrameForVariant`) 이후 TITLE 기능이 여전히 기존과 동일하게 동작하는지 재확인 필요 (이 리팩터링 이후 TITLE을 실기로 다시 테스트한 적 없음)
+- 안전 검사 실패 케이스(Article 미로드, POINT_TEXT 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
