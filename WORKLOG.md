@@ -480,3 +480,29 @@
 - `applyPointTextOnly()`가 실제 InDesign에서 에러 없이 동작하는지, WITH_PHOTO/WITHOUT_PHOTO 각각에서 올바른 페이지의 POINT_TEXT만 바뀌고 다른 요소·반대쪽 페이지는 그대로인지 확인 필요
 - 탐색 로직 일반화(`findLabeledFrameForVariant`) 이후 TITLE 기능이 여전히 기존과 동일하게 동작하는지 재확인 필요 (이 리팩터링 이후 TITLE을 실기로 다시 테스트한 적 없음)
 - 안전 검사 실패 케이스(Article 미로드, POINT_TEXT 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
+
+---
+
+## 2026-09-28 - POINT_TEXT 실기 테스트 성공 확인 + TITLE 재확인 + Generate 원자성 분석
+
+완료:
+- 사용자가 실제 InDesign에서 POINT_TEXT 자동 입력(및 리팩터링 이후 TITLE)을 두 variant 모두 테스트한 결과를 확인해 전달:
+  - WITH_PHOTO: TITLE 정상 변경, POINT_TEXT 정상 변경, BODY 변화 없음, HERO_IMAGE 변화 없음, WITHOUT_PHOTO 페이지 변화 없음
+  - WITHOUT_PHOTO: TITLE 정상 변경, POINT_TEXT 정상 변경, BODY_COLUMN_1/BODY_COLUMN_2 변화 없음, WITH_PHOTO 페이지 변화 없음
+  - 이 결과로 `findLabeledFrameForVariant` 일반화(D013) 이후 TITLE도 문제없이 동작함이 함께 재확인됨 — 이전 엔트리의 "TITLE 재확인 필요" 남은 문제가 해소됨
+  - 안전 검사 실패 케이스(Article 미로드, Label 없음/중복, 타입 불일치)는 이번에도 테스트되지 않음
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계, "완료된 기능"의 POINT_TEXT 항목을 실기 검증 완료로 갱신, "실제 테스트 완료된 기능"에 이번 결과 상세 추가 및 기존 TITLE 단독 테스트 항목의 "주의" 문구 제거, "아직 테스트하지 못한 기능"에서 POINT_TEXT 전체 미검증 항목을 제거하고 "부분 반영 재현 여부 미확인" 항목으로 대체, "진행 중인 작업"을 BODY/HERO_IMAGE 착수 전 상태로 갱신, "미구현 기능"의 `src/text.js` 설명에서 "미검증" 제거, "알려진 문제"의 D013 관련 항목을 재확인 완료로 갱신하고 `Generate` 순차 쓰기의 부분 반영(원자성) 위험을 분석 결과로 새로 기록, "다음 추천 작업"에서 완료된 테스트 항목을 제거하고 BODY/BODY_COLUMN_1 구현을 1순위로 승격, 원자성 문제 대응 방향 결정을 선택 항목으로 추가
+- BODY와 HERO_IMAGE는 이번에도 구현/수정하지 않음 (요청 범위 유지)
+- `Generate`가 `applyTitleOnly()` 후 `applyPointTextOnly()`를 순차 실행하는 구조가 "검증 실패 시 문서를 수정하지 않는다" 원칙과 충돌 가능한지 분석(코드 변경 없음, 사용자 요청에 따른 분석만): 각 `apply*Only` 함수는 필드 단위로는 안전하지만(자신의 안전 검사를 통과해야만 씀), 서로 별개의 `app.doScript`/Undo 트랜잭션이라 TITLE 성공 후 POINT_TEXT의 검증이 실패하면 문서는 "TITLE만 반영된" 부분 상태로 남을 수 있음 — 필드별 원자성은 보장되지만 `Generate` 클릭 전체의 원자성은 보장되지 않음. BODY/HERO_IMAGE가 추가될수록 위험 범위가 커짐. 수정 여부/방향은 이번에 결정하지 않음
+
+변경 파일:
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(문서화 및 분석 작업만 수행). 문서에 반영한 POINT_TEXT/TITLE 성공 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- 안전 검사 실패 케이스(Article 미로드, Label 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
+- `Generate`의 부분 반영(원자성) 위험은 분석만 했을 뿐, 실기로 재현하거나 코드로 대응한 적은 없음 — BODY 구현 전에 대응 방향을 결정할지 검토 필요
+- BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전

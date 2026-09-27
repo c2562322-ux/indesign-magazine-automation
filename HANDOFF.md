@@ -6,7 +6,7 @@
 
 ## 현재 프로젝트 단계
 
-**TITLE 자동 입력은 실기 테스트 성공(2026-09-23). 이어서 POINT_TEXT 자동 입력을 TITLE과 완전히 같은 패턴으로 추가 구현했다(아직 실기 테스트 전). `Generate`는 이제 TITLE → POINT_TEXT 순서로 채운다. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수, BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 안 됨.**
+**TITLE, POINT_TEXT 자동 입력 모두 WITH_PHOTO/WITHOUT_PHOTO 두 variant에서 실기 테스트 성공. `Generate`는 TITLE → POINT_TEXT 순서로 채우고, 각 variant에서 반대쪽 페이지·BODY·HERO_IMAGE는 그대로임을 확인했다. 탐색 로직을 공유 함수로 일반화한 리팩터링 이후 TITLE도 재확인 완료. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수, BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 안 됨.**
 
 개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
@@ -32,7 +32,9 @@
 
 **사용자가 실제 InDesign에서 두 variant 모두 테스트해 성공을 확인했다**(2026-09-23): `opening-page-with-photo.json`을 `Load Article`로 불러와 검증 통과 후 `Generate`하면 "사진 있는 시작 페이지"의 TITLE만 JSON의 `title`로 바뀌고 "사진 없는 시작 페이지"의 TITLE·POINT_TEXT/BODY/HERO_IMAGE 등 다른 요소는 전혀 바뀌지 않음. `opening-page-without-photo.json`으로는 반대로 "사진 없는 시작 페이지"의 TITLE만 바뀌고 "사진 있는 시작 페이지"는 그대로임. 즉 `OPENING_PROFILES_BY_VARIANT` 기반 대상 페이지 판별과 doScript 콜백 안에서의 탐색+쓰기가 실제로 올바르게 동작함이 확인됐다([DECISIONS.md](DECISIONS.md) D012). 안전 검사 실패 케이스(Article 미로드 등)는 이번 테스트에서 별도로 확인되지 않았다.
 
-이 성공을 바탕으로 (2026-09-28) `src/text.js`에 **POINT_TEXT 자동 입력**을 추가했다: `applyPointTextOnly(articleData)`가 `currentArticleData.pointText`를 POINT_TEXT Script Label Text Frame의 `contents`에 채운다. TITLE 전용이던 대상 페이지 탐색 로직(`findTitleFrameForVariant`)을 `findLabeledFrameForVariant(doc, variant, targetLabel, expectedType)`로 일반화해 TITLE/POINT_TEXT가 정확히 같은 페이지 판별 기준과 안전 검사(대상 페이지 0개/2개 이상, Label 0개/2개 이상, 타입 불일치)를 공유하도록 했다([DECISIONS.md](DECISIONS.md) D013). 기존 TITLE 동작(실행 경로, 에러 메시지)은 그대로다 — 함수를 얇은 래퍼로 다시 감쌌을 뿐 로직은 바뀌지 않았다. `Generate` 버튼은 이제 TITLE을 먼저 쓰고 성공하면 이어서 POINT_TEXT를 쓴다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 이번에도 구현하지 않았다. **POINT_TEXT 입력은 아직 실제 InDesign에서 실행해본 적이 없다** — TITLE만 재확인되고 POINT_TEXT는 코드만 작성된 상태.
+이 성공을 바탕으로 (2026-09-28) `src/text.js`에 **POINT_TEXT 자동 입력**을 추가했다: `applyPointTextOnly(articleData)`가 `currentArticleData.pointText`를 POINT_TEXT Script Label Text Frame의 `contents`에 채운다. TITLE 전용이던 대상 페이지 탐색 로직(`findTitleFrameForVariant`)을 `findLabeledFrameForVariant(doc, variant, targetLabel, expectedType)`로 일반화해 TITLE/POINT_TEXT가 정확히 같은 페이지 판별 기준과 안전 검사(대상 페이지 0개/2개 이상, Label 0개/2개 이상, 타입 불일치)를 공유하도록 했다([DECISIONS.md](DECISIONS.md) D013). 기존 TITLE 동작(실행 경로, 에러 메시지)은 그대로다 — 함수를 얇은 래퍼로 다시 감쌌을 뿐 로직은 바뀌지 않았다. `Generate` 버튼은 이제 TITLE을 먼저 쓰고 성공하면 이어서 POINT_TEXT를 쓴다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 이번에도 구현하지 않았다.
+
+**사용자가 실제 InDesign에서 두 variant 모두 테스트해 성공을 확인했다**(2026-09-28): WITH_PHOTO는 TITLE 정상 변경, POINT_TEXT 정상 변경, BODY 변화 없음, HERO_IMAGE 변화 없음, WITHOUT_PHOTO 페이지 변화 없음. WITHOUT_PHOTO는 TITLE 정상 변경, POINT_TEXT 정상 변경, BODY_COLUMN_1/BODY_COLUMN_2 변화 없음, WITH_PHOTO 페이지 변화 없음. 같은 테스트에서 **리팩터링(`findLabeledFrameForVariant` 일반화) 이후 TITLE도 두 variant 모두 정상 동작함이 재확인**되어, D013 이후 남아 있던 "TITLE 재확인 필요" 항목이 해소됐다. 안전 검사 실패 케이스(Article 미로드, Label 없음/중복, 타입 불일치 등)는 이번 테스트에서도 확인되지 않았다.
 
 ## 완료된 기능
 
@@ -48,7 +50,7 @@
 - Text Frame 연결(텍스트 스레드) 읽기 전용 확인 기능 추가 및 실기 검증 완료: [src/inspector.js](src/inspector.js)에 `TextFrame.previousTextFrame`/`nextTextFrame`을 읽어 `Inspection Log`에 출력하는 기능(`getLinkedFrameInfo`), [src/validation.js](src/validation.js)에 "BODY_COLUMN_1 → BODY_COLUMN_2" 연결 여부를 판정하는 `linkChecks`(`checkFrameLink`)를 추가해 기존 `Inspect Template` 흐름에 포함. 실제 InDesign에서 두 프레임이 연결되어 있음을 확인함(2026-09-23). 프레임을 연결/수정하는 코드는 없음.
 - `Load Article` 버튼 구현 및 실기 검증 완료 ([src/data.js](src/data.js)의 `loadArticleFile()`, [src/validation.js](src/validation.js)의 `validateArticleData()`/`formatArticleValidationReport()`): 파일 선택 대화상자로 JSON 파일을 골라 읽고, `JSON.parse` 실패/OPENING_PAGE 계약 위반을 구분해서 어떤 필드가 문제인지 `Article Log`와 콘솔에 표시. 검증 통과 시에만 `index.js`의 `currentArticleData`에 메모리 보관. InDesign 문서는 전혀 건드리지 않음(순수 로컬 파일 읽기+데이터 검증). 사용자가 실제 InDesign에서 두 샘플 파일 모두 "검증 통과"를 확인함(2026-09-23).
 - `Generate` 버튼으로 자동조판 쓰기(TITLE) 구현 및 실기 검증 완료 ([src/text.js](src/text.js)의 `applyTitleOnly`): `currentArticleData`의 `variant`에 맞는 "시작 페이지"를 `src/validation.js`의 Script Label 프로필로 찾아, 그 페이지의 TITLE Text Frame `contents`에 `title`만 입력. 대상 페이지/TITLE 프레임 존재·개수·타입 안전 검사를 모두 통과해야만 문서를 수정한다. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 둘 다 올바른 페이지만 수정되고 반대쪽·다른 요소는 그대로임을 확인함(2026-09-23).
-- `Generate` 버튼으로 자동조판 쓰기(POINT_TEXT) 구현 ([src/text.js](src/text.js)의 `applyPointTextOnly`, TITLE과 동일한 패턴 재사용 — [DECISIONS.md](DECISIONS.md) D013): TITLE 성공 후 이어서 POINT_TEXT Text Frame `contents`에 `pointText`만 입력. 대상 페이지/POINT_TEXT 프레임 존재·개수·타입 안전 검사를 모두 통과해야만 문서를 수정한다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 여전히 건드리지 않음. **아직 실기 테스트 전.**
+- `Generate` 버튼으로 자동조판 쓰기(POINT_TEXT) 구현 및 실기 검증 완료 ([src/text.js](src/text.js)의 `applyPointTextOnly`, TITLE과 동일한 패턴 재사용 — [DECISIONS.md](DECISIONS.md) D013): TITLE 성공 후 이어서 POINT_TEXT Text Frame `contents`에 `pointText`만 입력. 대상 페이지/POINT_TEXT 프레임 존재·개수·타입 안전 검사를 모두 통과해야만 문서를 수정한다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 여전히 건드리지 않음. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 둘 다 올바른 페이지의 TITLE·POINT_TEXT만 바뀌고 BODY/HERO_IMAGE/반대쪽 페이지는 그대로임을 확인함(2026-09-28).
 
 ## 실제 테스트 완료된 기능
 
@@ -61,7 +63,8 @@
 - Script Label 기반 프레임 검증 기능([src/validation.js](src/validation.js)): Script Label이 부여된 실제 working .indd에서 `Inspect Template`을 실행해 page.name=2("시작 페이지(사진 있음)")와 page.name=3("시작 페이지(사진 없음)") 모두 `TITLE`/`POINT_TEXT`/`BODY`/`HERO_IMAGE` 및 `TITLE`/`POINT_TEXT`/`BODY_COLUMN_1`/`BODY_COLUMN_2`가 전부 `[OK]`, "결과: 모두 정상"으로 나옴을 확인 (2026-09-23)
 - `TextFrame.previousTextFrame`/`nextTextFrame` 읽기 및 "BODY_COLUMN_1 → BODY_COLUMN_2" 텍스트 스레드 연결 검사: 실제 InDesign에서 에러 없이 읽혔고, `BODY_COLUMN_1.nextTextFrame`=`BODY_COLUMN_2`, `BODY_COLUMN_2.previousTextFrame`=`BODY_COLUMN_1`로 실제 연결되어 있음을 확인 (2026-09-23) — InDesign UI에 연결선이 안 보인다고 보고됐던 것과 달리 실제로는 연결돼 있었음
 - `Load Article` 버튼: `require("uxp").storage.localFileSystem`로 `sample/opening-page-with-photo.json`/`sample/opening-page-without-photo.json`을 실제로 불러와 둘 다 "결과: 검증 통과"가 나옴을 확인 (2026-09-23) — 이 프로젝트에서 `uxp` storage API가 처음으로 실기 검증됨
-- `Generate` 버튼의 TITLE 자동 입력([src/text.js](src/text.js)의 `applyTitleOnly`): `opening-page-with-photo.json` Load 후 Generate → "사진 있는 시작 페이지"의 TITLE만 JSON의 `title`로 변경, "사진 없는 시작 페이지"의 TITLE 및 POINT_TEXT/BODY/HERO_IMAGE는 변경 없음을 확인. `opening-page-without-photo.json` Load 후 Generate → "사진 없는 시작 페이지"의 TITLE만 변경, "사진 있는 시작 페이지"는 변경 없음을 확인 (모두 2026-09-23) — `OPENING_PROFILES_BY_VARIANT` 기반 대상 페이지 판별과 doScript 안에서의 탐색+쓰기가 실제로 올바르게 동작함이 확인됨. 안전 검사 실패 케이스(Article 미로드 등)는 이번에 테스트되지 않음. **주의**: 이 테스트 당시 `Generate`는 TITLE만 입력했다. 이후(2026-09-28) `Generate`가 TITLE에 이어 POINT_TEXT도 입력하도록 코드가 바뀌어, 이 변경된 `Generate` 흐름 자체는 아직 재확인되지 않았다(아래 "아직 테스트하지 못한 기능" 참고).
+- `Generate` 버튼의 TITLE 자동 입력([src/text.js](src/text.js)의 `applyTitleOnly`): `opening-page-with-photo.json` Load 후 Generate → "사진 있는 시작 페이지"의 TITLE만 JSON의 `title`로 변경, "사진 없는 시작 페이지"의 TITLE 및 POINT_TEXT/BODY/HERO_IMAGE는 변경 없음을 확인. `opening-page-without-photo.json` Load 후 Generate → "사진 없는 시작 페이지"의 TITLE만 변경, "사진 있는 시작 페이지"는 변경 없음을 확인 (모두 2026-09-23) — `OPENING_PROFILES_BY_VARIANT` 기반 대상 페이지 판별과 doScript 안에서의 탐색+쓰기가 실제로 올바르게 동작함이 확인됨. 안전 검사 실패 케이스(Article 미로드 등)는 이번에 테스트되지 않음.
+- `Generate` 버튼의 TITLE + POINT_TEXT 자동 입력([src/text.js](src/text.js)의 `applyTitleOnly`/`applyPointTextOnly`, `findLabeledFrameForVariant` 일반화 이후): WITH_PHOTO/WITHOUT_PHOTO 두 variant 모두에서 TITLE·POINT_TEXT가 올바른 페이지에만 정상 반영되고 BODY/HERO_IMAGE/반대쪽 페이지는 변화 없음을 확인 (2026-09-28) — 이 테스트로 D013 리팩터링 이후 TITLE도 함께 재확인됨. 안전 검사 실패 케이스는 이번에도 확인되지 않음.
 
 **아직 확인되지 않은 부분**: `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록) 출력이 올바른지, "시작 페이지" 외 나머지 페이지(목차/본문 페이지/인터뷰 레이아웃)에서도 동일하게 동작하는지는 아직 보고되지 않았다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
@@ -73,12 +76,12 @@
 - `body`를 `BODY_COLUMN_1.contents`에 쓰면 실제로 `BODY_COLUMN_2`까지 올바르게 흐르는지는 아직 확인되지 않았다 — 지금까지 확인된 것은 "두 프레임이 텍스트 스레드로 연결돼 있다"는 사실뿐이고, 실제로 `contents`를 쓰는 코드는 TITLE에만 적용되어 있다.
 - `Load Article`의 오류 케이스(파일 선택 취소, JSON 문법 오류, 필드 누락/값 오류)가 화면에 올바르게 표시되는지는 아직 실기로 확인되지 않았다 — 정상 케이스만 확인됨.
 - `Generate`의 안전 검사 실패 케이스: Article을 불러오지 않은 채 `Generate`를 눌렀을 때 문서가 정말 수정되지 않고 Status에 중단 사유가 뜨는지, TITLE/POINT_TEXT가 없거나 2개 이상이거나 TextFrame이 아닌 경우 등은 이번 테스트에서 확인되지 않았다(정상 성공 케이스만 확인됨).
-- POINT_TEXT 자동 입력 전체([src/text.js](src/text.js)의 `applyPointTextOnly`, `Generate`가 TITLE에 이어 POINT_TEXT를 쓰는 새 흐름): 실제 InDesign에서 한 번도 실행해본 적이 없다. WITH_PHOTO/WITHOUT_PHOTO 각각에서 올바른 페이지의 POINT_TEXT만 바뀌고 다른 요소·반대쪽 페이지는 그대로인지, TITLE과 POINT_TEXT가 순서대로 둘 다 정상 반영되는지 전부 미확인.
+- TITLE 성공 후 POINT_TEXT 자체의 안전 검사가 실패하는 경우(예: POINT_TEXT Label 없음/중복, 타입 불일치) 문서가 TITLE만 바뀐 채로 남는지 — 즉 "부분 반영" 상태가 실제로 재현되는지는 아직 실기로 확인된 적이 없다(아래 "알려진 문제"의 원자성 분석 참고).
 
 ## 진행 중인 작업
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(pointText가 원래 handoff 문서의 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다.
-- `Generate`의 TITLE 자동 입력은 실기 테스트로 성공이 확인됐다. POINT_TEXT 자동 입력은 TITLE과 완전히 같은 패턴으로 코드를 작성했지만, 사용자가 실제 InDesign에서 실행해 확인해주기 전까지는 "성공"으로 기록하지 않는다. BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 POINT_TEXT 테스트가 끝난 뒤 같은 패턴으로 순서대로 진행할 예정이며 아직 시작하지 않았다.
+- `Generate`의 TITLE·POINT_TEXT 자동 입력 모두 실기 테스트로 성공이 확인됐다(2026-09-28). BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치를 같은 패턴(`findLabeledFrameForVariant` 재사용)으로 다음 단계로 진행할 예정이며 아직 시작하지 않았다.
 
 ## Script Label 부여 및 검증 현황
 
@@ -95,7 +98,7 @@
 
 - `src/data.js`: JSON 파일 선택/읽기 구현 및 실기 검증 완료. `sample/opening-page-*.json` 외 다른 Template Type용 데이터 로드는 아직 없음
 - `src/template.js`: `templateType`(`OPENING_PAGE` 등)별 템플릿 처리, `variant`에 따른 분기
-- `src/text.js`: TITLE(실기 검증 완료)/POINT_TEXT(코드 작성 완료, 미검증) 입력 구현됨. BODY/BODY_COLUMN_1/BODY_COLUMN_2를 텍스트 프레임 `contents`에 채워 넣는 코드는 아직 없음
+- `src/text.js`: TITLE/POINT_TEXT(둘 다 실기 검증 완료) 입력 구현됨. BODY/BODY_COLUMN_1/BODY_COLUMN_2를 텍스트 프레임 `contents`에 채워 넣는 코드는 아직 없음
 - `src/image.js`: HERO_IMAGE 등 이미지 프레임 배치
 - `src/validation.js`: "시작 페이지" Script Label 기준 프레임 존재/타입 검사, OPENING_PAGE 기사 데이터 검증은 구현됨(둘 다 실기 미검증인 부분이 남아 있음). 이미지 누락, Overset Text 검사, 다른 Template Type에 대한 검증은 아직 없음
 - 여러 기사 지원, 여러 템플릿 지원
@@ -117,7 +120,8 @@
 - `src/data.js`가 사용하는 `require("uxp").storage.localFileSystem`은 Adobe UXP 공식 문서에 있는 플랫폼 공통 API지만, 이 프로젝트에서 `uxp` 모듈(지금까지는 `indesign` 모듈만 사용)을 처음 호출하는 것이라 이 InDesign UXP 환경에서 실제로 동일하게 동작하는지 검증되지 않았다. `getFileForOpening()`의 파일 형식 필터(`types`)는 정확한 옵션 형태가 불확실해 의도적으로 생략했다([DECISIONS.md](DECISIONS.md) D011). (2026-09-23 실기 테스트로 정상 케이스 동작은 확인됨 — 위 "실제 테스트 완료된 기능" 참고. 오류 케이스는 아직 미확인.)
 - `src/text.js`의 `applyTitleOnly()`는 대상 페이지/TITLE 프레임 탐색과 `contents` 쓰기를 하나의 `app.doScript` 콜백 안에서 함께 수행한다([DECISIONS.md](DECISIONS.md) D012). 이 패턴("doScript 콜백 안에서 여러 페이지를 순회하며 읽기 + 쓰기")은 실기 테스트로 정상 동작이 확인됐다(2026-09-23). 다만 대상 페이지/TITLE 프레임을 못 찾는 등 예외가 doScript 콜백 안에서 던져지는 안전 검사 실패 경로는 아직 실기로 확인되지 않았다.
 - `Generate` 버튼의 동작이 "Hello Magazine 생성"에서 "TITLE 자동 입력"으로 바뀌었다. `addHelloText()` 함수 자체는 `src/indesign.js`에 남아 있지만 더 이상 UI와 연결되어 있지 않다 — 필요하면 디버깅용으로 재연결할 수 있지만 현재는 죽은 코드에 가깝다.
-- `src/text.js`의 `findTitleFrameForVariant`를 `findLabeledFrameForVariant`로 일반화하고 `findPointTextFrameForVariant`를 추가했다([DECISIONS.md](DECISIONS.md) D013). TITLE 쪽 실행 경로/에러 메시지는 바뀌지 않았다고 판단하지만, 이 리팩터링 이후 TITLE을 다시 실기로 재확인한 적은 없다 — POINT_TEXT 테스트 때 TITLE도 여전히 정상 동작하는지 함께 확인해야 한다.
+- `src/text.js`의 `findTitleFrameForVariant`를 `findLabeledFrameForVariant`로 일반화하고 `findPointTextFrameForVariant`를 추가했다([DECISIONS.md](DECISIONS.md) D013). 이 리팩터링 이후 TITLE도 POINT_TEXT와 함께 두 variant 모두 실기로 재확인되어(2026-09-28), 실행 경로/에러 메시지가 바뀌지 않았음이 확인됐다.
+- **`Generate`의 순차 쓰기와 "검증 실패 시 문서를 수정하지 않는다" 원칙 사이의 잠재적 충돌 (분석, 미해결)**: `applyTitleOnly()`와 `applyPointTextOnly()`는 각각 자기 자신의 범위 안에서는 안전하다 — 각 함수는 자신의 안전 검사를 모두 통과해야만 그 함수가 담당하는 프레임에 쓴다. 하지만 이 둘은 서로 **별개의 `app.doScript` 호출(별개의 Undo 트랜잭션)**이다. 따라서 `applyTitleOnly()`가 성공적으로 TITLE을 쓴 뒤 `applyPointTextOnly()`의 안전 검사가 실패하면(예: POINT_TEXT Label이 없거나 중복되거나 타입이 다름), `Generate` 클릭 전체로 보면 문서는 "TITLE만 바뀌고 POINT_TEXT는 안 바뀐" 부분 반영 상태로 남는다 — "이 클릭에서 검증이 실패했으니 문서는 그대로여야 한다"는 사용자 관점의 기대와 어긋날 수 있다. 되돌리려면 Ctrl+Z를 TITLE 쓰기만큼 별도로 눌러야 한다(POINT_TEXT는 애초에 안 쓰였으므로 Undo 스택에 없음). 필드별 안전성은 지켜지지만 "Generate 클릭 전체의 원자성"은 코드가 보장하지 않는다. BODY/HERO_IMAGE가 같은 순차 패턴으로 추가될수록 부분 반영 가능성의 범위(몇 개 필드가 먼저 성공했을 수 있는지)가 커진다. 아직 실기로 이 부분 반영 상태 자체가 재현된 적은 없고(정상 성공 케이스만 테스트됨), 수정 방향도 아직 결정하지 않았다 — 사용자 요청에 따라 이번에는 분석만 하고 코드는 변경하지 않았다.
 
 ## 외부 대기 사항
 
@@ -125,9 +129,9 @@
 
 ## 다음 추천 작업
 
-1. UDT에서 Reload 후, `sample/opening-page-with-photo.json`을 `Load Article`로 검증 통과시킨 뒤 `Generate`를 클릭해 "사진 있는 시작 페이지"의 TITLE과 POINT_TEXT가 모두 JSON 값으로 바뀌는지, "사진 없는 시작 페이지"는 그대로인지 확인한다. 이어서 `sample/opening-page-without-photo.json`으로도 같은 방식으로 반대 방향을 확인한다. 결과를 전달하면 HANDOFF.md/WORKLOG.md에 반영한다.
+1. BODY(WITH_PHOTO)와 BODY_COLUMN_1(WITHOUT_PHOTO, `BODY_COLUMN_2`는 건드리지 않음)을 같은 패턴(`findLabeledFrameForVariant` 재사용)으로 추가한다 — `BODY_COLUMN_1`에 쓴 본문이 실제로 `BODY_COLUMN_2`까지 흐르는지 이 단계에서 처음 확인하게 된다.
 2. (선택) Article을 불러오지 않은 채 `Generate`를 눌러 문서가 전혀 바뀌지 않고 Status에 중단 사유가 뜨는지 확인한다 — 안전 검사 실패 경로는 아직 테스트되지 않았다.
-3. 위 테스트가 통과하면 BODY(WITH_PHOTO)와 BODY_COLUMN_1(WITHOUT_PHOTO, `BODY_COLUMN_2`는 건드리지 않음)을 같은 패턴(`findLabeledFrameForVariant` 재사용)으로 추가한다 — `BODY_COLUMN_1`에 쓴 본문이 실제로 `BODY_COLUMN_2`까지 흐르는지 이 단계에서 처음 확인하게 된다.
+3. (선택) 위 "알려진 문제"에 기록한 `Generate` 순차 쓰기의 부분 반영 가능성을 어떻게 다룰지 결정한다 — 예: TITLE/POINT_TEXT(추후 BODY 포함)의 안전 검사를 모두 먼저 통과시킨 뒤에만 실제 쓰기를 시작하는 방식, 또는 현재처럼 필드별 독립 트랜잭션을 유지하고 실패 시 안내 문구로 대응하는 방식.
 4. 이미지 배치(`heroImage` → `HERO_IMAGE` Rectangle)는 텍스트 자동조판이 안정된 뒤 별도 단계로 진행한다.
 5. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
 6. 위 MVP가 "시작 페이지"에서 안정되면 "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해 같은 방식으로 분석·검증·데이터 계약을 확장한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 순서대로 진행한다.
