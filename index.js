@@ -1,4 +1,4 @@
-// UI 이벤트 바인딩과 프로그램 시작점. InDesign 제어 로직은 src/indesign.js에 위임한다.
+// UI 이벤트 바인딩과 프로그램 시작점. InDesign 제어 로직은 src/text.js, src/inspector.js 등에 위임한다.
 
 const { inspectDocument, formatReport } = require("./src/inspector.js");
 const {

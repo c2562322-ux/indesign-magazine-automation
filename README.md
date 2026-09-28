@@ -24,24 +24,22 @@ indesign-magazine-automation/
 ├─ index.js           버튼 이벤트 바인딩, 프로그램 시작점
 │
 ├─ src/
-│  ├─ indesign.js     InDesign document/page/frame 접근 및 제어 (구현됨)
 │  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
 │  ├─ data.js         JSON/DOCX 파일 선택/읽기(require("uxp").storage), 파일 nativePath 반환 (JSON은 실기 검증 완료, DOCX 분기는 D019·미검증)
 │  ├─ docxZip.js      .docx(ZIP) 안의 항목을 꺼내는 최소 ZIP 리더 + 직접 구현한 RFC 1951(DEFLATE) 압축 해제 (D019, 미검증)
 │  ├─ docxArticle.js  word/document.xml에서 문단/텍스트 추출 + 마커 파싱 → Article Data 변환 (D019, 미검증)
-│  ├─ template.js     templateType별 템플릿 처리 (예정)
 │  ├─ text.js         TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 입력을 applyOpeningPageContent() 하나로 통합 구현. TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE(WITH_PHOTO 정상 케이스)는 실기 검증 완료
 │  ├─ image.js         heroImage 경로 해석/파일 접근 확인(fs.lstat)/place 구현 및 실기 검증 완료. fit/리사이즈 없음
-│  └─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
+│  ├─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
+│  ├─ indesign.js     [사용되지 않음] 초기 "Hello Magazine" 테스트 코드(addHelloText)만 남아 있고 D012 이후 어디서도 require되지 않는다. 삭제 여부는 별도 판단 대상(cleanup 범위 밖) — 최종 배포 패키지에는 포함하지 않는다
+│  └─ template.js     [사용되지 않음] templateType별 템플릿 처리용으로 만든 빈 스텁, 미구현. 최종 배포 패키지에는 포함하지 않는다
 │
-├─ sample/
-│  ├─ article.json                          개발용 테스트 기사 데이터 (FEATURE 예시, 이번 작업과 무관)
+├─ sample/                                   회귀 테스트용 샘플(개발 저장소에만 유지, 최종 배포 패키지에는 포함하지 않음)
 │  ├─ opening-page-with-photo.json           "시작 페이지"(사진 있음) 샘플 데이터
 │  ├─ opening-page-without-photo.json        "시작 페이지"(사진 없음) 샘플 데이터
 │  ├─ opening-page-without-photo-long-test.json  Text Thread 실기 테스트용(본문을 길게 늘림)
-│  ├─ hero.png / eye-clinic-hero.png         실기 테스트용 이미지(heroImage가 참조하는 JSON/DOCX와 같은 폴더)
-│  ├─ article-eye-clinic-with-photo.docx     Word 입력 MVP 실기 테스트용 샘플(D019, 안과 병원 매거진 예시)
-│  └─ images/                                개발용 테스트 이미지(예전 sample/article.json 전용, 이번 작업과 무관)
+│  ├─ eye-clinic-hero.png                    실기 테스트용 이미지(article-eye-clinic-with-photo.docx의 heroImage가 참조하는 파일)
+│  └─ article-eye-clinic-with-photo.docx     Word 입력 MVP 실기 테스트용 샘플(D019, 안과 병원 매거진 예시)
 │
 ├─ assets/
 │  ├─ templates/
@@ -52,7 +50,7 @@ indesign-magazine-automation/
 └─ README.md
 ```
 
-UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)을 분리해서, InDesign API 사용 방식이 바뀌어도 UI 코드를 건드리지 않도록 구성했다.
+UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/text.js`, `src/inspector.js`, `src/image.js` 등)을 분리해서, InDesign API 사용 방식이 바뀌어도 UI 코드를 건드리지 않도록 구성했다. `src/indesign.js`는 초기 "Hello Magazine" 테스트 코드가 남아 있는 미사용 파일이다(위 폴더 구조 참고).
 
 ## assets 폴더
 
@@ -67,6 +65,33 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 ## 기사 데이터 규격
 
 자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. `Load Article` 버튼으로 이 JSON을 선택/읽기/검증하는 기능은 구현됐고, `Generate` 버튼으로 `title`/`pointText`/`body`/(WITH_PHOTO는)`heroImage`를 TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1)/HERO_IMAGE 프레임에 채워 넣는 것까지 구현됐다(`src/text.js`의 `applyOpeningPageContent`, 하나의 `app.doScript` 안에서 모든 프레임 탐색·WITHOUT_PHOTO의 텍스트 스레드 연결 확인을 마친 뒤에만 쓰기를 시작함 — [DECISIONS.md](DECISIONS.md) D014/D015/D017). `heroImage`는 `Load Article`로 불러온 JSON 파일이 있는 폴더 기준 상대 경로로 해석하며, 기존 `HERO_IMAGE` Rectangle의 위치/크기는 건드리지 않고 이미지만 place한다([src/image.js](src/image.js)). TITLE+POINT_TEXT+BODY 범위는 실기 검증 완료, HERO_IMAGE가 포함된 현재 구조는 아직 실기 테스트 전이다.
+
+## 최종 사용자 배포 패키지
+
+개발 저장소에는 회귀 테스트용 `sample/` 샘플과 프로젝트 관리 문서를 그대로 유지한다. 최종 사용자에게 전달하는 배포 패키지를 만들 때는 아래 기준으로 포함/제외한다.
+
+**배포 패키지에 포함(런타임에 실제로 필요한 파일)**
+
+```
+manifest.json
+index.html
+styles.css
+index.js
+src/inspector.js
+src/validation.js
+src/data.js
+src/docxArticle.js
+src/docxZip.js
+src/text.js
+src/image.js
+```
+
+**배포 패키지에서 제외**
+
+- `sample/` — 회귀 테스트용 샘플. `Load Article`은 사용자가 직접 선택한 파일만 읽으므로 최종 사용자에게는 불필요하다.
+- `docs/`, `assets/` — 개발 문서 및 디자이너 원본 리소스.
+- `CLAUDE.md`, `README.md`, `HANDOFF.md`, `WORKLOG.md`, `DECISIONS.md` — 프로젝트 관리/개발 이력 문서.
+- `src/indesign.js`, `src/template.js` — 어디서도 `require`되지 않는 미사용 코드(위 폴더 구조 참고). 저장소에는 남아 있지만 배포 패키지에는 포함하지 않는다.
 
 ## UXP Developer Tool에서 실행하는 방법
 

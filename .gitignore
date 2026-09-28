@@ -9,3 +9,7 @@ assets/templates/working/*
 
 assets/fonts/*
 !assets/fonts/.gitkeep
+
+# Microsoft Office lock/temp files (e.g. ~$ticle-eye-clinic-with-photo.docx),
+# created while a .docx/.xlsx is open in Word/Excel and removed when it's closed.
+~$*

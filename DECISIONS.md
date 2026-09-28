@@ -379,3 +379,19 @@ Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파�
 
 변경 조건:
 재테스트에서 (0) 플러그인이 정상적으로 UI를 렌더링하는지(빈 패널 문제 해소), (a) `sample/article-eye-clinic-with-photo.docx`를 Load Article로 불러왔을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 정확히 추출되는지, (b) Generate까지 실행했을 때 기존 JSON 경로와 동일하게 정상 반영되는지, (c) 기존 JSON 샘플 파일들이 이번 변경 이후에도 문제없이 동작하는지(회귀 확인)가 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. 파서 버그가 발견되면 `src/docxZip.js`/`src/docxArticle.js`만 수정하고 InDesign 배치 로직(`src/text.js`/`src/image.js`)은 건드리지 않는다.
+
+## D020: 최종 배포 대비 cleanup — 진단 로그 제거, 저장소 샘플 정리, 배포 패키지 제외 목록 확정
+
+날짜: 2026-09-28
+
+배경: D019 이후 HERO_IMAGE가 기존 그래픽이 있는 프레임에서 교체되지 않는 문제를 조사하기 위해 `src/text.js`/`index.js`에 진단용 `console.log`와 Status 노출 코드를 두 차례(1회는 이미 커밋 `c7421d5`, 1회는 uncommitted)에 걸쳐 추가했다. 이 조사가 아직 결론 나지 않은 상태에서, 사용자가 "현재까지 커밋된 내용은 origin/main에 push 완료했으니 최종 배포 cleanup을 진행하자"고 요청했다. 먼저 (1) uncommitted 진단 변경 중 배포에 불필요한 부분, (2) `sample/`의 각 파일이 런타임에 필요한지, (3~5) 저장소 보관/완전 삭제/배포 패키지에서만 제외 대상 분류, (6) `sample/eye-clinic-hero.png`의 "modified" 상태가 무엇인지, (7) 최종 배포에 실제 필요한 파일 목록을 **삭제/수정/commit 없이 분석만** 보고한 뒤, 그 분석을 사용자가 검토하고 방향을 확정해 이 cleanup을 진행했다.
+
+결정 및 실행 내용:
+1. **진단 로그 완전 제거, 동작 변경 없음**: `src/text.js`의 `applyOpeningPageContent()`와 `index.js`의 `Generate` 핸들러에서 `[HERO_IMAGE 진단]` `console.log` 전량(이미 커밋된 `c7421d5`분 포함)과, `src/text.js`가 반환하던 진단용 `{ heroImageNativePath }`, `index.js`의 Status 문자열에 실제 파일 절대경로를 노출하던 `heroImageNote`를 제거했다. `rectangle.place()` 호출, 탐색-후-쓰기 doScript 구조, Script Label 계약, HERO_IMAGE/HERO_IMAGE_GUIDE 처리 순서 등 실제 동작은 한 줄도 바꾸지 않았다 — Status는 다시 진단 이전과 동일하게 TITLE/POINT_TEXT/BODY(+variant) 완료 메시지만 표시한다. **HERO_IMAGE가 기존 그래픽이 있는 프레임에서 교체되지 않는 문제 자체는 이 cleanup으로 해결되지 않았고 원인도 미확정이다** — 재조사 시 로그를 다시 추가해야 한다.
+2. **저장소에서 완전 삭제**: `sample/article.json`, `sample/images/`(README.md 포함) — 둘 다 현재 자동조판 코드(OPENING_PAGE 등)와 무관한 예전 FEATURE 샘플이라고 이미 `README.md`/`docs/TEMPLATE_SPEC.md`/`sample/images/README.md` 자체에 명시돼 있었고, 어떤 회귀 테스트에도 참조되지 않았다.
+3. **저장소에는 회귀 테스트용으로 유지, 배포 패키지에서는 제외**: `sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`, `sample/opening-page-without-photo-long-test.json`, `sample/article-eye-clinic-with-photo.docx`, `sample/eye-clinic-hero.png`. `sample/eye-clinic-hero.png`는 커밋된 버전(2,208,367바이트, 당시 `hero.png` 복사본)과 working tree 버전(1,791,391바이트)의 바이트 내용이 달랐는데, 사용자가 이 working tree 버전이 실제 안과 병원 실기 테스트에 사용한 이미지가 맞다고 확인해 그 내용 그대로 commit한다 — 애초에 바이트가 달라진 원인(코드가 이 파일에 쓴 적은 없음, Word/동기화 도구 등 외부 요인 추정되나 미확정)은 여전히 불명이지만, 파일 내용 자체는 사용자가 실물로 확인한 유효한 기준 이미지다.
+4. **untracked 임시 파일 정리**: `sample/hero.png`(예전 JSON 테스트용 임시 이미지, 더 이상 어떤 문서/코드에서도 참조되지 않음을 확인)와 Word 잠금 파일 `sample/~$ticle-eye-clinic-with-photo.docx`를 로컬에서 삭제했다. `.gitignore`에 `~$*` 패턴을 추가해 앞으로 Word/Office 잠금 파일이 `git status`에 나타나지 않도록 했다 — 이 패턴은 Office가 만드는 임시 파일 이름 규칙에만 해당하므로 프로젝트 코드/데이터에 영향이 없다.
+5. **죽은 코드(`src/indesign.js`, `src/template.js`)는 삭제하지 않음**: 사용자가 이번 cleanup 범위에서 명시적으로 제외했다 — 기능 코드 정리와 성격이 다른 별도 판단 대상. 다만 어디서도 `require`되지 않는다는 사실은 문서화하고, 최종 배포 패키지에는 포함하지 않는 것으로 README.md에 기록했다.
+6. **최종 사용자 배포 패키지 기준을 README.md에 명문화**: `manifest.json`, `index.html`, `styles.css`, `index.js`, `src/inspector.js`, `src/validation.js`, `src/data.js`, `src/docxArticle.js`, `src/docxZip.js`, `src/text.js`, `src/image.js`만 포함. `sample/`, `docs/`, `assets/`, `CLAUDE.md`/`README.md`/`HANDOFF.md`/`WORKLOG.md`/`DECISIONS.md`, `src/indesign.js`, `src/template.js`는 제외.
+
+이번 결정이 바꾸지 않은 것(사용자 명시 지시): Word(.docx)/JSON 입력 기능, TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 동작, Script Label 계약, InDesign 레이아웃 관련 코드 — 전부 이번 cleanup 전후로 동일하다. 새 기능은 추가하지 않았다.

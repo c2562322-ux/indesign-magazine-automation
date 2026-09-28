@@ -901,3 +901,34 @@
 - 콘솔에 찍힌 `articleData.heroImage`/`resolvedHeroImagePath`/`placeHeroImage에 전달되는 경로` 세 값이 서로 일치하고 모두 `eye-clinic-hero.png` 기준으로 올바른지 재테스트로 확인 필요
 - 위 값들이 모두 정확하다면, "이미 그래픽이 있는 프레임에서 place()가 교체하지 않는다"는 가설이 유력해지므로 다음 단계로 B안(기존 그래픽 명시적 제거/교체) 검토 필요
 - 값 자체가 틀리다면(예: 여전히 hero.png로 나온다면) 데이터/경로 쪽 문제이므로 원인 재분석 필요
+
+---
+
+## 2026-09-28 - 최종 배포 cleanup (D020): 진단 로그 제거 + sample/ 정리 + 배포 패키지 제외 목록 확정
+
+완료:
+- 사용자가 "커밋된 내용은 origin/main에 push 완료했으니 최종 배포 cleanup을 진행하자"고 요청. 먼저 삭제/수정/commit 없이 (1) uncommitted 진단 로그 중 불필요한 부분, (2) `sample/`의 런타임 필요 여부, (3~5) 저장소 보관/완전 삭제/배포 패키지 전용 제외 분류, (6) `sample/eye-clinic-hero.png`의 modified 상태가 무엇인지, (7) 최종 배포 필요 파일 목록을 분석만 해서 보고 — `git diff --stat`으로 `eye-clinic-hero.png`가 2,208,367→1,791,391바이트로 실제 내용이 바뀌었음을 확인했지만 원인은 코드상 근거가 없어 불명으로 보고함. `src/indesign.js`/`src/template.js`가 어디서도 require되지 않는 죽은 코드라는 사실도 이 분석 과정에서 함께 발견해 보고함
+- 사용자가 분석을 검토하고 방향을 확정해 cleanup 진행을 요청함(D020 참고)
+- `src/text.js`의 `applyOpeningPageContent()`와 `index.js`의 `Generate` 핸들러에서 `[HERO_IMAGE 진단]` `console.log`(이미 커밋된 `c7421d5`분 포함) 전량과 진단용 반환값(`{ heroImageNativePath }`)/Status의 경로 노출(`heroImageNote`)을 제거. `rectangle.place()` 호출, doScript 탐색-후-쓰기 구조, Script Label 계약은 전혀 바꾸지 않음. Status는 진단 이전과 동일한 TITLE/POINT_TEXT/BODY(+variant) 완료 메시지만 표시하도록 복원
+- `sample/article.json`, `sample/images/`(README.md 포함) 저장소에서 완전 삭제 — 현재 자동조판 코드와 무관한 예전 FEATURE 샘플임이 기존 문서에 이미 명시돼 있었음
+- `sample/hero.png`(예전 JSON 테스트용 untracked 임시 이미지), `sample/~$ticle-eye-clinic-with-photo.docx`(Word 잠금 파일) 로컬 삭제. `.gitignore`에 `~$*` 패턴 추가
+- `sample/eye-clinic-hero.png`는 working tree 버전(사용자가 실제 안과 병원 실기 테스트에 사용한 이미지로 확인)을 그대로 commit 대상으로 유지 — 바이트가 왜 달라졌는지 원인은 여전히 불명이나, 내용 자체는 사용자가 실물 확인한 유효한 기준 이미지
+- `README.md`: 폴더 구조에서 삭제된 `sample/article.json`/`sample/images/` 항목 제거, `src/indesign.js`/`src/template.js`를 "사용되지 않음"으로 표시, "최종 사용자 배포 패키지" 절 신설(포함/제외 파일 목록 명문화)
+- `index.js`/`HANDOFF.md`: `src/indesign.js` 관련 설명을 실제 require 체인 상태(더 이상 어디서도 require되지 않는 완전한 죽은 코드)에 맞게 갱신
+- `HANDOFF.md`: 현재 프로젝트 단계 서술에 이번 cleanup 경과 추가, "완료된 기능"에서 삭제된 `sample/article.json` 항목 제거, "알려진 문제"에 HERO_IMAGE 교체 문제가 여전히 미해결·원인 미확정임을 명시(재조사 시 로그를 다시 추가해야 함을 기록)
+- `DECISIONS.md`: D020으로 이번 cleanup의 결정 내용과 이유, 바뀌지 않은 것(Word/JSON 입력 기능, TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 동작, Script Label 계약, InDesign 레이아웃 코드) 기록
+
+변경/삭제 파일:
+- index.js (진단 로그/반환값 소비 제거)
+- src/text.js (진단 로그/반환값 제거)
+- .gitignore (`~$*` 패턴 추가)
+- README.md, HANDOFF.md, DECISIONS.md, WORKLOG.md
+- 삭제: sample/article.json, sample/images/README.md(및 폴더)
+- 유지(내용 갱신 없이 그대로 commit): sample/eye-clinic-hero.png
+
+테스트:
+- 코드 동작 자체(HERO_IMAGE/TITLE/POINT_TEXT/BODY 배치 로직)는 변경하지 않았으므로 이번 작업으로 별도 실기 재테스트가 필요하지는 않다고 판단함 — 단, Status 문구가 바뀌었으므로(경로 노출 제거) UDT에서 Generate를 한 번 실행해 Status/콘솔에 더 이상 진단 로그·파일 경로가 나오지 않고 정상 완료 메시지만 뜨는지는 다음 실기 테스트 때 함께 확인 권장(이번 세션에서 사용자가 별도로 확인 완료했다고 보고한 것은 아님)
+
+남은 문제:
+- HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정 (D020 참고, 재조사 시 로그 재추가 필요)
+- 플러그인 빈 화면 수정(getter/setter → 일반 메서드)이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
