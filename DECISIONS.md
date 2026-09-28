@@ -213,7 +213,7 @@ BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE를 추가할 때도 이 패턴(공�
 
 이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): doScript 콜백 안에서 `titleFrame.contents = ...`가 성공한 바로 다음 줄 `pointTextFrame.contents = ...`가 실패하는 경우, `UndoModes.ENTIRE_SCRIPT`가 예외 발생 시 이미 실행된 대입을 자동으로 롤백하는지는 이 프로젝트에서 확인된 적이 없다. 두 탐색이 모두 성공한 뒤의 단순 `contents` 대입이 실패할 가능성 자체는 낮다고 보지만, 이 지점은 여전히 이론적 위험으로 남는다.
 
-이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+**실기 검증 완료(2026-09-28)**: 사용자가 실제 InDesign에서 (a) 정상 케이스 — WITH_PHOTO/WITHOUT_PHOTO 두 variant 모두 TITLE+POINT_TEXT가 함께 올바르게 반영되고 BODY/HERO_IMAGE/반대쪽 페이지는 그대로임을 확인, (b) 실패 케이스 — WITH_PHOTO의 POINT_TEXT Script Label을 임시로 바꾼 뒤 Generate를 실행하자 "필요한 Script Label을 가진 페이지를 찾지 못했다"는 오류로 중단됐고 TITLE도 전혀 반영되지 않음을 확인(테스트 후 Script Label 원복)했다. 이 실패 케이스는 탐색 단계(`findLabeledFrameForVariant`가 필요한 Script Label을 모두 가진 페이지를 찾는 단계)에서 막힌 것이며, 위에서 언급한 "두 번째 `contents` 대입이 실패하는" 이론적 시나리오를 재현한 것은 아니다 — 그 부분은 여전히 미검증으로 남는다.
 
 변경 조건:
-실기 테스트에서 (a) 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO 모두 TITLE+POINT_TEXT가 함께 올바르게 반영됨)와 (b) 실패 케이스(POINT_TEXT 탐색을 의도적으로 실패시켰을 때 TITLE도 전혀 반영되지 않음, Undo 한 번으로 전체가 되돌아감)가 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. BODY/HERO_IMAGE를 추가할 때도 이 "탐색 전부 → 쓰기 전부" 패턴을 그대로 확장할지, 아니면 다른 구조가 필요할지는 그 시점에 다시 검토한다.
+BODY/HERO_IMAGE를 추가할 때 이 "탐색 전부 → 쓰기 전부" 패턴을 그대로 확장할지, 아니면 다른 구조가 필요할지는 그 구현 시점에 다시 검토한다.

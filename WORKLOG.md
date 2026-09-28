@@ -536,3 +536,32 @@
 - doScript 콜백 안에서 `titleFrame.contents` 대입 이후 `pointTextFrame.contents` 대입이 실패하는 극단적 경우, `UndoModes.ENTIRE_SCRIPT`가 이미 실행된 대입을 자동 롤백하는지는 여전히 미검증(이론적 위험으로만 문서화)
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
 - BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전 — D014 검증 후 이 패턴을 BODY까지 확장할지 여부도 그때 결정
+
+---
+
+## 2026-09-28 - applyTitleAndPointText(D014) 실기 테스트 성공 확인 (정상 + 실패 케이스)
+
+완료:
+- 사용자가 실제 InDesign에서 `applyTitleAndPointText()`를 정상 케이스와 실패 케이스 모두 테스트한 결과를 확인해 전달:
+  - 정상 케이스: WITH_PHOTO는 TITLE 정상 변경, POINT_TEXT 정상 변경, BODY 변화 없음, HERO_IMAGE 변화 없음, 반대 variant 변화 없음. WITHOUT_PHOTO는 TITLE 정상 변경, POINT_TEXT 정상 변경, BODY_COLUMN_1/BODY_COLUMN_2 변화 없음, 반대 variant 변화 없음
+  - 실패 케이스: WITH_PHOTO의 POINT_TEXT Script Label을 임시로 변경한 뒤 Generate 실행 → "필요한 Script Label을 가진 페이지를 찾지 못했다"는 오류로 Generate 중단 → TITLE도 변경되지 않음, POINT_TEXT/BODY/HERO_IMAGE도 변경되지 않음. 테스트 후 POINT_TEXT Script Label은 정상 값으로 복구
+  - 이 결과로 D014가 목표한 "TITLE·POINT_TEXT 검증 실패 시 Generate 클릭 전체에서 아무것도 쓰이지 않는다"가 실기로 확인됨 — D013 이후 알려진 문제로 기록됐던 부분 반영 위험이 이 구조 변경으로 실제로 해소됨
+  - 이 실패 케이스는 `findLabeledFrameForVariant`가 "variant에 필요한 Script Label을 모두 가진 페이지"를 찾는 탐색 단계에서 막힌 것이며, "두 번째 `contents` 대입이 첫 번째 성공 이후 실패하는" 이론적 시나리오를 재현한 것은 아님 — 그 부분은 여전히 미검증으로 남음
+- `DECISIONS.md`의 D014에 실기 검증 완료 기록 추가(정상/실패 케이스 결과, 남은 미검증 시나리오 명시)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계(D014 실기 검증 완료 + 다음 작업은 BODY로 명시), 서술형 이력에 이번 테스트 결과와 실패 케이스가 코드 구조와 일치하는 이유 추가, "완료된 기능"의 D014 항목을 실기 검증 완료로 갱신, "실제 테스트 완료된 기능"에 D014 통합 구조 기준 테스트 결과 항목 추가(이전 두 doScript 구조 테스트 항목은 그대로 유지하되 "이후 항목이 새 구조 결과" 안내 추가), "아직 테스트하지 못한 기능"에서 `applyTitleAndPointText()` 전체 미검증 항목을 제거하고 Undo 단위 확인/이론적 롤백 시나리오 항목으로 대체, "진행 중인 작업"을 "다음은 BODY" 상태로 갱신, "미구현 기능"의 `src/text.js` 설명에서 미검증 문구 제거, "알려진 문제"의 D014 항목을 실기 검증 완료로 갱신(남은 이론적 위험은 유지), "다음 추천 작업" 1순위를 BODY/BODY_COLUMN_1 구현으로 승격(D014 테스트 항목 제거)
+- BODY와 HERO_IMAGE는 이번에도 구현/수정하지 않음(요청대로 문서화만 진행)
+- 다음 작업을 BODY 자동 입력으로 확정(사용자 지정) — 아직 시작하지 않음
+
+변경 파일:
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(문서화 작업만 수행). 문서에 반영한 D014 정상/실패 케이스 성공 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- doScript 콜백 안에서 `titleFrame.contents` 대입 이후 `pointTextFrame.contents` 대입이 실패하는 극단적 경우의 자동 롤백 여부는 여전히 미검증(이번 실패 케이스는 이 시나리오를 재현한 것이 아님)
+- `applyTitleAndPointText()` 성공 후 Undo(Ctrl+Z) 한 번으로 TITLE+POINT_TEXT 전체가 함께 되돌아가는지는 아직 별도로 확인되지 않음
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+- BODY(WITH_PHOTO)/BODY_COLUMN_1(WITHOUT_PHOTO) 자동 입력이 다음 작업으로 확정됨 — 아직 구현 시작 전
