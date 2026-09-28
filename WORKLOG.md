@@ -782,3 +782,30 @@
 - HERO_IMAGE_GUIDE 정상 케이스(안내 문구가 비워지고 프레임은 남아 있는지)와 실패 케이스(Label 없을 때 아무것도 안 쓰이는지) 모두 실기 확인 필요
 - D017 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 여전히 확인되지 않음
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+
+---
+
+## 2026-09-28 - HERO_IMAGE_GUIDE(D018) 정상 케이스 실기 검증 완료
+
+완료:
+- 사용자가 working .indd의 "대표이미지" 안내 문구 TextFrame에 Script Label `HERO_IMAGE_GUIDE`를 직접 부여한 뒤, `opening-page-with-photo.json` Load 후 Generate를 실행한 결과를 전달: TITLE 정상 반영, POINT_TEXT 정상 반영, BODY 정상 반영, HERO_IMAGE(`hero.png`) 정상 place, 이미지 place 성공 후 "대표이미지" 안내 문구가 화면에서 사라짐(HERO_IMAGE_GUIDE TextFrame의 `contents`가 빈 문자열로 바뀜), HERO_IMAGE_GUIDE TextFrame 자체는 삭제되지 않고 유지됨, 그 프레임과 HERO_IMAGE Rectangle 모두 위치/크기/스타일 변화 없음, WITHOUT_PHOTO 페이지는 변화 없음
+- 이번 요청은 실기 테스트 진행 전 "추가 기능 구현 없이 확인 체크리스트만 정리해 달라"는 것이었고, 코드 수정 없이 확인 항목만 안내한 뒤 사용자가 직접 InDesign에서 테스트를 수행하고 결과를 전달함
+- `DECISIONS.md`의 D018에 실기 검증 완료 기록 추가(정상 케이스 결과, 실패 케이스는 이번에 다루지 않았음을 명시)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계(HERO_IMAGE_GUIDE까지 모두 WITH_PHOTO 정상 케이스 실기 검증 완료로 요약), 서술형 이력에 실기 테스트 결과 추가, "완료된 기능"의 HERO_IMAGE_GUIDE 항목을 실기 검증 완료로 갱신, "실제 테스트 완료된 기능"에 D018 테스트 결과 항목 추가, "아직 테스트하지 못한 기능"에서 D018 전체 미확인 항목을 제거하고 실패 케이스만 남긴 항목으로 축소, "진행 중인 작업"/"Script Label 부여 및 검증 현황"/"미구현 기능"/"알려진 문제"의 D018 관련 항목을 실기 검증 완료로 갱신, "다음 추천 작업"에서 D018 테스트 항목을 제거하고 남은 선택 항목들을 재정렬, "시작 페이지" MVP 핵심 정상 케이스가 모두 검증됐음을 명시
+- `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트에서 HERO_IMAGE_GUIDE 행의 "(적용 예정)"을 "(적용됨)"으로 갱신하고 실기 검증 완료 사실 반영
+- 요청받은 범위만 수행: 추가 기능 구현 없음, 코드 변경 없음(문서만 변경)
+
+변경 파일:
+- DECISIONS.md
+- HANDOFF.md
+- docs/TEMPLATE_SPEC.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(문서화 작업만 수행). 문서에 반영한 HERO_IMAGE_GUIDE 정상 케이스 성공 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- HERO_IMAGE_GUIDE 실패 케이스(Label이 없거나 중복되거나 타입이 다를 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않는지)는 아직 확인되지 않음
+- D017 HERO_IMAGE의 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 여전히 확인되지 않음
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+- "시작 페이지" MVP 핵심 정상 케이스는 모두 검증됐으므로, 다음 우선순위(다른 Template Type 착수 여부, 남은 선택적 실패 케이스 테스트 여부 등)를 사용자와 논의 필요

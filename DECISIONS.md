@@ -340,7 +340,7 @@ WITH_PHOTO의 HERO_IMAGE Rectangle 위에 디자이너가 넣어둔 "대표이�
 
 이번 결정이 범위에 포함하지 않은 것: 안내 문구 프레임을 삭제하는 것, 프레임 위치/크기/스타일 변경, WITHOUT_PHOTO에 대한 처리(이 프레임이 없음).
 
-이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — `HERO_IMAGE_GUIDE` Script Label을 working .indd에 실제로 부여하는 작업도 아직 사용자가 수행하지 않았다.
+**실기 검증 완료(2026-09-28)**: 사용자가 working .indd의 "대표이미지" 안내 문구 TextFrame에 `HERO_IMAGE_GUIDE` Script Label을 직접 부여한 뒤 정상 케이스를 테스트해 확인했다 — `opening-page-with-photo.json` Load 후 Generate 실행 → TITLE·POINT_TEXT·BODY 정상 반영, `hero.png`가 기존 HERO_IMAGE Rectangle에 정상 place, 이미지 place 성공 후 "대표이미지" 안내 문구가 화면에서 사라짐(HERO_IMAGE_GUIDE TextFrame의 `contents`가 빈 문자열로 바뀜), HERO_IMAGE_GUIDE TextFrame 자체는 삭제되지 않고 유지됨, 그 프레임의 위치/크기/스타일 변화 없음, HERO_IMAGE Rectangle의 위치/크기도 변화 없음, WITHOUT_PHOTO 페이지는 변화 없음. 이로써 D018이 목표한 대로 동작함이 실기로 확인됐다. 실패 케이스(HERO_IMAGE_GUIDE Label이 없을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않는지)는 이번 테스트에서 별도로 수행되지 않았다.
 
 변경 조건:
-사용자가 working .indd의 "대표이미지" 안내 문구 TextFrame에 `HERO_IMAGE_GUIDE` Script Label을 부여한 뒤, 실기 테스트에서 (a) 정상 케이스(HERO_IMAGE 배치 성공 후 안내 문구가 비워지고 프레임 자체는 남아 있음), (b) 실패 케이스(HERO_IMAGE_GUIDE Label이 없을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않음)가 확인되면 실기 검증 완료로 갱신한다.
+실패 케이스(HERO_IMAGE_GUIDE Label이 없거나 중복되거나 타입이 다를 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않는지)가 별도로 확인되면 이 기록을 갱신한다.
