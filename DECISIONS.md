@@ -194,3 +194,26 @@ InDesign 프레임을 코드에서 식별할 때, `PageItem.name`이 아니라 S
 
 변경 조건:
 BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE를 추가할 때도 이 패턴(공유 탐색 함수 + 필드별 독립 `apply*Only` 함수)을 계속 따른다. 프레임 종류가 Rectangle(HERO_IMAGE)인 경우도 `expectedType` 파라미터로 이미 대응 가능하다.
+
+**주의(D014에서 일부 변경됨)**: "필드별 독립 `apply*Only` 함수를 doScript 단위로도 계속 분리한다"는 부분은 D014에서 뒤집혔다. 아래 D014 참고.
+
+---
+
+## D014 - TITLE+POINT_TEXT를 하나의 doScript로 통합해 Generate의 부분 반영 위험을 줄임
+
+결정:
+`src/text.js`의 `applyTitleOnly()`/`applyPointTextOnly()`(각각 독립된 `app.doScript` 호출)를 제거하고, 하나의 `applyTitleAndPointText(articleData)`로 합쳤다. 이 함수는 단 하나의 `app.doScript` 콜백 안에서 (1) `findTitleFrameForVariant`와 `findPointTextFrameForVariant`를 **둘 다 먼저** 호출해 탐색/검증을 모두 끝내고, (2) 그 다음에야 `titleFrame.contents`/`pointTextFrame.contents`를 순서대로 쓴다. `index.js`의 `Generate` 핸들러는 이제 이 함수 하나만 호출한다. 탐색 함수(`findLabeledFrameForVariant`/`findTitleFrameForVariant`/`findPointTextFrameForVariant`)와 Script Label 식별 방식(D008)은 전혀 바꾸지 않았다.
+
+이유:
+- D013 이후 실제로 확인된 문제(2026-09-28 사용자 요청으로 분석): 기존 구조는 `applyTitleOnly()`가 성공한 뒤에만 `applyPointTextOnly()`를 호출했는데, 둘이 별개의 `app.doScript`/Undo 트랜잭션이라 TITLE 트랜잭션이 이미 커밋된 뒤 POINT_TEXT의 안전 검사가 실패하면, "이번 Generate가 실패했다"는 Status 메시지와 달리 문서에는 TITLE만 반영된 부분 상태가 남을 수 있었다. 필드별 안전 검사는 지켜져도 "Generate 클릭 전체의 원자성"은 보장되지 않는 구조였다.
+- TITLE/POINT_TEXT의 탐색을 모두 doScript 콜백 앞부분에 몰아넣고 쓰기를 뒷부분에 몰아넣으면, 둘 중 하나라도 탐색에 실패했을 때 예외가 쓰기 코드 이전에 발생하므로 아무것도 안 쓰인 채로 콜백이 끝난다. 즉 "검증 실패 시 문서를 수정하지 않는다"는 원칙이 TITLE+POINT_TEXT를 합친 단위에서 성립하게 된다.
+- 하나의 doScript 콜백은 하나의 Undo 트랜잭션이므로, Generate 클릭 한 번이 Undo 스택에서도 하나의 항목으로 남는다 — 성공하면 Ctrl+Z 한 번으로 TITLE+POINT_TEXT가 함께 되돌아간다.
+- 탐색 함수 자체(`findLabeledFrameForVariant` 등)는 이미 순수하게 "찾아서 반환, 실패 시 throw"만 하고 아무것도 쓰지 않으므로 그대로 재사용 가능했다 — 새로 만든 부분은 "탐색 전부 → 쓰기 전부"로 순서를 강제하는 조립부뿐이라 변경 범위가 작다.
+- `applyTitleOnly`/`applyPointTextOnly`를 개별 함수로 남겨두는 대신 삭제했다: Generate 흐름에서 더 이상 쓰이지 않고, 남겨두면 누군가 실수로 다시 개별 호출해 같은 부분 반영 문제를 재현할 위험이 있다.
+
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): doScript 콜백 안에서 `titleFrame.contents = ...`가 성공한 바로 다음 줄 `pointTextFrame.contents = ...`가 실패하는 경우, `UndoModes.ENTIRE_SCRIPT`가 예외 발생 시 이미 실행된 대입을 자동으로 롤백하는지는 이 프로젝트에서 확인된 적이 없다. 두 탐색이 모두 성공한 뒤의 단순 `contents` 대입이 실패할 가능성 자체는 낮다고 보지만, 이 지점은 여전히 이론적 위험으로 남는다.
+
+이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+
+변경 조건:
+실기 테스트에서 (a) 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO 모두 TITLE+POINT_TEXT가 함께 올바르게 반영됨)와 (b) 실패 케이스(POINT_TEXT 탐색을 의도적으로 실패시켰을 때 TITLE도 전혀 반영되지 않음, Undo 한 번으로 전체가 되돌아감)가 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. BODY/HERO_IMAGE를 추가할 때도 이 "탐색 전부 → 쓰기 전부" 패턴을 그대로 확장할지, 아니면 다른 구조가 필요할지는 그 시점에 다시 검토한다.

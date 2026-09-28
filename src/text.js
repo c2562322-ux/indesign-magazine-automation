@@ -1,6 +1,7 @@
 // 검증된 기사 데이터를 InDesign 텍스트 프레임에 실제로 채워 넣는 모듈.
-// 지금까지 TITLE, POINT_TEXT를 다룬다 — BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과
-// HERO_IMAGE 이미지 배치는 아직 구현하지 않는다 (다음 단계).
+// 지금까지 TITLE, POINT_TEXT를 다룬다(applyTitleAndPointText, 하나의 doScript로 통합
+// — D014) — BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 이미지 배치는 아직
+// 구현하지 않는다 (다음 단계).
 //
 // 대상 페이지 판별은 src/validation.js의 OPENING_PROFILES_BY_VARIANT(읽기 전용 검증에 쓰는
 // 것과 동일한 requiredFrames 정의)를 그대로 재사용한다 — 페이지를 page.name 등으로
@@ -130,9 +131,18 @@ function findPointTextFrameForVariant(doc, variant) {
     return findLabeledFrameForVariant(doc, variant, "POINT_TEXT", "TextFrame");
 }
 
-// 검증을 통과한 OPENING_PAGE 기사 데이터의 title만 TITLE 프레임에 채운다.
-// POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 이 함수에서 전혀 건드리지 않는다.
-async function applyTitleOnly(articleData) {
+// 검증을 통과한 OPENING_PAGE 기사 데이터의 title과 pointText를 TITLE/POINT_TEXT 프레임에
+// 채운다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 이 함수에서 전혀 건드리지 않는다.
+//
+// D014: 이전에는 applyTitleOnly()/applyPointTextOnly()가 각각 독립된 app.doScript(=독립된
+// Undo 트랜잭션)였다. 그 결과 TITLE 쓰기가 성공한 뒤 POINT_TEXT의 안전 검사가 실패하면,
+// "이번 Generate 클릭은 실패했다"는 메시지와 달리 문서에는 TITLE만 반영된 부분 상태가
+// 남을 수 있었다("검증 실패 시 문서를 수정하지 않는다"는 원칙이 필드 단위에서는 지켜져도
+// Generate 클릭 전체 단위에서는 지켜지지 않음). 이를 막기 위해 TITLE/POINT_TEXT 두 필드의
+// 탐색(검증)을 모두 끝낸 뒤에만 두 필드의 쓰기를 시작하도록, 하나의 app.doScript 콜백 안에서
+// "탐색 단계 전부 → 쓰기 단계 전부" 순서로 묶었다. 탐색 단계에서 하나라도 실패하면 예외가
+// 쓰기 단계에 도달하기 전에 발생하므로, 문서는 전혀 수정되지 않는다.
+async function applyTitleAndPointText(articleData) {
     if (!articleData) {
         throw new Error("Load Article로 먼저 검증된 기사 데이터를 불러와야 합니다.");
     }
@@ -142,53 +152,32 @@ async function applyTitleOnly(articleData) {
     if (typeof articleData.title !== "string" || articleData.title.length === 0) {
         throw new Error("article 데이터에 title이 없습니다.");
     }
-
-    const doc = getActiveDocument();
-
-    // 대상 페이지/프레임 탐색과 실제 쓰기를 모두 doScript 안에서 수행한다. 탐색을 doScript
-    // 밖에서 먼저 하고 찾은 참조를 doScript 안에서 쓰는 방식은 이 UXP 환경에서 검증된 적이
-    // 없어, 미검증 API 경계를 하나라도 줄이기 위해 이렇게 묶었다.
-    await app.doScript(
-        () => {
-            const titleFrame = findTitleFrameForVariant(doc, articleData.variant);
-            titleFrame.contents = articleData.title;
-        },
-        indesign.ScriptLanguage.JAVASCRIPT,
-        [],
-        indesign.UndoModes.ENTIRE_SCRIPT,
-        "Apply Title to Opening Page"
-    );
-}
-
-// 검증을 통과한 OPENING_PAGE 기사 데이터의 pointText만 POINT_TEXT 프레임에 채운다.
-// applyTitleOnly와 완전히 같은 패턴(검사 → doScript 안에서 탐색+쓰기)이며, TITLE/BODY 등
-// 다른 필드는 이 함수에서 전혀 건드리지 않는다.
-async function applyPointTextOnly(articleData) {
-    if (!articleData) {
-        throw new Error("Load Article로 먼저 검증된 기사 데이터를 불러와야 합니다.");
-    }
-    if (articleData.templateType !== "OPENING_PAGE") {
-        throw new Error(`templateType이 OPENING_PAGE가 아닙니다: ${articleData.templateType}`);
-    }
     if (typeof articleData.pointText !== "string" || articleData.pointText.length === 0) {
         throw new Error("article 데이터에 pointText가 없습니다.");
     }
 
     const doc = getActiveDocument();
 
+    // 탐색(검증)과 쓰기를 모두 doScript 안에서 수행한다(D012의 연장 — doScript 밖에서 얻은
+    // 프레임 참조를 doScript 안에서 쓰는 방식은 검증된 적이 없어 계속 피한다).
     await app.doScript(
         () => {
+            // 1) 탐색/검증 단계: 이 시점까지는 문서에 아무것도 쓰지 않는다. 둘 중 하나라도
+            //    findLabeledFrameForVariant가 던지면 아래 쓰기 단계는 실행되지 않는다.
+            const titleFrame = findTitleFrameForVariant(doc, articleData.variant);
             const pointTextFrame = findPointTextFrameForVariant(doc, articleData.variant);
+
+            // 2) 쓰기 단계: 위 탐색이 둘 다 성공했을 때만 실행된다.
+            titleFrame.contents = articleData.title;
             pointTextFrame.contents = articleData.pointText;
         },
         indesign.ScriptLanguage.JAVASCRIPT,
         [],
         indesign.UndoModes.ENTIRE_SCRIPT,
-        "Apply Point Text to Opening Page"
+        "Generate Opening Page (Title + Point Text)"
     );
 }
 
 module.exports = {
-    applyTitleOnly,
-    applyPointTextOnly,
+    applyTitleAndPointText,
 };

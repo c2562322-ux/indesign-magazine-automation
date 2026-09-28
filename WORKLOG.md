@@ -506,3 +506,33 @@
 - 안전 검사 실패 케이스(Article 미로드, Label 없음/중복/타입 불일치)는 아직 실기로 확인되지 않음
 - `Generate`의 부분 반영(원자성) 위험은 분석만 했을 뿐, 실기로 재현하거나 코드로 대응한 적은 없음 — BODY 구현 전에 대응 방향을 결정할지 검토 필요
 - BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전
+
+---
+
+## 2026-09-28 - Generate 부분 반영 위험 감소: TITLE+POINT_TEXT를 하나의 doScript로 통합 (D014)
+
+완료:
+- 사용자가 위 엔트리의 원자성 분석을 근거로, BODY 구현에 앞서 `Generate`의 부분 반영 위험을 줄이는 구조 변경을 TITLE+POINT_TEXT 범위로 한정해 요청함(목표: (1) 실제 문서 수정 전 TITLE·POINT_TEXT 검증을 모두 끝낼 것, (2) 검증 중 하나라도 실패하면 둘 다 수정하지 않을 것, (3) 모두 통과한 뒤에만 쓸 것, (4) 기존 WITH_PHOTO/WITHOUT_PHOTO 동작 유지, (5) BODY/HERO_IMAGE는 건드리지 않을 것, (6) Script Label 식별 방식 유지, (7) 탐색/검증과 쓰기 단계 분리, (8) 하나의 Generate가 Undo 관점에서도 하나의 작업이 되도록 검토)
+- `src/text.js`: `applyTitleOnly()`/`applyPointTextOnly()`(독립된 `app.doScript` 2개) 제거, `applyTitleAndPointText(articleData)` 하나로 통합. 데이터 존재 검사(articleData/templateType/title/pointText)는 doScript 밖에서 먼저 수행. 단 하나의 `app.doScript` 콜백 안에서 (1) `findTitleFrameForVariant`/`findPointTextFrameForVariant`로 두 프레임을 모두 먼저 탐색(탐색 단계, 아직 아무것도 안 씀) → (2) 탐색이 둘 다 성공했을 때만 `titleFrame.contents`/`pointTextFrame.contents`를 순서대로 대입(쓰기 단계). 탐색 함수 자체(`findLabeledFrameForVariant` 등)와 Script Label 식별 방식(D008)은 전혀 바꾸지 않음
+- `index.js`: `Generate` 핸들러가 `applyTitleOnly`+`applyPointTextOnly` 두 번 호출하던 것을 `applyTitleAndPointText` 한 번 호출로 변경. Status 메시지도 "TITLE + POINT_TEXT 검증 및 입력 중..." 하나로 통합
+- `DECISIONS.md`에 D014 기록: 문제 상황(D013 이후 실기 테스트에서 겉으로는 드러나지 않았지만 구조적으로 존재하던 부분 반영 위험), 해결 방식(탐색 전부 → 쓰기 전부, 하나의 doScript), 이 변경이 없애지 못하는 남은 이론적 위험(두 번째 `contents` 대입이 첫 번째 성공 이후 실패하는 경우의 자동 롤백 여부는 미검증), `applyTitleOnly`/`applyPointTextOnly`를 남기지 않고 삭제한 이유(재사용 시 같은 문제 재현 위험). D013 항목에도 "이 부분은 D014에서 변경됨" 상호 참조 추가
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계, 서술형 이력에 이번 리팩터링 경위 추가, "완료된 기능"의 POINT_TEXT 관련 두 항목(이전 구조 실기 검증 완료 + 새 구조 코드 작성 완료·미검증)으로 분리, "실제 테스트 완료된 기능"의 TITLE+POINT_TEXT 항목에 "이 테스트는 리팩터링 이전 구조 기준" 주의 문구 추가, "아직 테스트하지 못한 기능"에 `applyTitleAndPointText()` 정상/실패 케이스 실기 확인 필요 항목 추가, "진행 중인 작업"·"미구현 기능" 갱신, "알려진 문제"의 원자성 항목을 "D014로 구조적 해결 시도, 실기 검증 전"으로 갱신(남은 이론적 위험 명시), "다음 추천 작업" 1순위를 D014 실기 테스트(정상 케이스 + 부분 반영 재현 여부를 확인하는 실패 케이스)로 재편하고 BODY는 그 다음으로 유지
+- `README.md` 갱신: 기사 데이터 규격 설명과 UDT 실행 절차(7번)에 POINT_TEXT/`applyTitleAndPointText`/D014를 반영 (기존에 `pointText` 미구현으로 남아있던 서술의 누락도 함께 바로잡음)
+- 요청받은 범위만 구현: BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 건드리지 않음. push는 요청 전까지 하지 않음
+
+변경 파일:
+- src/text.js
+- index.js
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- 없음. `applyTitleAndPointText()`는 아직 실제 InDesign에서 한 번도 실행해본 적이 없다. **이번 작업은 실기 테스트 전이므로 문서에 "성공"으로 기록하지 않았다.** 이전에 실기 검증됐던 `applyTitleOnly`/`applyPointTextOnly` 기준 테스트 결과는 문서에 그대로 남기되, 이번 리팩터링 이후 코드에는 적용되지 않는다는 점을 명시했다.
+
+남은 문제:
+- `applyTitleAndPointText()`의 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO 각각 TITLE+POINT_TEXT 정상 반영)와 실패 케이스(POINT_TEXT 탐색 실패 시 TITLE도 전혀 반영되지 않음, Undo 한 번으로 전체가 되돌아감)를 실제 InDesign에서 확인 필요
+- doScript 콜백 안에서 `titleFrame.contents` 대입 이후 `pointTextFrame.contents` 대입이 실패하는 극단적 경우, `UndoModes.ENTIRE_SCRIPT`가 이미 실행된 대입을 자동 롤백하는지는 여전히 미검증(이론적 위험으로만 문서화)
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+- BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현 전 — D014 검증 후 이 패턴을 BODY까지 확장할지 여부도 그때 결정

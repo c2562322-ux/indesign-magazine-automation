@@ -8,7 +8,7 @@ const {
     formatArticleValidationReport,
 } = require("./src/validation.js");
 const { loadArticleFile } = require("./src/data.js");
-const { applyTitleOnly, applyPointTextOnly } = require("./src/text.js");
+const { applyTitleAndPointText } = require("./src/text.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
@@ -85,14 +85,11 @@ document.getElementById("btnGenerate").addEventListener("click", async () => {
     }
 
     try {
-        // 대상 페이지 탐색, 각 Script Label 프레임 존재/개수/타입 검사는 applyTitleOnly /
-        // applyPointTextOnly 내부에서 수행하며, 문제가 있으면 그 필드는 문서를 수정하지 않고
-        // Error를 던진다. TITLE을 먼저 쓰고, 성공했을 때만 POINT_TEXT를 이어서 쓴다.
-        setStatus("Generate: TITLE 입력 중...");
-        await applyTitleOnly(currentArticleData);
-
-        setStatus("Generate: POINT_TEXT 입력 중...");
-        await applyPointTextOnly(currentArticleData);
+        // TITLE/POINT_TEXT 대상 페이지·프레임 탐색(검증)을 모두 마친 뒤에만 실제 쓰기를
+        // 시작한다(applyTitleAndPointText 내부에서 하나의 doScript로 처리, D014). 탐색 중
+        // 하나라도 실패하면 TITLE/POINT_TEXT 어느 쪽도 쓰이지 않는다.
+        setStatus("Generate: TITLE + POINT_TEXT 검증 및 입력 중...");
+        await applyTitleAndPointText(currentArticleData);
 
         setStatus(
             `Generate 완료: TITLE="${currentArticleData.title}", POINT_TEXT="${currentArticleData.pointText}" 입력됨 ` +
