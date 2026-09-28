@@ -350,66 +350,149 @@ function inspectDocument() {
     };
 }
 
-// 현재 InDesign에서 보고 있는 활성 페이지 하나만 읽기 전용으로 분석한다. 전체 문서를 도는
+// 현재 선택된 객체(app.activeDocument.selection)에서 페이지를 역추적한다 — "현재 페이지"
+// 판별의 1순위 방법(사용자 명시 지시). 선택된 첫 번째 객체의 parentPage(classic
+// ExtendScript의 PageItem 표준 속성)를 읽어본다. 이 프로젝트에서 selection/parentPage를
+// 읽어보는 것은 이번이 처음이라 이 UXP 환경에서 지원되는지 미검증이다. 실패하거나 선택이
+// 없으면 예외를 던지지 않고 { page: null, reason } 을 반환해 호출자가 다음 방법
+// (activeWindow.activePage)으로 넘어가게 한다.
+function getPageFromSelection() {
+    let selection;
+    try {
+        selection = app.activeDocument && app.activeDocument.selection;
+    } catch (err) {
+        selection = null;
+    }
+
+    // app.activeDocument.selection이 비어 있거나 없으면, classic ExtendScript에서 더 흔히
+    // 쓰이는 app.selection도 방어적으로 한 번 더 시도한다 — 둘 다 이 UXP 환경에서
+    // 미검증이라 어느 쪽이 실제로 동작하는지 미리 알 수 없기 때문이다.
+    if (!selection || typeof selection.length !== "number" || selection.length === 0) {
+        try {
+            selection = app.selection;
+        } catch (err) {
+            selection = null;
+        }
+    }
+
+    if (!selection || typeof selection.length !== "number" || selection.length === 0) {
+        return { page: null, reason: "선택된 객체가 없습니다" };
+    }
+
+    let firstItem;
+    try {
+        firstItem = typeof selection.item === "function" ? selection.item(0) : selection[0];
+    } catch (err) {
+        return { page: null, reason: `선택된 객체를 읽는 데 실패: ${err.message}` };
+    }
+
+    if (!firstItem) {
+        return { page: null, reason: "선택된 객체 값이 비어 있음" };
+    }
+
+    let parentPage;
+    try {
+        parentPage = firstItem.parentPage;
+    } catch (err) {
+        return { page: null, reason: `선택된 객체의 parentPage 읽기 실패: ${err.message}` };
+    }
+
+    if (!parentPage) {
+        return { page: null, reason: "선택된 객체에 parentPage가 없음(페이스트보드에 있거나 페이지에 속하지 않은 객체일 수 있음)" };
+    }
+
+    return { page: parentPage, reason: null };
+}
+
+// page 객체가 doc.pages 안에서 몇 번째인지(index) 표시용으로 알아낸다. 실패해도 null을
+// 반환할 뿐 예외를 던지지 않는다 — index를 못 찾는다고 전체 조회를 막을 필요는 없다
+// (formatActivePageReport가 "(확인 불가)"로 표시한다). 1차: 참조 동등성(===). 2차 대체:
+// page.name 일치(이름이 문서 전체에서 반드시 유일하다는 보장은 없어 완전한 대체는 아니다).
+// 두 방식 모두 이 UXP 환경에서 실제로 통하는지 미검증이다.
+function findPageIndex(doc, page) {
+    try {
+        for (let i = 0; i < doc.pages.length; i++) {
+            if (doc.pages.item(i) === page) {
+                return i;
+            }
+        }
+    } catch (err) {
+        // 아래 2차 대체로 계속 진행
+    }
+
+    try {
+        const pageName = page.name;
+        for (let i = 0; i < doc.pages.length; i++) {
+            if (doc.pages.item(i).name === pageName) {
+                return i;
+            }
+        }
+    } catch (err) {
+        // 무시 — null 반환
+    }
+
+    return null;
+}
+
+// 현재 InDesign에서 보고 있는 페이지 하나만 읽기 전용으로 분석한다. 전체 문서를 도는
 // inspectDocument()/formatReport()와 완전히 별개의 경로이며, 그 둘의 동작·출력은 전혀
 // 건드리지 않는다(기존 함수 재사용만 함).
 //
-// app.activeWindow.activePage는 classic InDesign Scripting DOM의 표준 속성이지만, 이
-// 프로젝트에서 activeWindow/activePage를 읽어본 것은 이번이 처음이라 이 UXP 환경에서
-// 동일하게 동작하는지 미검증이다. 읽기 자체가 실패하거나 값이 없으면, 다른 페이지(예: 첫
-// 페이지)를 임의로 대신 보여주지 않는다 — 잘못된 페이지를 "현재 페이지"로 오인시킬 수 있기
-// 때문에(사용자 명시 요구), 이 경우 { ok: false, message } 를 반환하고 호출자가 그 메시지를
-// 그대로 사용자에게 보여준다.
+// 페이지 판별은 2단계 우선순위로 시도한다(사용자 명시 지시):
+//   1순위: 선택된 객체의 parentPage (getPageFromSelection) — 사용자가 페이지 안의 객체를
+//          클릭/선택했을 때 가장 신뢰할 수 있는 방법으로 기대됨.
+//   2순위: app.activeWindow.activePage — 1순위가 실패했을 때만 시도하는 대체 수단.
+//          classic InDesign Scripting DOM의 표준 속성이지만, 실기 테스트에서 사용자가
+//          어느 페이지를 보고 있든 항상 문서의 첫 페이지(index=0)를 반환하는 것이 확인되어
+//          이 UXP 환경에서는 신뢰도가 낮다 — 그래도 selection이 없을 때를 위한 최후
+//          수단으로는 남겨둔다.
+// 둘 다 실패하면 다른 페이지(예: 첫 페이지)를 임의로 대신 보여주지 않는다 — 잘못된 페이지를
+// "현재 페이지"로 오인시킬 수 있기 때문에(사용자 명시 요구), { ok: false, message } 를
+// 반환하고 호출자가 그 메시지를 그대로 사용자에게 보여준다. 성공하면 실제로 어떤 방법으로
+// 페이지를 얻었는지(source)도 함께 반환해 사용자가 결과를 신뢰할 수 있는 정도를 판단할 수
+// 있게 한다.
 function inspectActivePage() {
     const doc = getActiveDocument();
 
-    let activePage;
-    try {
-        activePage = app.activeWindow && app.activeWindow.activePage;
-    } catch (err) {
-        return { ok: false, message: `현재 페이지를 확인할 수 없습니다 (activeWindow.activePage 읽기 실패: ${err.message}).` };
+    let page = null;
+    let source = null;
+    const failureReasons = [];
+
+    const bySelection = getPageFromSelection();
+    if (bySelection.page) {
+        page = bySelection.page;
+        source = "selection.parentPage";
+    } else {
+        failureReasons.push(`selection: ${bySelection.reason}`);
     }
 
-    if (!activePage) {
-        return { ok: false, message: "현재 페이지를 확인할 수 없습니다 (activeWindow.activePage 값이 비어 있습니다)." };
-    }
-
-    // activePage가 doc.pages 안에서 몇 번째인지(index) 알아낸다 — 표시용일 뿐이라 실패해도
-    // 전체 조회를 막지 않고 null로 남긴다(formatActivePageReport가 "(확인 불가)"로 표시).
-    // 1차: 참조 동등성(===)으로 시도. 이 UXP 환경에서 같은 페이지를 가리키는 두 참조가
-    // === 로 같다고 나오는지는 미검증이다.
-    let pageIndex = null;
-    try {
-        for (let i = 0; i < doc.pages.length; i++) {
-            if (doc.pages.item(i) === activePage) {
-                pageIndex = i;
-                break;
-            }
-        }
-    } catch (err) {
-        pageIndex = null;
-    }
-
-    // 2차 대체: 참조 동등성이 안 통하는 경우, page.name으로 첫 일치 항목을 찾는다(이름이
-    // 문서 전체에서 반드시 유일하다는 보장은 없어 완전한 대체 수단은 아니다).
-    if (pageIndex === null) {
+    if (!page) {
         try {
-            const activeName = activePage.name;
-            for (let i = 0; i < doc.pages.length; i++) {
-                if (doc.pages.item(i).name === activeName) {
-                    pageIndex = i;
-                    break;
-                }
+            const activePage = app.activeWindow && app.activeWindow.activePage;
+            if (activePage) {
+                page = activePage;
+                source = "activeWindow.activePage";
+            } else {
+                failureReasons.push("activeWindow.activePage: 값이 비어 있음");
             }
         } catch (err) {
-            pageIndex = null;
+            failureReasons.push(`activeWindow.activePage: 읽기 실패 (${err.message})`);
         }
     }
+
+    if (!page) {
+        return {
+            ok: false,
+            message: `현재 페이지를 확인할 수 없습니다 (${failureReasons.join(" / ")}).`,
+        };
+    }
+
+    const pageIndex = findPageIndex(doc, page);
 
     // 기존 inspectPage()를 그대로 재사용 — textFrames/rectangles/pageItemTree 계산 로직은
     // 전체 문서 Inspect와 완전히 동일하다.
-    const page = inspectPage(activePage, pageIndex);
-    return { ok: true, page };
+    const inspected = inspectPage(page, pageIndex);
+    return { ok: true, source, page: inspected };
 }
 
 // 트리 한 노드를 한 줄 텍스트로 만든다(연결선 prefix는 formatPageItemForest가 따로 붙인다).
@@ -462,6 +545,7 @@ function formatActivePageReport(result) {
     const indexText = page.pageIndex === null || typeof page.pageIndex === "undefined" ? "(확인 불가)" : page.pageIndex;
 
     const lines = [];
+    lines.push(`Current Page source: ${result.source}`);
     lines.push(`Current Page: index=${indexText}, name=${page.pageName}`);
     lines.push(`Page Item 수 (전체 타입 포함): ${page.pageItemCount}`);
     lines.push("");

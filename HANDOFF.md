@@ -83,6 +83,8 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 같은 작업에서 **"Inspect Current Page"**(전체 문서가 아니라 현재 InDesign에서 보고 있는 페이지 하나만 읽기 전용으로 보는 기능)도 추가했다: `app.activeWindow.activePage`를 try/catch로 조회하고(이 프로젝트에서 `activeWindow`/`activePage`를 읽어보는 것은 이번이 처음이라 미검증), **읽기 실패 시 다른 페이지(예: 첫 페이지)로 임의 대체하지 않는다** — 사용자가 명시적으로 요구한 안전장치로, 잘못된 페이지를 "현재 페이지"로 오인시키는 것을 막기 위함이다. 실패하면 실패 사유만 Status/로그에 표시하고 아무 페이지도 보여주지 않는다. 성공하면 실제로 분석한 `page index`/`name`을 로그 맨 위에 명시한 뒤 기존 `inspectPage()`/`formatPageItemForest()`를 그대로 재사용해 트리를 출력한다 — 기존 `inspectDocument()`/`formatReport()`(전체 문서 Inspect)는 전혀 건드리지 않은 완전히 별도의 함수/버튼(`btnInspectCurrentPage`)이다.
 
+**사용자가 목차 페이지를 직접 클릭/선택한 뒤 `Inspect Current Page`를 실기 테스트했으나, 매번 `index=0, name=1, Page Item 수=61`(문서의 실제 첫 페이지)만 반환됐다** — 이미 전체 문서 Inspect로 목차 페이지가 `index=1, name=2, Page Item 수=22`임이 확인된 것과 명백히 다른 결과였다. 이는 `app.activeWindow.activePage`가 이 UXP 환경에서 사용자가 실제로 보고 있는 페이지를 전혀 따라가지 못하고 **항상 문서의 첫 페이지를 반환**한다는 것을 실기로 확정한 것이다(추측이 아니라 관찰된 사실). 사용자가 대체 방법으로 `app.activeDocument.selection`(선택된 객체) → 그 객체의 `parentPage`로 페이지를 역추적하는 방식을 1순위로, `activeWindow.activePage`는 2순위(대체 수단)로 낮추자고 제안해 그대로 반영했다(2026-09-28, D023): `getPageFromSelection()`이 `app.activeDocument.selection`(비어 있으면 `app.selection`도 방어적으로 시도)의 첫 번째 선택 객체에서 `parentPage`를 읽고, 성공하면 그 페이지를 사용한다. 실패하면(선택 없음/`parentPage` 없음 등) `activeWindow.activePage`로 넘어가고, 그것도 실패하면 **다른 페이지로 대체하지 않고** 실패 사유를 그대로 보여준다(index=0 자동 선택 금지, 사용자 명시 요구). 어떤 방법으로 페이지를 얻었는지 `Current Page source: selection.parentPage` 또는 `Current Page source: activeWindow.activePage`로 로그 맨 위에 표시한다. `inspectDocument()`/`formatReport()`(전체 문서 Inspect)와 기존 Opening Page 코드는 이번에도 전혀 수정하지 않았다. **이 수정 자체는 아직 실기로 재확인되지 않았다** — `app.activeDocument.selection`/`firstItem.parentPage`가 이 UXP 환경에서 실제로 동작하는지가 다음에 확인해야 할 지점이다.
+
 ## 완료된 기능
 
 - 프로젝트 기본 폴더 구조 ([manifest.json](manifest.json), [index.html](index.html), [styles.css](styles.css), [index.js](index.js), `src/`, `sample/`)
@@ -105,6 +107,7 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 - 플러그인 패널 빈 화면 문제 수정(D019 정정, 2026-09-28, 재테스트 전): 1차 실기 테스트에서 `Load Article`이 멈추더니 플러그인 재시작 후 패널 전체가 빈 화면으로 뜸. `src/docxZip.js`의 객체 리터럴 getter/setter 접근자(`get bytePos()`/`set bytePos()`, 이 코드베이스 최초 사용)를 가장 유력한 원인으로 보고, 이미 검증된 일반 메서드 형태(`getBytePos()`/`setBytePos()`)로 교체했다(기능 동일, `for (;;)` 2곳도 `while (true)`로 변경). **이 수정이 실제로 문제를 해결했는지는 아직 확인되지 않았다.**
 - `Inspect Template`에 Group 등 컨테이너 내부까지 보는 읽기 전용 재귀 탐색 추가(D021, 2026-09-28): "목차" 페이지에서 `page.textFrames`가 실제로 보이는 여러 텍스트 중 1개만 반환하는 문제가 보고되어, `src/inspector.js`에 `detectPageItemType()`(`constructor.name` 1차 시도 + 속성 기반 휴리스틱 대체, 실패해도 `"UNKNOWN"`으로 계속 진행)와 `buildPageItemNode()`/`buildPageItemForest()`(`page.pageItems` 전체를 depth 0부터 재귀, depth 상한 20, 개별 try/catch)를 추가했다. `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션을 기존 Text Frame/Rectangle 목록 아래에 추가로 출력한다(기존 출력은 그대로 유지). 자동입력/Script Label 계약/Word 데이터 구조는 이번에 만들지 않았다. **"중첩 Page Item 트리" 자체는 사용자가 실제 InDesign에서 실기 검증했다** — 다만 `type`이 대부분 `"PageItem"`으로만 나오는 문제가 발견되어 아래 항목에서 추가로 수정함(아직 재테스트 전).
 - `detectPageItemType()`의 `"PageItem"` 오판별 수정 + "Inspect Current Page" 추가(D021 보완, 2026-09-28, 코드 작성 완료·실기 미검증): `constructor.name`이 `"PageItem"`(너무 일반적인 공통 상위 클래스 이름으로 추정)을 반환해도 그대로 신뢰해 버리는 로직 버그를 찾아, `GENERIC_CONSTRUCTOR_NAMES`(`"PageItem"`/`"Item"`/`"Object"`/빈 문자열) 거부 목록으로 이 값들을 걸러내고 항상 기존 휴리스틱(Group/TextFrame/Rectangle 판별)까지 진행하도록 최소 수정했다. 또한 전체 14페이지를 다 출력하는 기존 `Inspect Template`과 별개로, 현재 InDesign에서 보고 있는 페이지 하나만 보는 `inspectActivePage()`/"Inspect Current Page" 버튼을 추가했다 — `app.activeWindow.activePage`를 try/catch로 조회하고, **실패 시 다른 페이지로 임의 대체하지 않고 실패 사유만 표시**한다(사용자 명시 요구, 잘못된 페이지를 "현재 페이지"로 오인시키지 않기 위함). 기존 `inspectDocument()`/`formatReport()`와 `inspectPage()`/`formatPageItemForest()`를 재사용할 뿐 전체 문서 Inspect 경로는 전혀 수정하지 않았다.
+- `inspectActivePage()`의 페이지 판별 방식을 selection 우선으로 변경(D023, 2026-09-28, 코드 작성 완료·실기 미검증): 실기 테스트에서 `app.activeWindow.activePage`가 사용자가 실제로 보고 있는 페이지와 무관하게 **항상 문서의 첫 페이지**만 반환하는 것이 확인됨(index=0/name=1 고정, 전체 문서 Inspect로 이미 확인된 실제 목차 페이지 index=1/name=2와 불일치). `src/inspector.js`에 `getPageFromSelection()`(`app.activeDocument.selection`, 비어 있으면 `app.selection`도 시도 → 첫 선택 객체의 `parentPage`) 신규 추가, `inspectActivePage()`가 이를 1순위로 시도하고 실패할 때만 기존 `activeWindow.activePage`를 2순위 대체 수단으로 시도하도록 재구성. 두 방법 모두 실패하면(사용자 명시 요구) **index=0 등으로 절대 대체하지 않고** 실패 사유를 그대로 보여준다. 어떤 방법으로 얻었는지 `Current Page source: selection.parentPage`/`activeWindow.activePage`로 로그 맨 위에 표시. `findPageIndex()`(참조 동등성→name 일치)로 index 조회 로직은 공용 함수로 추출했을 뿐 동작은 그대로다. 다른 기능(전체 문서 Inspect, "PageItem" 판별, `index.js`/`index.html`)은 이번에 전혀 건드리지 않았다.
 
 ## 실제 테스트 완료된 기능
 
@@ -206,12 +209,13 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 ## 다음 추천 작업
 
-0. **"PageItem" 오판별 수정 + "Inspect Current Page" 재테스트.** UDT에서 Reload 후:
-   - "목차" 페이지로 이동한 뒤 `Inspect Current Page` 버튼을 클릭해, 로그 맨 위에 `Current Page: index=..., name=...`가 실제로 지금 보고 있는 목차 페이지와 일치하는지 확인한다. 만약 `app.activeWindow.activePage`를 읽지 못해 "현재 페이지를 확인할 수 없습니다"만 뜬다면 그 사실을 그대로 전달한다(이 경우 다음 단계는 기존 `Inspect Template`으로 대체 확인).
-   - "중첩 Page Item 트리"의 각 노드 `type`이 이제 `TextFrame`/`Group`/`Rectangle` 등 구체적인 값으로 나오는지, `"PageItem"`이 더 이상 나오지 않는지 확인한다(여전히 `"PageItem"`이 보이면 거부 목록에 다른 이름이 더 필요할 수 있음).
+0. **"Inspect Current Page" selection 우선 판별(D023) 재테스트.** UDT에서 Reload 후:
+   - "목차" 페이지의 **텍스트/이미지 프레임 같은 객체를 하나 직접 클릭해 선택한 상태**에서 `Inspect Current Page`를 클릭해, 로그 맨 위 `Current Page source:`가 `selection.parentPage`로 나오는지, `Current Page: index=1, name=2`(전체 문서 Inspect로 이미 확인된 실제 목차 페이지 값)와 일치하는지 확인한다.
+   - 아무 것도 선택하지 않은 상태(빈 화면 클릭 등)에서 같은 버튼을 눌러, `Current Page source: activeWindow.activePage`로 넘어가는지(그리고 여전히 index=0/name=1만 나오는지, 즉 D022의 관찰이 재현되는지) 또는 두 방법 다 실패해 "현재 페이지를 확인할 수 없습니다" 메시지가 뜨는지 확인한다 — **이때도 index=0 페이지 내용이 함부로 표시되면 안 된다.**
+   - "중첩 Page Item 트리"의 각 노드 `type`이 `TextFrame`/`Group`/`Rectangle` 등 구체적인 값으로 나오는지, `"PageItem"`이 더 이상 나오지 않는지 확인한다.
    - `TextFrame`으로 판별된 노드에 실제 `text="..."` 값이 채워지는지 확인한다(예: "제목 입력란"/"부제 문구 입력란"/"03" 등). 여기서도 비어 있다면 3차 보완(id/타입 전용 컬렉션 교차 매칭)이 필요할 수 있다.
    - 기존 `Inspect Template`(`btnInspect`)로 전체 문서를 열었을 때 `Text Frame (N개)`/`Rectangle / 이미지 프레임 (N개)` 목록과 "중첩 Page Item 트리" 섹션이 이전과 동일하게 나오는지(회귀 없음) 확인한다.
-   - 결과를 전달하면 HANDOFF.md/DECISIONS.md D021에 실기 검증 완료로 반영한다. 이 단계에서는 여전히 "목차" 자동입력/Script Label 계약을 만들지 않는다.
+   - 결과를 전달하면 HANDOFF.md/DECISIONS.md D021~D023에 실기 검증 완료로 반영한다. 이 단계에서는 여전히 "목차" 자동입력/Script Label 계약을 만들지 않는다.
 1. **패널 빈 화면 수정 재테스트부터 먼저 진행한다(D019 정정).** UDT에서 Reload 후:
    - 패널이 정상적으로 다시 렌더링되는지(제목뿐 아니라 `Load Article`/`Generate`/`Inspect Template` 버튼과 로그 영역 모두) 확인한다.
    - `Load Article`로 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)를 선택했을 때 "파일 선택 중..."에 멈추지 않고 정상 진행되는지 확인한다(같은 폴더에 [sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)가 이미 준비되어 있다). `Article Log`에 "결과: 검증 통과"가 뜨고 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 예시 원고 내용과 일치하는지 확인한다(콘솔 로그로 추출된 값을 직접 눈으로 확인).

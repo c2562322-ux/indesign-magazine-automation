@@ -434,3 +434,25 @@ Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파�
 읽기 전용 보장: 이번 변경도 `.constructor`/`.pageItems`/`.name`(비교용) 읽기와 기존 재사용 함수(모두 값 읽기만 수행)뿐이며, 어떤 속성에도 대입하지 않는다. Script Label 쓰기, 텍스트 수정, 위치/크기 변경, 목차 Generate, Word/JSON 파서 수정, 기존 Opening Page 코드 수정, Template Selection 자동화 — 전부 이번 범위에 포함하지 않았다(사용자 명시 지시).
 
 이번 결정이 없애지 못하는 위험(미검증): `app.activeWindow.activePage`가 이 UXP 환경에서 실제로 노출되는지, 두 페이지 참조 간 `===` 비교가 이 환경에서 유효한지, `GENERIC_CONSTRUCTOR_NAMES` 거부 후에도 여전히 `"PageItem"`류의 다른 일반적인 이름이 더 있는지, TextFrame의 `text`가 실기에서 실제로 채워지는지 — 전부 다음 실기 테스트로만 확인 가능하다.
+
+## D023: "Inspect Current Page" 페이지 판별을 selection 우선으로 변경
+
+날짜: 2026-09-28
+
+배경: D022의 `inspectActivePage()`(`app.activeWindow.activePage` 단독 사용)를 사용자가 실제 목차 페이지에서 실기 테스트했다. 목차 페이지("목차샘플1")를 직접 클릭/선택한 뒤 `Inspect Current Page`를 실행했는데도 **매번 `index=0, name=1, Page Item 수=61`**만 반환됐다 — 이미 전체 문서 Inspect로 실제 목차 페이지가 `index=1, name=2, Page Item 수=22`임이 확인된 상태였으므로 명백히 다른 페이지였다.
+
+**결론(관찰된 사실, 추측 아님): 이 UXP 환경에서 `app.activeWindow.activePage`는 사용자가 실제로 보고 있는/선택한 페이지를 전혀 반영하지 않고, 항상 문서의 첫 페이지를 반환한다.** D022 시점에는 "classic DOM 표준 속성이니 시도해볼 가치가 있다"는 수준의 미검증 가정이었지만, 이번 실기 결과로 이 속성 단독으로는 신뢰할 수 없다는 것이 확정됐다.
+
+사용자가 대안으로 `app.activeDocument.selection`(현재 선택된 객체) → 선택된 객체의 `parentPage`(classic ExtendScript `PageItem`의 표준 속성)로 페이지를 역추적하는 방식을 제안했고, 우선순위를 다음과 같이 재구성하도록 명시적으로 지시했다:
+
+1. **1순위 — `getPageFromSelection()`(신규)**: `app.activeDocument.selection`을 조회하고(비어 있으면 classic ExtendScript에 더 흔히 문서화된 `app.selection`도 방어적으로 한 번 더 시도), 첫 번째 선택 객체의 `parentPage`를 읽는다. 성공하면 그 Page를 사용한다.
+2. **2순위 — `app.activeWindow.activePage`(기존 D022 코드)**: 1순위가 실패했을 때만(선택된 객체가 없거나, `parentPage`를 읽을 수 없거나 없을 때) 대체 수단으로 시도한다. 실기로 신뢰도가 낮음이 확인됐지만, 선택된 객체가 전혀 없는 상황(예: 방금 문서를 열어 아직 아무것도 클릭하지 않은 상태)을 위한 최후 수단으로는 남겨뒀다.
+3. **둘 다 실패하면 index=0 등으로 절대 대체하지 않는다**(사용자 명시 재확인) — `{ ok: false, message }`를 반환하고 실패 사유를 그대로 보여준다.
+4. 어떤 방법으로 페이지를 얻었는지 `source`(`"selection.parentPage"` 또는 `"activeWindow.activePage"`)를 함께 반환해, `formatActivePageReport()`가 `Current Page source: ...`를 로그 맨 위에 표시한다.
+5. Page 객체가 `doc.pages` 안에서 몇 번째인지(index) 찾는 로직은 D022에서 이미 만든 것(참조 동등성 → `name` 일치 대체)을 `findPageIndex(doc, page)`라는 공용 함수로 추출했을 뿐, 동작은 바뀌지 않았다 — 1순위/2순위 어느 쪽으로 페이지를 얻었든 같은 함수로 index를 찾는다.
+
+변경 범위는 `src/inspector.js`의 `inspectActivePage()`와 그 주변 헬퍼(`getPageFromSelection`, `findPageIndex`)로 한정했다 — `index.html`/`index.js`(버튼/핸들러는 이미 범용적으로 `inspectActivePage()`/`formatActivePageReport()`를 호출하고 있어 수정 불필요), 전체 문서 Inspect(`inspectDocument()`/`formatReport()`), D021/D022에서 고친 `detectPageItemType()`, 기존 Opening Page 코드(`src/text.js`/`src/image.js`/`src/validation.js`) — 전부 이번에 건드리지 않았다.
+
+읽기 전용 보장: `app.activeDocument.selection`/`app.selection`/`firstItem.parentPage`/`doc.pages.item(i)` 전부 값 읽기이며 어떤 속성에도 대입하지 않는다. `app.doScript` 미사용. Script Label 쓰기, 텍스트/위치/크기 변경, 목차 Generate, 기존 Opening Page 코드 수정 — 전부 이번 범위 밖(사용자 명시 지시).
+
+이번 결정이 없애지 못하는 위험(미검증, 다음 실기 테스트로만 확인 가능): `app.activeDocument.selection`(또는 `app.selection`)이 이 UXP 환경에서 실제로 선택된 객체를 반영하는지, `firstItem.parentPage`가 이 환경에서 지원되는지, 선택된 객체가 여러 개일 때 첫 번째 객체만 보는 것으로 충분한지(이번 범위에서는 다루지 않음), `app.activeWindow.activePage`가 여전히 index=0을 반환하는지(2순위 fallback 경로 자체의 재확인).

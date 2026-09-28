@@ -984,3 +984,27 @@
 남은 문제(이전부터 이어짐, 이번 작업과 무관):
 - HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
 - 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
+
+---
+
+## 2026-09-28 - "Inspect Current Page" 페이지 판별을 selection 우선으로 변경 (D023, 읽기 전용)
+
+완료:
+- 사용자가 D022의 `Inspect Current Page`를 실제 목차 페이지("목차샘플1")에서 직접 클릭/선택한 뒤 실기 테스트했으나, 매번 `index=0, name=1, Page Item 수=61`(문서의 실제 첫 페이지)만 반환됨을 보고 — 이미 전체 문서 Inspect로 목차 페이지가 `index=1, name=2, Page Item 수=22`임이 확인된 상태라 명백히 다른 페이지였음. `app.activeWindow.activePage`가 이 UXP 환경에서 사용자가 보고 있는 페이지를 전혀 반영하지 못하고 항상 첫 페이지를 반환한다는 것이 실기로 확정됨
+- 사용자가 `app.activeDocument.selection`(선택된 객체) → `parentPage`로 페이지를 역추적하는 방식을 1순위로, `activeWindow.activePage`는 2순위 대체 수단으로 낮추고, 어떤 방법으로 페이지를 얻었는지 로그에 표시하도록 명시적으로 지시. index=0 등으로의 임의 대체는 여전히 금지, 확인 불가 시 명확한 오류만 표시하도록 재확인
+- `src/inspector.js`에 `getPageFromSelection()`(`app.activeDocument.selection`, 비어 있으면 `app.selection`도 방어적으로 시도 → 첫 선택 객체의 `parentPage`) 신규 추가. `inspectActivePage()`를 재구성해 1순위(selection.parentPage) → 실패 시 2순위(activeWindow.activePage) → 둘 다 실패 시 `{ ok: false, message }`(대체 없음) 순으로 페이지를 판별하도록 변경. index 조회 로직(참조 동등성 → name 일치)은 `findPageIndex(doc, page)` 공용 함수로 추출(동작 변화 없음)
+- `formatActivePageReport()`에 `Current Page source: selection.parentPage` 또는 `activeWindow.activePage` 표시 줄 추가
+- `index.html`/`index.js`는 이미 `inspectActivePage()`/`formatActivePageReport()`를 범용적으로 호출하고 있어 수정 불필요 — 실제로 건드리지 않음. 전체 문서 Inspect(`inspectDocument()`/`formatReport()`), D021/D022의 `detectPageItemType()`, 기존 Opening Page 코드 전부 이번에도 무변경
+- `app.doScript` 미사용, Script Label 쓰기/텍스트·위치·크기 변경/목차 Generate 없음(전부 값 읽기뿐)
+- HANDOFF.md(현재 프로젝트 단계, 완료된 기능, 다음 추천 작업)/DECISIONS.md(D023)에 반영
+
+변경 파일:
+- src/inspector.js (`getPageFromSelection()`/`findPageIndex()` 신규, `inspectActivePage()`/`formatActivePageReport()` 수정 — 다른 파일은 무변경)
+- HANDOFF.md, DECISIONS.md, WORKLOG.md
+
+테스트:
+- 없음(실행 가능한 JavaScript 런타임이 이 세션에 없어 코드 리뷰로만 확인). `app.activeDocument.selection`/`app.selection`/`firstItem.parentPage`가 이 UXP 환경에서 실제로 동작하는지는 사용자의 다음 실기 테스트로만 확인 가능
+
+남은 문제(이전부터 이어짐, 이번 작업과 무관):
+- HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
+- 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
