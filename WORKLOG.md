@@ -852,3 +852,31 @@
 - 직접 구현한 RFC 1951 DEFLATE 압축 해제, `require("uxp").storage.formats.binary`, 자체 UTF-8 디코더 모두 이 InDesign UXP 환경에서 실기로 검증된 적 없음
 - `BODY` 필드의 문단 사이 `\n`이 InDesign TextFrame에서 실제로 별도 문단으로 나뉘어 보이는지 확인 필요
 - HERO_IMAGE_GUIDE 실패 케이스, D017 이미지 누락 실패 케이스, WITHOUT_PHOTO 회귀, 안전 검사 실패 케이스 등 이전부터 남아있던 선택적 실기 확인 항목들도 여전히 미확인
+
+---
+
+## 2026-09-28 - 플러그인 패널 빈 화면 문제 진단 및 수정 (D019 정정, 재테스트 전)
+
+완료:
+- 사용자가 Word DOCX 1차 실기 테스트 결과를 전달: `Load Article` 클릭 후 Status가 "파일 선택 중..."에서 멈추고 `Article Log`에 아무것도 로드되지 않음. 이번에는 DOCX 파서를 수정하지 말고 파일 선택 단계만 점검해 달라고 요청 — `index.js`/`src/data.js`의 `getFileForOpening()` 호출부, 타입 필터 존재 여부, JSON+DOCX 동시 선택 가능 여부, await가 멈출 수 있는 코드 경로, 취소 시 처리, 기존 JSON 동작 유지 여부를 확인해 달라고 함
+- `index.js`/`src/data.js`를 재검토한 결과: `getFileForOpening()`은 인자 없이 호출되어(타입 필터 없음, D011부터 그대로) JSON/DOCX 모두 이미 선택 가능하며, 모든 `await`가 개별 `try/catch`로 감싸여 있고 취소 처리도 명시적으로 구현되어 있어(파일이 없으면 `{status:"cancelled"}` 반환) 코드 구조상 무한 대기를 일으킬 경로를 찾지 못함. HANDOFF.md에 "Load Article의 취소 케이스가 아직 실기로 확인된 적 없다"는 기존 기록이 있어, 취소 처리 자체의 실제 동작(이 InDesign 버전에서 `getFileForOpening()`이 취소 시 정확히 무엇을 반환/settle하는지)이 미검증 상태였다는 점을 짚고, 실제로 네이티브 파일 선택 대화상자가 화면에 나타났는지 사용자에게 확인을 요청함(AskUserQuestion) — 사용자는 아직 확인 전이라고 답하고 재테스트하기로 함
+- 이어서 사용자가 더 심각한 증상을 보고: 플러그인 재시작 후 **패널 전체가 빈 화면**(제목만 보이고 버튼이 하나도 렌더링되지 않음)으로 뜸. reset/revert 금지, DOCX 기능 삭제 금지, 원인 설명 우선을 명시하며 `index.js`의 require 체인, `src/docxZip.js`/`src/docxArticle.js`/`src/data.js`의 top-level 코드, `src/image.js`의 `require("fs")`, HTML DOM 렌더링 구조, 문법 오류/미지원 전역 API, 최근 정상 커밋 대비 D019 diff를 확인해 달라고 요청
+- 코드를 정밀 재검토해 원인을 특정: `src/docxZip.js`의 `makeBitReader()`가 반환하는 객체에서 이 프로젝트 최초로 쓴 **객체 리터럴 getter/setter 접근자 프로퍼티**(`get bytePos() {...}`/`set bytePos(value) {...}`)를 가장 유력한 원인으로 판단함 — 이 문법이 InDesign UXP의 JS 엔진에서 파싱/지원되지 않으면 `index.js → src/data.js → src/docxArticle.js → src/docxZip.js` require 체인 전체가 실패해, `index.js`의 버튼 이벤트 바인딩 코드까지 전혀 실행되지 않고 패널이 빈 화면이 되는 증상과 정확히 부합. `index.html`을 확인해 버튼들이 정적 HTML 마크업임(JS로 동적 생성 아님)도 함께 확인함. `src/image.js`의 `require("fs")`는 D017에서 이미 실기로 성공한 호출이라 이번 문제의 원인일 가능성은 낮다고 판단해 배제
+- 가장 작은 수정: `src/docxZip.js`의 getter/setter 접근자 2개를 이 코드베이스 다른 곳에서 이미 검증된 일반 메서드 형태(`getBytePos()`/`setBytePos(value)`)로 교체(기능 동일, 호출부 4곳 변경). 추가로 `for (;;)` 무한 루프 2곳도 더 널리 쓰이는 `while (true)`로 교체(기능 변화 없음, 보수적 조치). DOCX ZIP/DEFLATE 알고리즘 로직, JSON 기능, Generate 기능은 전혀 건드리지 않음
+- `DECISIONS.md`(D019)/`HANDOFF.md`/`docs/WORD_INPUT_SPEC.md`에 이번 진단·수정 내용을 반영하되, 재테스트 전까지는 "성공"으로 기록하지 않음. UDT Console에서 확인할 오류 유형(`SyntaxError`, `Unexpected token`, 파일명 등)도 사용자에게 안내함
+
+변경 파일:
+- src/docxZip.js
+- DECISIONS.md
+- HANDOFF.md
+- docs/WORD_INPUT_SPEC.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(이 세션에 JS 런타임이 없어 여전히 자체 실행 검증 불가). 패널 빈 화면 문제의 원인 추정과 수정은 코드 분석에 근거하며, 실제로 문제가 해결됐는지는 사용자의 재테스트로만 확인 가능하다.
+
+남은 문제:
+- 이번 수정이 실제로 패널 빈 화면 문제를 해결했는지 재테스트 필요
+- `Load Article`이 "파일 선택 중..."에서 멈추던 증상이 재현되는지, 재현된다면 실제 OS 파일 선택 대화상자가 화면에 나타나는지(숨겨져 있는지) 확인 필요
+- 위 두 가지가 해결된 뒤에야 Word DOCX end-to-end 실기 테스트(TITLE/POINT_TEXT/BODY/HERO_IMAGE 추출·Generate 반영·기존 JSON 회귀 확인)를 진행할 수 있음
+- getter/setter 접근자 프로퍼티가 InDesign UXP JS 엔진에서 실제로 문제였는지는 콘솔 로그로 확정되지 않았다 — 다른 원인의 가능성도 완전히 배제하지 않음

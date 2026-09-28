@@ -87,6 +87,12 @@ function buildHuffman(codeLengths) {
     return { count, symbol };
 }
 
+// D019 정정: 이 객체의 bytePos를 처음에는 getter/setter 접근자 프로퍼티(get bytePos()/
+// set bytePos())로 만들었으나, 실제 InDesign UXP 패널이 아예 빈 화면으로 뜨는 문제가
+// 발생했다(2026-09-28). 이 프로젝트에서 객체 리터럴 accessor 프로퍼티 문법을 쓴 것은
+// 이번이 처음이라 InDesign UXP의 JS 엔진이 이 문법을 지원하는지 검증된 적이 없었고,
+// 가장 유력한 원인으로 보고 이미 이 코드베이스 다른 곳에서 검증된 "일반 메서드" 형태
+// (getBytePos()/setBytePos())로 바꿨다 — 기능은 동일하다.
 function makeBitReader(bytes, startByteOffset) {
     let bytePos = startByteOffset;
     let bitBuf = 0;
@@ -117,10 +123,10 @@ function makeBitReader(bytes, startByteOffset) {
             bitBuf = 0;
             bitCount = 0;
         },
-        get bytePos() {
+        getBytePos() {
             return bytePos;
         },
-        set bytePos(value) {
+        setBytePos(value) {
             bytePos = value;
             bitBuf = 0;
             bitCount = 0;
@@ -177,18 +183,18 @@ function inflateRaw(compressedBytes, expectedLength) {
     const fixedLitLenHuffman = buildHuffman(FIXED_LITLEN_LENGTHS);
     const fixedDistHuffman = buildHuffman(FIXED_DIST_LENGTHS);
 
-    for (;;) {
+    while (true) {
         const isFinal = reader.getBit();
         const blockType = reader.getBits(2);
 
         if (blockType === 0) {
             reader.alignToByte();
-            const len = compressedBytes[reader.bytePos] | (compressedBytes[reader.bytePos + 1] << 8);
-            reader.bytePos = reader.bytePos + 4; // LEN(2)+NLEN(2), NLEN 검증은 생략
+            const len = compressedBytes[reader.getBytePos()] | (compressedBytes[reader.getBytePos() + 1] << 8);
+            reader.setBytePos(reader.getBytePos() + 4); // LEN(2)+NLEN(2), NLEN 검증은 생략
             for (let i = 0; i < len; i++) {
-                out[outPos++] = compressedBytes[reader.bytePos + i];
+                out[outPos++] = compressedBytes[reader.getBytePos() + i];
             }
-            reader.bytePos = reader.bytePos + len;
+            reader.setBytePos(reader.getBytePos() + len);
         } else if (blockType === 1 || blockType === 2) {
             let litLenHuffman;
             let distHuffman;
@@ -229,7 +235,7 @@ function inflateRaw(compressedBytes, expectedLength) {
                 distHuffman = buildHuffman(allLengths.slice(hlit, hlit + hdist));
             }
 
-            for (;;) {
+            while (true) {
                 const symbol = decodeSymbol(reader, litLenHuffman);
                 if (symbol < 256) {
                     out[outPos++] = symbol;

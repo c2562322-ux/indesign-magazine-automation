@@ -69,6 +69,8 @@ UXP에는 zip 해제나 압축 해제(inflate) 내장 API가 없다([DECISIONS.m
 
 **이 ZIP/DEFLATE/XML 처리 코드는 이 프로젝트에서 직접 새로 작성했고, 이 세션에서는 실행 가능한 JavaScript 런타임(Node.js 등)이 없어 자체적으로 실행 검증조차 해보지 못했다.** 실제 InDesign UXP 환경에서의 첫 실행이 곧 이 코드의 첫 실행이다 — 실기 테스트가 매우 중요하다.
 
+**1차 실기 테스트에서 플러그인 패널이 빈 화면으로 뜨는 문제가 발견됐다(2026-09-28)**: `src/docxZip.js`에서 이 코드베이스 최초로 쓴 객체 리터럴 getter/setter 접근자 프로퍼티(`get bytePos()`/`set bytePos()`)를 가장 유력한 원인으로 보고 일반 메서드(`getBytePos()`/`setBytePos()`)로 교체했다(기능 동일). 이 수정이 실제로 문제를 해결했는지는 아직 재테스트로 확인되지 않았다 — [HANDOFF.md](../HANDOFF.md)/[DECISIONS.md](../DECISIONS.md) D019 참고.
+
 ## 아직 정해지지 않은 것 / 미검증 사항
 
 - `require("uxp").storage.formats.binary`로 `.docx` 파일을 ArrayBuffer로 읽는 것이 이 InDesign UXP 환경에서 실제로 동작하는지 미검증(공식 문서 기준으로는 지원되는 것으로 보임).
