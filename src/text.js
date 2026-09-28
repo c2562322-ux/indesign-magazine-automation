@@ -1,6 +1,7 @@
 // 검증된 기사 데이터를 InDesign 텍스트 프레임/이미지 프레임에 실제로 채워 넣는 모듈.
-// 지금까지 TITLE, POINT_TEXT, BODY, HERO_IMAGE를 다룬다(applyOpeningPageContent, 하나의
-// doScript로 통합 — D014/D015/D017) — Overset 처리, 페이지 추가는 아직 구현하지 않는다.
+// 지금까지 TITLE, POINT_TEXT, BODY, HERO_IMAGE(+HERO_IMAGE_GUIDE 안내 문구 비우기)를 다룬다
+// (applyOpeningPageContent, 하나의 doScript로 통합 — D014/D015/D017/D018) — Overset 처리,
+// 페이지 추가는 아직 구현하지 않는다.
 //
 // 대상 페이지 판별은 src/validation.js의 OPENING_PROFILES_BY_VARIANT(읽기 전용 검증에 쓰는
 // 것과 동일한 requiredFrames 정의)를 그대로 재사용한다 — 페이지를 page.name 등으로
@@ -148,6 +149,10 @@ function findHeroImageFrameForVariant(doc, variant) {
     return findLabeledFrameForVariant(doc, variant, "HERO_IMAGE", "Rectangle");
 }
 
+function findHeroImageGuideFrameForVariant(doc, variant) {
+    return findLabeledFrameForVariant(doc, variant, "HERO_IMAGE_GUIDE", "TextFrame");
+}
+
 // BODY_COLUMN_1 → BODY_COLUMN_2가 실제로 텍스트 스레드로 연결되어 있는지, body를 쓰기 전에
 // 가능한 범위에서 확인한다. src/inspector.js의 getLinkedFrameInfo(Inspect Template에서 이미
 // 실기로 확인된 nextTextFrame/previousTextFrame 읽기 로직, D010 검증 당시 사용)를 그대로
@@ -236,10 +241,14 @@ async function applyOpeningPageContent(articleData, articleFileNativePath) {
             let bodyFrame = null;
             let bodyColumn1Frame = null;
             let heroImageFrame = null;
+            let heroImageGuideFrame = null;
 
             if (articleData.variant === "WITH_PHOTO") {
                 bodyFrame = findBodyFrameForVariant(doc, articleData.variant);
                 heroImageFrame = findHeroImageFrameForVariant(doc, articleData.variant);
+                // "대표이미지" 템플릿 제작 안내 문구 프레임(기사 데이터 필드 아님). HERO_IMAGE
+                // 배치가 성공한 뒤 이 프레임의 contents만 비운다(D018) — 삭제하지 않는다.
+                heroImageGuideFrame = findHeroImageGuideFrameForVariant(doc, articleData.variant);
             } else if (articleData.variant === "WITHOUT_PHOTO") {
                 bodyColumn1Frame = findBodyColumn1FrameForVariant(doc, articleData.variant);
                 const bodyColumn2Frame = findBodyColumn2FrameForVariant(doc, articleData.variant);
@@ -257,6 +266,9 @@ async function applyOpeningPageContent(articleData, articleFileNativePath) {
             //    실패하더라도 TITLE/POINT_TEXT/BODY는 아직 쓰이지 않은 상태로 남는다.
             if (heroImageFrame) {
                 placeHeroImage(heroImageFrame, heroImageNativePath);
+                // 이미지 place가 성공했을 때만(위 줄에서 예외 없이 통과했을 때만) 안내
+                // 문구를 비운다 — place가 실패하면 이 줄에 도달하지 않는다.
+                heroImageGuideFrame.contents = "";
             }
             titleFrame.contents = articleData.title;
             pointTextFrame.contents = articleData.pointText;

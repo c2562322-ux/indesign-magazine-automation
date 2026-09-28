@@ -17,6 +17,10 @@ const OPENING_WITH_PHOTO = {
         { label: "POINT_TEXT", expectedType: "TextFrame" },
         { label: "BODY", expectedType: "TextFrame" },
         { label: "HERO_IMAGE", expectedType: "Rectangle" },
+        // 디자이너가 이미지 위치를 표시하려고 넣어둔 "대표이미지" 템플릿 제작 안내 문구
+        // (기사 데이터 필드 아님). HERO_IMAGE에 이미지가 정상 place된 뒤 이 프레임의
+        // contents만 비운다(D018) — 프레임 자체는 삭제하지 않는다.
+        { label: "HERO_IMAGE_GUIDE", expectedType: "TextFrame" },
     ],
     linkChecks: [],
 };

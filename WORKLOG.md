@@ -749,3 +749,36 @@
 - WITHOUT_PHOTO가 이번 변경 이후에도 기존과 동일하게 동작하는지 확인 필요
 - `fs.lstat`이 없는/접근 불가 경로에서 정확히 어떤 형태의 오류를 던지는지, `rectangle.place(nativePath)`의 정확한 동작 모두 이 환경에서 실기로 검증된 적 없음
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+
+---
+
+## 2026-09-28 - HERO_IMAGE 정상 케이스 실기 성공 확인 + HERO_IMAGE_GUIDE 안내 문구 자동 비우기 구현 (D018)
+
+완료:
+- 사용자가 `fs.lstat` 교체 후 재실기 테스트 결과를 전달: `opening-page-with-photo.json` Load 성공, TITLE·POINT_TEXT·BODY 정상 반영, `hero.png`가 기존 Script Label=HERO_IMAGE Rectangle에 정상 place됨, HERO_IMAGE Rectangle 위치/크기 불변, Status에도 HERO_IMAGE 배치 완료 표시 확인 — D017(HERO_IMAGE 이미지 배치)이 WITH_PHOTO 정상 케이스에서 실기 검증 완료됨(이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 이번 테스트에서 다루지 않음)
+- 다만 이 테스트에서 기존 템플릿의 "대표이미지" 템플릿 제작 안내 문구(디자이너가 이미지 위치 표시용으로 넣어둔, 기사 데이터가 아닌 텍스트 — `docs/TEMPLATE_SPEC.md` Frame 분석 워크시트에 이미 "데이터 필드 아님"으로 기록돼 있던 바로 그 프레임)가 이미지 위에 그대로 남는 문제가 발견됨. 사용자가 다음 방식으로 처리해 달라고 요청: (1) working .indd에서 이 안내 텍스트 프레임에 Script Label `HERO_IMAGE_GUIDE` 부여, (2) WITH_PHOTO Generate에서 이를 찾아 검증, (3) 이미지 place가 성공한 뒤에만 `contents = ""`로 비움, (4) 프레임 자체는 삭제 안 함, (5) 위치/크기/스타일 변경 안 함, (6) WITHOUT_PHOTO는 처리 안 함, (7) 이미지/HERO_IMAGE/HERO_IMAGE_GUIDE 검증 실패 시 TITLE/POINT_TEXT/BODY/안내문구 모두 변경되지 않도록 기존 단일 Generate 안전 구조 유지. `HERO_IMAGE_GUIDE`라는 이름이 현재 명명 규칙에 적절한지도 검토 요청받음
+- 가장 작은 구현안을 먼저 설명한 뒤 구현 진행:
+  - `src/validation.js`의 `OPENING_WITH_PHOTO.requiredFrames`에 `{ label: "HERO_IMAGE_GUIDE", expectedType: "TextFrame" }` 한 줄만 추가 — 기존 "대상 페이지는 variant에 필요한 Script Label을 모두 가진 페이지" 판별 로직(D012)이 그대로 재사용되어, 이 Label이 없으면 TITLE 탐색부터 실패하므로 요구사항 #7이 새 로직 없이 만족됨. `Inspect Template`의 읽기 전용 검증에도 자동으로 포함됨
+  - `src/text.js`: `findHeroImageGuideFrameForVariant(doc, variant)`(기존 `findLabeledFrameForVariant` 재사용, 기존 패턴과 동일) 추가. `applyOpeningPageContent`의 WITH_PHOTO 탐색 분기에서 `heroImageGuideFrame`도 함께 찾고, 쓰기 단계에서 `placeHeroImage(...)` 바로 다음 줄에 `heroImageGuideFrame.contents = "";` 추가 — place()가 예외를 던지면 다음 줄에 도달하지 않는다는 JS의 순차 실행만으로 "place 성공 후에만 비움" 요구사항을 만족시킴(별도 성공 플래그 불필요). WITHOUT_PHOTO 분기와 나머지 doScript 구조는 전혀 변경하지 않음
+  - 명명 검토 결과 `HERO_IMAGE_GUIDE`를 그대로 채택 — 기존 Script Label의 대문자 스네이크케이스 형식과 일치하고, `HERO_IMAGE_` 접두어로 연관 프레임임을 드러내며, docs에 이미 기록된 "템플릿 제작 안내 문구" 표현과도 부합
+- `DECISIONS.md`에 D017의 정상 케이스 실기 검증 완료를 반영하고, D018을 신규 기록(결정, 이유, 명명 검토, 범위에서 제외한 것 — 프레임 삭제/위치·크기 변경/WITHOUT_PHOTO, 미검증 상태)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계, 서술형 이력에 재테스트 성공과 안내 문구 문제 발견 경위 추가, "완료된 기능"의 HERO_IMAGE 항목을 실기 검증 완료로 갱신하고 HERO_IMAGE_GUIDE 신규 항목 추가(실기 테스트 전, working .indd에 Label 미부여 상태이며 부여 전까지 WITH_PHOTO Generate 전체가 실패한다는 점 명시), "실제 테스트 완료된 기능"에 D017 정상 케이스 테스트 결과 추가, "아직 테스트하지 못한 기능"/"진행 중인 작업"/"Script Label 부여 및 검증 현황"/"미구현 기능"/"알려진 문제"/"다음 추천 작업"을 D018 관련 내용으로 갱신(다음 추천 작업 1순위를 "HERO_IMAGE_GUIDE Script Label을 InDesign에서 직접 부여한 뒤 재테스트"로 재편)
+- `docs/TEMPLATE_SPEC.md`의 Frame 분석 워크시트에서 "템플릿 제작 안내 문구" 행의 Proposed Automation Name을 "해당 없음"에서 "(적용 예정) HERO_IMAGE_GUIDE"로 갱신하고 D018 결정 내용 반영
+- HERO_IMAGE_GUIDE는 아직 실기 테스트 전으로 문서에 명시 — working .indd에 Script Label을 부여하는 작업은 사용자가 InDesign에서 직접 수행해야 하며, 아직 하지 않았음
+
+변경 파일:
+- src/validation.js
+- src/text.js
+- DECISIONS.md
+- HANDOFF.md
+- docs/TEMPLATE_SPEC.md
+- WORKLOG.md
+
+테스트:
+- HERO_IMAGE(D017) WITH_PHOTO 정상 케이스는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거해 실기 검증 완료로 기록함. HERO_IMAGE_GUIDE(D018)는 Claude Code가 직접 실행한 테스트가 없고, working .indd에 Script Label조차 아직 부여되지 않아 실기 테스트가 원천적으로 불가능한 상태다 — 문서에 "성공"으로 기록하지 않았다.
+
+남은 문제:
+- working .indd의 "대표이미지" 안내 문구 TextFrame에 `HERO_IMAGE_GUIDE` Script Label을 실제로 부여하는 작업이 아직 되지 않음(사용자가 InDesign에서 직접 수행 필요)
+- HERO_IMAGE_GUIDE 정상 케이스(안내 문구가 비워지고 프레임은 남아 있는지)와 실패 케이스(Label 없을 때 아무것도 안 쓰이는지) 모두 실기 확인 필요
+- D017 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 여전히 확인되지 않음
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음

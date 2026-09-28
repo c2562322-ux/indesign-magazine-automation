@@ -316,7 +316,31 @@ WITH_PHOTO의 `heroImage`(예: `"hero.jpg"`)를 **Load Article로 불러온 JSON
 - `rectangle.place(nativePath)`가 이 프로젝트의 정확한 InDesign/UXP 버전에서 동일하게 동작하는지는 공개 예제로만 뒷받침했을 뿐, 이 환경에서 직접 실기로 확인된 적은 없다.
 - `resolveHeroImagePath`는 `heroImage` 값에 `..`(상위 폴더 이동) 등이 들어와도 이를 특별히 막지 않는다 — 이 프로젝트는 신뢰할 수 있는 사용자가 자신의 로컬 파일을 다루는 내부 도구이므로 적대적 입력을 가정하지 않았다.
 
-이 결정은 아직 실제 InDesign에서 정상 케이스가 검증되지 않았다 — 1차 실기 테스트는 `fs.stat` API 오류로 사전 검사 단계에서 중단됐다(2026-09-28).
+**실기 검증 완료(2026-09-28, `fs.lstat` 교체 후)**: 사용자가 재실기 테스트해 WITH_PHOTO 정상 케이스를 확인했다 — `opening-page-with-photo.json` Load 성공, TITLE·POINT_TEXT·BODY 정상 반영, `hero.png`가 기존 Script Label=HERO_IMAGE Rectangle에 정상 place됨, HERO_IMAGE Rectangle의 위치/크기는 변경되지 않음, Status에도 HERO_IMAGE 배치 완료 표시됨. 이미지 누락/접근 불가 실패 케이스와 WITHOUT_PHOTO 회귀 확인은 이 테스트에서 별도로 수행되지 않았다.
 
 변경 조건:
-`fs.lstat`으로 교체한 뒤 재실기 테스트에서 (a) WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 프레임 위치/크기가 그대로임), (b) 이미지 누락/접근 불가 실패 케이스(TITLE/POINT_TEXT/BODY도 전혀 반영되지 않음), (c) WITHOUT_PHOTO가 기존과 동일하게 동작함이 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다.
+이미지 누락/접근 불가 실패 케이스(TITLE/POINT_TEXT/BODY도 전혀 반영되지 않는지)와 WITHOUT_PHOTO가 기존과 동일하게 동작하는지가 별도로 확인되면 이 기록을 갱신한다.
+
+---
+
+## D018 - "대표이미지" 템플릿 안내 문구(HERO_IMAGE_GUIDE) 자동 비우기
+
+결정:
+WITH_PHOTO의 HERO_IMAGE Rectangle 위에 디자이너가 넣어둔 "대표이미지" 템플릿 제작 안내 문구(기사 데이터 필드가 아닌, 이미지 위치를 표시하기 위한 텍스트)를 위한 별도 Script Label `HERO_IMAGE_GUIDE`를 도입한다. HERO_IMAGE 이미지 배치가 성공한 뒤에만 이 TextFrame의 `contents`를 빈 문자열로 비운다 — **프레임 자체는 삭제하지 않는다.** 구체적으로:
+
+1. `src/validation.js`의 `OPENING_WITH_PHOTO.requiredFrames`에 `{ label: "HERO_IMAGE_GUIDE", expectedType: "TextFrame" }`을 추가한다(WITHOUT_PHOTO 프로필은 변경하지 않음).
+2. `src/text.js`에 `findHeroImageGuideFrameForVariant(doc, variant)`(기존 `findLabeledFrameForVariant` 재사용, 기존 패턴과 동일) 추가.
+3. `applyOpeningPageContent()`의 WITH_PHOTO 탐색 분기에서 `heroImageGuideFrame`도 함께 찾고, 쓰기 단계에서 `placeHeroImage(...)` 바로 다음 줄에 `heroImageGuideFrame.contents = "";`를 실행한다. WITHOUT_PHOTO 분기와 나머지 doScript 구조(탐색 전부 → 쓰기 전부, HERO_IMAGE를 텍스트 필드보다 먼저 쓰는 순서)는 전혀 바꾸지 않았다.
+
+이유:
+- `requiredFrames`에 추가하는 것만으로 기존 "대상 페이지는 variant에 필요한 Script Label을 모두 가진 페이지" 판별 로직(D012)이 그대로 적용된다 — HERO_IMAGE_GUIDE Label이 없거나 중복되거나 타입이 다르면 TITLE 탐색 단계에서부터 이미 실패하므로, "이미지 파일 검증이나 HERO_IMAGE/HERO_IMAGE_GUIDE 검증이 실패하면 TITLE/POINT_TEXT/BODY/안내문구 모두 변경하지 않는다"는 요구사항을 새 검사 로직 없이 만족한다.
+- 안내 문구 비우기를 `placeHeroImage(...)` 바로 다음 줄에 둔 것은, place()가 예외를 던지면 그 다음 줄(안내 문구 비우기)에 도달하지 않는다는 JS의 기본적인 순차 실행 보장만으로 "이미지 place가 성공한 뒤에만 안내 문구를 비운다"는 요구사항을 만족하기 위함이다 — 별도의 성공 플래그나 조건문이 필요 없다.
+- `HERO_IMAGE_GUIDE.contents = ""`는 TITLE/POINT_TEXT/BODY와 완전히 같은 패턴(TextFrame.contents 대입)이라 새로운 미검증 API가 추가되지 않는다. 프레임을 삭제하는 API(`item.remove()` 등)는 검토하지 않았다 — 사용자가 명시적으로 "TextFrame 자체는 삭제하지 않음"을 요구했고, 삭제는 되돌리기 어려운 구조 변경에 더 가까워 범위 밖으로 뒀다.
+- **명명 검토**: `HERO_IMAGE_GUIDE`는 기존 Script Label 명명 규칙(대문자 스네이크케이스)과 형식은 일치하지만, 다른 Label들과 달리 "콘텐츠가 들어가는 프레임"이 아니라 "관련 프레임(HERO_IMAGE)에 딸린 메타 프레임"이라는 점에서 성격이 다르다. `HERO_IMAGE_` 접두어로 연관성을 드러내고, `docs/TEMPLATE_SPEC.md`에 이미 기록돼 있던 "템플릿 제작 안내 문구"라는 표현과도 부합해 그대로 채택했다.
+
+이번 결정이 범위에 포함하지 않은 것: 안내 문구 프레임을 삭제하는 것, 프레임 위치/크기/스타일 변경, WITHOUT_PHOTO에 대한 처리(이 프레임이 없음).
+
+이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — `HERO_IMAGE_GUIDE` Script Label을 working .indd에 실제로 부여하는 작업도 아직 사용자가 수행하지 않았다.
+
+변경 조건:
+사용자가 working .indd의 "대표이미지" 안내 문구 TextFrame에 `HERO_IMAGE_GUIDE` Script Label을 부여한 뒤, 실기 테스트에서 (a) 정상 케이스(HERO_IMAGE 배치 성공 후 안내 문구가 비워지고 프레임 자체는 남아 있음), (b) 실패 케이스(HERO_IMAGE_GUIDE Label이 없을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않음)가 확인되면 실기 검증 완료로 갱신한다.
