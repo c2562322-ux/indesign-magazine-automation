@@ -110,16 +110,22 @@ function formatLinkedFrameInfo(info) {
     return info.name ? `label=${info.label}, name=${info.name}` : `label=${info.label}`;
 }
 
+// item.constructor.name이 이 값들 중 하나면 "구체적인 타입"으로 신뢰하지 않는다 — 실기
+// 테스트에서 이 UXP 환경의 pageItems가 대부분 이 값(특히 "PageItem")만 돌려주는 것이
+// 확인됐다. 너무 일반적인(=Group/TextFrame/Rectangle을 구분해 주지 못하는) 이름이라
+// 아래 휴리스틱으로 계속 판별을 시도해야 한다.
+const GENERIC_CONSTRUCTOR_NAMES = ["PageItem", "Item", "Object", ""];
+
 // pageItem의 타입 이름을 읽기 전용으로 추정한다. classic ExtendScript에서는 보통
 // item.constructor.name(예: "TextFrame", "Group", "Rectangle")으로 타입을 구분하지만,
-// 이 UXP 환경에서 constructor.name이 같은 방식으로 동작하는지는 이번에 처음 읽어보는
-// 것이라 미검증이다. 1차로 시도해 보고, 실패하거나 의미 없는 값이면(빈 문자열, "Object" 등)
-// 존재하는 속성 기반 휴리스틱으로 대체한다. 그래도 판별하지 못하면 "UNKNOWN"을 반환할 뿐
-// 예외를 던지지 않는다 — 타입 하나를 못 알아낸다고 전체 Inspect가 중단되면 안 된다.
+// 이 UXP 환경에서는 실기 확인 결과 대부분 "PageItem"(위 GENERIC_CONSTRUCTOR_NAMES 참고)만
+// 돌려주는 것으로 나타났다 — 1차로 시도해 보되, 너무 일반적인 값이면 신뢰하지 않고 존재하는
+// 속성 기반 휴리스틱으로 대체한다. 그래도 판별하지 못하면 "UNKNOWN"을 반환할 뿐 예외를
+// 던지지 않는다 — 타입 하나를 못 알아낸다고 전체 Inspect가 중단되면 안 된다.
 function detectPageItemType(item) {
     try {
         const ctorName = item && item.constructor && item.constructor.name;
-        if (typeof ctorName === "string" && ctorName.length > 0 && ctorName !== "Object") {
+        if (typeof ctorName === "string" && ctorName.length > 0 && GENERIC_CONSTRUCTOR_NAMES.indexOf(ctorName) === -1) {
             return ctorName;
         }
     } catch (err) {
@@ -344,6 +350,68 @@ function inspectDocument() {
     };
 }
 
+// 현재 InDesign에서 보고 있는 활성 페이지 하나만 읽기 전용으로 분석한다. 전체 문서를 도는
+// inspectDocument()/formatReport()와 완전히 별개의 경로이며, 그 둘의 동작·출력은 전혀
+// 건드리지 않는다(기존 함수 재사용만 함).
+//
+// app.activeWindow.activePage는 classic InDesign Scripting DOM의 표준 속성이지만, 이
+// 프로젝트에서 activeWindow/activePage를 읽어본 것은 이번이 처음이라 이 UXP 환경에서
+// 동일하게 동작하는지 미검증이다. 읽기 자체가 실패하거나 값이 없으면, 다른 페이지(예: 첫
+// 페이지)를 임의로 대신 보여주지 않는다 — 잘못된 페이지를 "현재 페이지"로 오인시킬 수 있기
+// 때문에(사용자 명시 요구), 이 경우 { ok: false, message } 를 반환하고 호출자가 그 메시지를
+// 그대로 사용자에게 보여준다.
+function inspectActivePage() {
+    const doc = getActiveDocument();
+
+    let activePage;
+    try {
+        activePage = app.activeWindow && app.activeWindow.activePage;
+    } catch (err) {
+        return { ok: false, message: `현재 페이지를 확인할 수 없습니다 (activeWindow.activePage 읽기 실패: ${err.message}).` };
+    }
+
+    if (!activePage) {
+        return { ok: false, message: "현재 페이지를 확인할 수 없습니다 (activeWindow.activePage 값이 비어 있습니다)." };
+    }
+
+    // activePage가 doc.pages 안에서 몇 번째인지(index) 알아낸다 — 표시용일 뿐이라 실패해도
+    // 전체 조회를 막지 않고 null로 남긴다(formatActivePageReport가 "(확인 불가)"로 표시).
+    // 1차: 참조 동등성(===)으로 시도. 이 UXP 환경에서 같은 페이지를 가리키는 두 참조가
+    // === 로 같다고 나오는지는 미검증이다.
+    let pageIndex = null;
+    try {
+        for (let i = 0; i < doc.pages.length; i++) {
+            if (doc.pages.item(i) === activePage) {
+                pageIndex = i;
+                break;
+            }
+        }
+    } catch (err) {
+        pageIndex = null;
+    }
+
+    // 2차 대체: 참조 동등성이 안 통하는 경우, page.name으로 첫 일치 항목을 찾는다(이름이
+    // 문서 전체에서 반드시 유일하다는 보장은 없어 완전한 대체 수단은 아니다).
+    if (pageIndex === null) {
+        try {
+            const activeName = activePage.name;
+            for (let i = 0; i < doc.pages.length; i++) {
+                if (doc.pages.item(i).name === activeName) {
+                    pageIndex = i;
+                    break;
+                }
+            }
+        } catch (err) {
+            pageIndex = null;
+        }
+    }
+
+    // 기존 inspectPage()를 그대로 재사용 — textFrames/rectangles/pageItemTree 계산 로직은
+    // 전체 문서 Inspect와 완전히 동일하다.
+    const page = inspectPage(activePage, pageIndex);
+    return { ok: true, page };
+}
+
 // 트리 한 노드를 한 줄 텍스트로 만든다(연결선 prefix는 formatPageItemForest가 따로 붙인다).
 function formatPageItemNodeLine(node) {
     const parts = [node.type, `depth=${node.depth}`, `parent=${node.parentType}`];
@@ -380,6 +448,31 @@ function formatPageItemForest(roots, lines, basePrefix) {
     roots.forEach((root, i) => {
         renderNode(root, basePrefix, i === roots.length - 1, true);
     });
+}
+
+// inspectActivePage()의 결과를 텍스트로 만든다. 실패 시(ok: false) 그 사유 메시지를 그대로
+// 반환한다 — 다른 페이지를 대신 보여주지 않는다. 성공 시 실제로 분석한 page index/name을
+// 맨 위에 명시한 뒤, 기존 formatPageItemForest()를 그대로 재사용해 트리를 출력한다.
+function formatActivePageReport(result) {
+    if (!result || !result.ok) {
+        return result && result.message ? result.message : "현재 페이지를 확인할 수 없습니다.";
+    }
+
+    const page = result.page;
+    const indexText = page.pageIndex === null || typeof page.pageIndex === "undefined" ? "(확인 불가)" : page.pageIndex;
+
+    const lines = [];
+    lines.push(`Current Page: index=${indexText}, name=${page.pageName}`);
+    lines.push(`Page Item 수 (전체 타입 포함): ${page.pageItemCount}`);
+    lines.push("");
+    lines.push("중첩 Page Item 트리 (읽기 전용):");
+    if (page.pageItemTree.length === 0) {
+        lines.push("  (없음)");
+    } else {
+        formatPageItemForest(page.pageItemTree, lines, "  ");
+    }
+
+    return lines.join("\n");
 }
 
 function formatReport(report) {
@@ -459,4 +552,6 @@ module.exports = {
     inspectDocument,
     formatReport,
     getLinkedFrameInfo,
+    inspectActivePage,
+    formatActivePageReport,
 };

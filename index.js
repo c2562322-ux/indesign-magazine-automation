@@ -1,6 +1,6 @@
 // UI 이벤트 바인딩과 프로그램 시작점. InDesign 제어 로직은 src/text.js, src/inspector.js 등에 위임한다.
 
-const { inspectDocument, formatReport } = require("./src/inspector.js");
+const { inspectDocument, formatReport, inspectActivePage, formatActivePageReport } = require("./src/inspector.js");
 const {
     validateFrameLabels,
     formatValidationReport,
@@ -125,6 +125,29 @@ document.getElementById("btnInspect").addEventListener("click", () => {
         inspectLog.textContent = combinedText;
         console.log("[Inspect Template]\n" + combinedText);
         setStatus(`완료: 페이지 ${report.pageCount}개 분석 + Label 검증 (읽기 전용, 문서 변경 없음)`);
+    } catch (err) {
+        console.error(err);
+        inspectLog.textContent = `오류: ${err.message}`;
+        setStatus(`오류: ${err.message}`);
+    }
+});
+
+// 전체 문서가 아니라 현재 InDesign에서 보고 있는 페이지 하나만 읽기 전용으로 분석한다
+// (btnInspect와 완전히 별개 경로, 위 handler는 전혀 수정하지 않았다). 현재 페이지를 확인하지
+// 못하면 다른 페이지를 대신 보여주지 않고 실패 사유만 표시한다.
+document.getElementById("btnInspectCurrentPage").addEventListener("click", () => {
+    try {
+        setStatus("Inspecting current page...");
+        const result = inspectActivePage();
+        const text = formatActivePageReport(result);
+        inspectLog.textContent = text;
+        console.log("[Inspect Current Page]\n" + text);
+
+        if (result.ok) {
+            setStatus("완료: 현재 페이지 분석 (읽기 전용, 문서 변경 없음)");
+        } else {
+            setStatus(`Inspect Current Page 중단: ${result.message}`);
+        }
     } catch (err) {
         console.error(err);
         inspectLog.textContent = `오류: ${err.message}`;

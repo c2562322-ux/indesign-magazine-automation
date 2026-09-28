@@ -413,3 +413,24 @@ Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파�
 읽기 전용 보장: 모든 접근이 `item.pageItems`/`.name`/`.label`/`.contents`/`.geometricBounds`/`.images` 등 값 읽기뿐이며 어떤 속성에도 대입하지 않는다. `app.doScript`로도 감싸지 않는다(D006과 동일 원칙 — 문서를 수정하지 않는 조회는 doScript로 감쌀 필요가 없다). Script Label을 새로 쓰거나, "목차" 자동입력 로직이나 데이터 계약을 만드는 작업은 이번 범위에 포함하지 않았다(사용자 명시 지시).
 
 이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): `item.constructor.name`이 이 InDesign UXP 환경에서 실제로 `"TextFrame"`/`"Group"`/`"Rectangle"` 같은 의미 있는 문자열을 주는지, Group이 아닌 다른 컨테이너성 타입(MultiStateObject, Button 등)이 목차 페이지에 있고 그것도 `pageItems`로 재귀 진입되는지, 실제 중첩 깊이가 2단계 이상인지 — 전부 이번 세션에는 실행 가능한 JavaScript 런타임이 없어 코드 리뷰로만 확인했고 실기 테스트로만 검증할 수 있다.
+
+## D022: "PageItem" 오판별 수정 + "Inspect Current Page"(현재 페이지만 보기) 추가
+
+날짜: 2026-09-28
+
+배경: D021을 실제 목차 페이지에서 실기 테스트한 결과 "중첩 Page Item 트리"는 정상 출력됐지만, (1) 대부분의 `type`이 `TextFrame`/`Group`이 아니라 `"PageItem"`으로만 나왔고, (2) `Inspect Template`이 문서 14페이지 전체를 출력해 목차 페이지 하나만 확인하기 어려웠다.
+
+**"PageItem" 원인 분석 — UXP 내부 동작이 아니라 D021 자체의 로직 버그로 확인됨**: `detectPageItemType()`은 `item.constructor.name`이 빈 문자열이 아니고 정확히 `"Object"`만 아니면 무조건 그 값을 최종 타입으로 신뢰하도록 되어 있었다. `"PageItem"`(모든 pageItem의 공통 상위 클래스로 보이는, 너무 일반적인 이름)도 이 조건을 그대로 통과해 버려서, 그 아래의 더 구체적인 휴리스틱(Group/TextFrame/Rectangle 판별)까지 코드가 내려가지 못하고 있었다. 이는 실제 코드를 다시 읽어 확인한 사실이며, UXP 엔진의 동작을 추측한 것이 아니다.
+
+수정: `GENERIC_CONSTRUCTOR_NAMES = ["PageItem", "Item", "Object", ""]` 거부 목록을 추가해, `constructor.name`이 이 값들 중 하나면 신뢰하지 않고 항상 기존 휴리스틱(Group/TextFrame/Rectangle 판별, 실패 시 `"UNKNOWN"`)까지 계속 진행하도록 `detectPageItemType()`의 조건 하나만 고쳤다. GraphicLine 등 장식 객체를 이름으로 특정하는 판별은 사용자 명시 지시에 따라 이번에 추가하지 않았다 — 식별되지 않으면 `"UNKNOWN"`으로 남는 것으로 충분하다는 게 이번 범위의 최소 기준이다. `text`(TextFrame contents 미리보기)는 원래도 `type` 판별과 무관하게 `typeof item.contents === "string"`으로 독립적으로 채워지도록 D021에서 이미 만들어 뒀으므로, 이번에는 건드리지 않았다 — 사용자가 이 부분은 1번 수정 결과를 실기로 먼저 확인한 뒤 필요 여부를 판단하기로 함(id/타입 전용 컬렉션 교차 매칭 등 2차 보완은 이번에 넣지 않음).
+
+**"Inspect Current Page" 추가**: `src/inspector.js`에 `inspectActivePage()`/`formatActivePageReport()`를 신규 추가하고, `index.html`에 `btnInspectCurrentPage` 버튼, `index.js`에 그 클릭 핸들러를 추가했다. 기존 `inspectDocument()`/`formatReport()`(전체 문서 Inspect, `btnInspect`)는 시그니처와 동작을 전혀 바꾸지 않았다 — 완전히 별도의 함수/버튼으로 구현해 회귀 위험을 최소화하는, 지난 분석 보고에서 제안했던 "더 안전한 방식"을 그대로 택했다.
+
+- 현재 페이지 판별은 `app.activeWindow.activePage`를 시도한다 — classic InDesign Scripting DOM의 표준 속성이지만, 이 프로젝트에서 `activeWindow`/`activePage`를 읽어보는 것은 이번이 처음이라 이 UXP 환경에서 동일하게 노출되는지 미검증이다.
+- **사용자가 명시적으로 요구한 안전장치: 읽기 실패 시 index=0 등 다른 페이지로 임의 대체(fallback)하지 않는다.** 실패하면 `{ ok: false, message }`를 반환하고, 호출자는 그 메시지를 그대로 Status/로그에 보여줄 뿐 어떤 페이지도 대신 표시하지 않는다 — 잘못된 페이지를 "현재 페이지"로 오인시키는 것을 막기 위함이다.
+- 성공 시 `doc.pages`를 순회해 activePage의 index를 찾는다(1차: 참조 동등성 `===`, 실패 시 2차: `page.name` 일치로 대체 — 둘 다 이 UXP 환경에서 실제로 통하는지 미검증). index를 끝내 못 찾아도 조회 자체를 막지 않고 `"(확인 불가)"`로 표시한다(index 확인 실패는 activePage 확인 실패와 별개로 취급 — index는 표시용 부가 정보일 뿐이라 이것까지 못 찾는다고 전체 기능을 막을 필요는 없다는 판단).
+- `inspectPage()`/`formatPageItemForest()`를 그대로 재사용해, 실제로 분석한 `page index`/`name`을 로그 맨 위에 명시한 뒤 그 페이지의 트리만 출력한다.
+
+읽기 전용 보장: 이번 변경도 `.constructor`/`.pageItems`/`.name`(비교용) 읽기와 기존 재사용 함수(모두 값 읽기만 수행)뿐이며, 어떤 속성에도 대입하지 않는다. Script Label 쓰기, 텍스트 수정, 위치/크기 변경, 목차 Generate, Word/JSON 파서 수정, 기존 Opening Page 코드 수정, Template Selection 자동화 — 전부 이번 범위에 포함하지 않았다(사용자 명시 지시).
+
+이번 결정이 없애지 못하는 위험(미검증): `app.activeWindow.activePage`가 이 UXP 환경에서 실제로 노출되는지, 두 페이지 참조 간 `===` 비교가 이 환경에서 유효한지, `GENERIC_CONSTRUCTOR_NAMES` 거부 후에도 여전히 `"PageItem"`류의 다른 일반적인 이름이 더 있는지, TextFrame의 `text`가 실기에서 실제로 채워지는지 — 전부 다음 실기 테스트로만 확인 가능하다.

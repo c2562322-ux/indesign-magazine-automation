@@ -77,6 +77,12 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 이를 보완하기 위해 (2026-09-28) **`page.pageItems`(타입 무관 전체 컬렉션) 기반 읽기 전용 재귀 탐색**을 추가했다([DECISIONS.md](DECISIONS.md) D021): `src/inspector.js`에 `detectPageItemType()`(1차로 `item.constructor.name` 시도, 실패/무의미한 값이면 존재하는 속성 기반 휴리스틱으로 대체, 그래도 안 되면 예외 없이 `"UNKNOWN"` 반환), `hasNestedPageItems()`(pageItems 보유 여부로 컨테이너 판단, 타입 판별과 독립), `buildPageItemNode()`/`buildPageItemForest()`(depth 0부터 재귀, 각 항목마다 개별 try/catch, depth 상한 20)를 새로 추가하고, `inspectPage()`가 계산한 `pageItemTree`를 `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션(└─/├─ 트리 형태)으로 출력한다. **기존 `page.textFrames`/`page.rectangles` 기반 로직과 그 출력 줄은 한 글자도 바꾸지 않고 완전히 추가만 했다** — `app.doScript`를 쓰지 않는 읽기 전용 원칙(D006)도 그대로 유지된다. Script Label을 쓰거나, 자동입력 로직을 만들거나, "목차" 템플릿의 데이터 계약을 정의하는 작업은 이번에 하지 않았다. **이 코드는 아직 실제 InDesign에서 실행해본 적이 없다** — `constructor.name`이 이 UXP 환경에서 기대한 문자열을 주는지가 가장 먼저 확인해야 할 미검증 지점이다.
 
+**사용자가 실제 목차 페이지에서 D021을 실기 테스트해 "중첩 Page Item 트리"가 정상 출력됨을 확인했다(2026-09-28)**. 다만 두 가지 후속 문제가 발견됐다: (1) `Inspect Template`이 문서 14페이지 전체를 출력해 목차 페이지 하나만 확인하기 어려움, (2) 대부분의 `type`이 `TextFrame`/`Group`이 아니라 `"PageItem"`으로만 표시됨. `detectPageItemType()`을 다시 읽어 원인을 코드 리뷰로 확인했다 — UXP 내부 동작의 문제가 아니라 **판별 함수 자체의 로직 버그**였다: `item.constructor.name`이 반환한 값이 빈 문자열이거나 정확히 `"Object"`가 아니기만 하면 무조건 신뢰하도록 되어 있어서, `"PageItem"`(모든 pageItem의 공통 상위 클래스로 보이는, 너무 일반적인 이름)도 그 조건을 통과해 곧바로 반환되고, 그 아래의 더 구체적인 휴리스틱(Group/TextFrame/Rectangle 판별)까지 내려가지 못하고 있었다.
+
+이를 보완해(2026-09-28, 같은 D021 범위의 최소 수정) `GENERIC_CONSTRUCTOR_NAMES`(`"PageItem"`/`"Item"`/`"Object"`/빈 문자열) 거부 목록을 추가해, 이 값들이 나오면 신뢰하지 않고 항상 아래 휴리스틱까지 계속 진행하도록 고쳤다. GraphicLine 등 장식 객체를 이름으로 특정하는 별도 판별은 이번에 추가하지 않았다 — 근거 없이 속성을 추측하지 않기 위해, 식별 안 되면 `"UNKNOWN"`으로 남기는 것을 최소 기준으로 삼았다(요청받은 범위).
+
+같은 작업에서 **"Inspect Current Page"**(전체 문서가 아니라 현재 InDesign에서 보고 있는 페이지 하나만 읽기 전용으로 보는 기능)도 추가했다: `app.activeWindow.activePage`를 try/catch로 조회하고(이 프로젝트에서 `activeWindow`/`activePage`를 읽어보는 것은 이번이 처음이라 미검증), **읽기 실패 시 다른 페이지(예: 첫 페이지)로 임의 대체하지 않는다** — 사용자가 명시적으로 요구한 안전장치로, 잘못된 페이지를 "현재 페이지"로 오인시키는 것을 막기 위함이다. 실패하면 실패 사유만 Status/로그에 표시하고 아무 페이지도 보여주지 않는다. 성공하면 실제로 분석한 `page index`/`name`을 로그 맨 위에 명시한 뒤 기존 `inspectPage()`/`formatPageItemForest()`를 그대로 재사용해 트리를 출력한다 — 기존 `inspectDocument()`/`formatReport()`(전체 문서 Inspect)는 전혀 건드리지 않은 완전히 별도의 함수/버튼(`btnInspectCurrentPage`)이다.
+
 ## 완료된 기능
 
 - 프로젝트 기본 폴더 구조 ([manifest.json](manifest.json), [index.html](index.html), [styles.css](styles.css), [index.js](index.js), `src/`, `sample/`)
@@ -97,7 +103,8 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 - `Generate`에 HERO_IMAGE_GUIDE("대표이미지" 템플릿 안내 문구) 자동 비우기 추가, 같은 단일 doScript 흐름에 포함 및 실기 검증 완료(D018): 위 HERO_IMAGE 테스트에서 이미지 위에 디자이너의 안내 문구가 그대로 남는 문제가 발견되어, WITH_PHOTO에서 HERO_IMAGE 배치가 성공한 뒤에만 `HERO_IMAGE_GUIDE` Script Label TextFrame의 `contents`를 비우도록 추가했다(프레임 자체는 삭제하지 않음). [src/validation.js](src/validation.js)의 `OPENING_WITH_PHOTO.requiredFrames`에 `HERO_IMAGE_GUIDE`가 추가되어, working .indd에 이 Script Label을 부여하기 전까지는 WITH_PHOTO의 `Generate`(TITLE 포함) 전체가 실패한다. 사용자가 실제 working .indd에 `HERO_IMAGE_GUIDE` Script Label을 직접 부여한 뒤 정상 케이스를 테스트해, 안내 문구가 사라지고 프레임 자체는 유지되며 위치/크기/스타일 변화가 없음을 확인함(2026-09-28).
 - Word(.docx) 원고 입력 MVP 구현(D019, 코드 작성 완료): [src/docxZip.js](src/docxZip.js)(직접 구현한 RFC 1951 DEFLATE 압축 해제 + 최소 ZIP 리더), [src/docxArticle.js](src/docxArticle.js)(`word/document.xml`에서 문단/텍스트 추출 + `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커 파싱 → 기존 Article Data 구조로 변환), [src/data.js](src/data.js)의 `loadArticleFile()` 확장(파일 확장자로 JSON/DOCX 분기, 기존 JSON 경로는 코드 변경 없음). OPENING_PAGE/WITH_PHOTO 1종 고정. 변환 결과는 기존 `validateArticleData()`/`applyOpeningPageContent()`를 그대로 통과하며 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않았다.
 - 플러그인 패널 빈 화면 문제 수정(D019 정정, 2026-09-28, 재테스트 전): 1차 실기 테스트에서 `Load Article`이 멈추더니 플러그인 재시작 후 패널 전체가 빈 화면으로 뜸. `src/docxZip.js`의 객체 리터럴 getter/setter 접근자(`get bytePos()`/`set bytePos()`, 이 코드베이스 최초 사용)를 가장 유력한 원인으로 보고, 이미 검증된 일반 메서드 형태(`getBytePos()`/`setBytePos()`)로 교체했다(기능 동일, `for (;;)` 2곳도 `while (true)`로 변경). **이 수정이 실제로 문제를 해결했는지는 아직 확인되지 않았다.**
-- `Inspect Template`에 Group 등 컨테이너 내부까지 보는 읽기 전용 재귀 탐색 추가(D021, 2026-09-28, 코드 작성 완료·실기 미검증): "목차" 페이지에서 `page.textFrames`가 실제로 보이는 여러 텍스트 중 1개만 반환하는 문제가 보고되어, `src/inspector.js`에 `detectPageItemType()`(`constructor.name` 1차 시도 + 속성 기반 휴리스틱 대체, 실패해도 `"UNKNOWN"`으로 계속 진행)와 `buildPageItemNode()`/`buildPageItemForest()`(`page.pageItems` 전체를 depth 0부터 재귀, depth 상한 20, 개별 try/catch)를 추가했다. `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션을 기존 Text Frame/Rectangle 목록 아래에 추가로 출력한다(기존 출력은 그대로 유지). 자동입력/Script Label 계약/Word 데이터 구조는 이번에 만들지 않았다.
+- `Inspect Template`에 Group 등 컨테이너 내부까지 보는 읽기 전용 재귀 탐색 추가(D021, 2026-09-28): "목차" 페이지에서 `page.textFrames`가 실제로 보이는 여러 텍스트 중 1개만 반환하는 문제가 보고되어, `src/inspector.js`에 `detectPageItemType()`(`constructor.name` 1차 시도 + 속성 기반 휴리스틱 대체, 실패해도 `"UNKNOWN"`으로 계속 진행)와 `buildPageItemNode()`/`buildPageItemForest()`(`page.pageItems` 전체를 depth 0부터 재귀, depth 상한 20, 개별 try/catch)를 추가했다. `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션을 기존 Text Frame/Rectangle 목록 아래에 추가로 출력한다(기존 출력은 그대로 유지). 자동입력/Script Label 계약/Word 데이터 구조는 이번에 만들지 않았다. **"중첩 Page Item 트리" 자체는 사용자가 실제 InDesign에서 실기 검증했다** — 다만 `type`이 대부분 `"PageItem"`으로만 나오는 문제가 발견되어 아래 항목에서 추가로 수정함(아직 재테스트 전).
+- `detectPageItemType()`의 `"PageItem"` 오판별 수정 + "Inspect Current Page" 추가(D021 보완, 2026-09-28, 코드 작성 완료·실기 미검증): `constructor.name`이 `"PageItem"`(너무 일반적인 공통 상위 클래스 이름으로 추정)을 반환해도 그대로 신뢰해 버리는 로직 버그를 찾아, `GENERIC_CONSTRUCTOR_NAMES`(`"PageItem"`/`"Item"`/`"Object"`/빈 문자열) 거부 목록으로 이 값들을 걸러내고 항상 기존 휴리스틱(Group/TextFrame/Rectangle 판별)까지 진행하도록 최소 수정했다. 또한 전체 14페이지를 다 출력하는 기존 `Inspect Template`과 별개로, 현재 InDesign에서 보고 있는 페이지 하나만 보는 `inspectActivePage()`/"Inspect Current Page" 버튼을 추가했다 — `app.activeWindow.activePage`를 try/catch로 조회하고, **실패 시 다른 페이지로 임의 대체하지 않고 실패 사유만 표시**한다(사용자 명시 요구, 잘못된 페이지를 "현재 페이지"로 오인시키지 않기 위함). 기존 `inspectDocument()`/`formatReport()`와 `inspectPage()`/`formatPageItemForest()`를 재사용할 뿐 전체 문서 Inspect 경로는 전혀 수정하지 않았다.
 
 ## 실제 테스트 완료된 기능
 
@@ -199,10 +206,11 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 ## 다음 추천 작업
 
-0. **"목차" 페이지 Inspector 재귀 탐색(D021) 실기 테스트.** UDT에서 Reload 후 "목차" 페이지에서 `Inspect Template`을 실행해:
-   - 기존 `Text Frame (N개)`/`Rectangle / 이미지 프레임 (N개)` 목록이 이전과 동일하게 나오는지(회귀 없음) 확인한다.
-   - 새로 추가된 "중첩 Page Item 트리" 섹션이 에러 없이 출력되고, 화면에 실제로 보이는 제목/부제/페이지번호 텍스트들이 트리 안에 `TextFrame`으로 나타나는지 확인한다.
-   - 각 노드의 `type`이 `constructor.name` 기반으로 의미 있는 값(`TextFrame`/`Group`/`Rectangle` 등)인지, 아니면 `UNKNOWN`으로 많이 빠지는지 확인한다 — `UNKNOWN`이 많다면 `detectPageItemType()`의 휴리스틱을 보강해야 한다.
+0. **"PageItem" 오판별 수정 + "Inspect Current Page" 재테스트.** UDT에서 Reload 후:
+   - "목차" 페이지로 이동한 뒤 `Inspect Current Page` 버튼을 클릭해, 로그 맨 위에 `Current Page: index=..., name=...`가 실제로 지금 보고 있는 목차 페이지와 일치하는지 확인한다. 만약 `app.activeWindow.activePage`를 읽지 못해 "현재 페이지를 확인할 수 없습니다"만 뜬다면 그 사실을 그대로 전달한다(이 경우 다음 단계는 기존 `Inspect Template`으로 대체 확인).
+   - "중첩 Page Item 트리"의 각 노드 `type`이 이제 `TextFrame`/`Group`/`Rectangle` 등 구체적인 값으로 나오는지, `"PageItem"`이 더 이상 나오지 않는지 확인한다(여전히 `"PageItem"`이 보이면 거부 목록에 다른 이름이 더 필요할 수 있음).
+   - `TextFrame`으로 판별된 노드에 실제 `text="..."` 값이 채워지는지 확인한다(예: "제목 입력란"/"부제 문구 입력란"/"03" 등). 여기서도 비어 있다면 3차 보완(id/타입 전용 컬렉션 교차 매칭)이 필요할 수 있다.
+   - 기존 `Inspect Template`(`btnInspect`)로 전체 문서를 열었을 때 `Text Frame (N개)`/`Rectangle / 이미지 프레임 (N개)` 목록과 "중첩 Page Item 트리" 섹션이 이전과 동일하게 나오는지(회귀 없음) 확인한다.
    - 결과를 전달하면 HANDOFF.md/DECISIONS.md D021에 실기 검증 완료로 반영한다. 이 단계에서는 여전히 "목차" 자동입력/Script Label 계약을 만들지 않는다.
 1. **패널 빈 화면 수정 재테스트부터 먼저 진행한다(D019 정정).** UDT에서 Reload 후:
    - 패널이 정상적으로 다시 렌더링되는지(제목뿐 아니라 `Load Article`/`Generate`/`Inspect Template` 버튼과 로그 영역 모두) 확인한다.

@@ -957,3 +957,30 @@
 남은 문제(이전부터 이어짐, 이번 작업과 무관):
 - HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
 - 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
+
+---
+
+## 2026-09-28 - D021 실기 테스트 결과 반영: "PageItem" 오판별 수정 + "Inspect Current Page" 추가 (D022, 읽기 전용)
+
+완료:
+- 사용자가 D021을 실제 목차 페이지에서 실기 테스트해 "중첩 Page Item 트리"가 정상 출력됨을 확인, 다만 (1) `Inspect Template`이 문서 14페이지 전체를 출력해 목차 페이지만 보기 어렵고 (2) 대부분의 `type`이 `TextFrame`/`Group`이 아니라 `"PageItem"`으로만 나오는 문제를 보고함. 아직 자동입력은 만들지 말고 원인과 최소 보완 방법만 먼저 분석해 달라고 요청
+- `detectPageItemType()`을 코드 리뷰로 재확인해, UXP 내부 동작이 아니라 판별 함수 자체의 로직 버그(constructor.name이 빈 문자열/"Object"만 아니면 무조건 신뢰 → "PageItem"도 통과해 버려 아래 휴리스틱까지 못 내려감)임을 분석해 보고함. 페이지 단위 조회는 두 옵션(별도 함수/버튼 vs 기존 함수 내부 파라미터) 중 회귀 위험이 적은 "완전히 별도 함수/버튼"을 권장, 현재 페이지 자동 감지는 `app.activeWindow.activePage`(이 프로젝트에서 처음 시도, 미검증)를 제안하고 실패 시 index=0 폴백 여부를 물음
+- 사용자가 분석에 동의하되, activePage 확인 실패 시 index=0 등으로 임의 대체하지 말고 "확인할 수 없습니다"만 표시하도록 명확히 지시함(잘못된 페이지를 현재 페이지로 오인 방지)
+- `src/inspector.js`의 `detectPageItemType()`에 `GENERIC_CONSTRUCTOR_NAMES`(`"PageItem"`/`"Item"`/`"Object"`/빈 문자열) 거부 목록 추가 — 이 값들이면 신뢰하지 않고 항상 기존 휴리스틱까지 진행하도록 조건 하나만 수정. GraphicLine 등 장식 객체 전용 판별은 이번에 추가하지 않음(UNKNOWN으로 남는 것이 요청받은 최소 기준)
+- `inspectActivePage()`/`formatActivePageReport()` 신규 추가: `app.activeWindow.activePage`를 try/catch로 조회, 실패/값 없음 시 `{ ok: false, message }` 반환하고 다른 페이지로 대체하지 않음. 성공 시 `doc.pages`에서 참조 동등성(1차) → `page.name` 일치(2차, 대체 수단)로 index를 찾되 실패해도 "(확인 불가)"로 표시하며 조회 자체는 막지 않음. 기존 `inspectPage()`/`formatPageItemForest()`를 그대로 재사용해 실제 분석한 page index/name을 로그 맨 위에 명시한 뒤 트리를 출력
+- `index.html`에 `btnInspectCurrentPage`("Inspect Current Page") 버튼 추가(기존 `btnInspect` 옆, 같은 `inspectLog` 영역 재사용). `index.js`에 클릭 핸들러 추가 — 기존 `btnInspect` 핸들러는 한 글자도 수정하지 않음
+- 기존 `inspectDocument()`/`formatReport()`(전체 문서 Inspect)와 `page.textFrames`/`page.rectangles` 기반 로직은 이번에도 전혀 수정하지 않음. `app.doScript` 미사용, Script Label 쓰기/텍스트 수정/위치·크기 변경/목차 Generate/Word·JSON 파서 수정/기존 Opening Page 코드 수정 없음(전부 값 읽기뿐)
+- HANDOFF.md(현재 프로젝트 단계, 완료된 기능, 다음 추천 작업)/DECISIONS.md(D022)에 반영
+
+변경 파일:
+- src/inspector.js (`detectPageItemType()` 조건 수정, `inspectActivePage()`/`formatActivePageReport()` 신규)
+- index.html (`btnInspectCurrentPage` 버튼 추가)
+- index.js (`inspectActivePage`/`formatActivePageReport` require, 클릭 핸들러 추가)
+- HANDOFF.md, DECISIONS.md, WORKLOG.md
+
+테스트:
+- 없음(실행 가능한 JavaScript 런타임이 이 세션에 없어 코드 리뷰로만 확인). `app.activeWindow.activePage`가 이 UXP 환경에서 실제로 노출되는지, 참조 동등성(`===`) 비교가 유효한지, "PageItem" 거부 후 type이 실제로 TextFrame/Group/Rectangle로 나오는지, TextFrame의 text가 채워지는지는 사용자의 다음 실기 테스트로만 확인 가능
+
+남은 문제(이전부터 이어짐, 이번 작업과 무관):
+- HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
+- 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
