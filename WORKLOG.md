@@ -720,3 +720,32 @@
 - WITHOUT_PHOTO가 이번 변경 이후에도 기존과 동일하게 동작하는지(HERO_IMAGE 관련 코드가 전혀 실행되지 않아야 함) 확인 필요
 - `require("fs")`, `rectangle.place(nativePath)` 둘 다 이 InDesign UXP 환경에서 실기로 검증된 적 없음
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+
+---
+
+## 2026-09-28 - HERO_IMAGE 1차 실기 테스트 실패 수정: fs.stat → fs.lstat (D017)
+
+완료:
+- 사용자가 로컬 실기 테스트 환경을 준비함: `sample/hero.png`(실제 이미지 파일)가 이미 존재하는 상태에서, `sample/opening-page-with-photo.json`의 `heroImage` 값을 `"hero.jpg"` → `"hero.png"`로만 변경(다른 필드 templateType/variant/title/pointText/body는 변경 금지 지시 — git diff로 이 파일 하나만 바뀌었음을 함께 확인)
+- 사용자가 1차 실기 테스트를 진행한 결과를 전달: `opening-page-with-photo.json` Load 후 Generate → Status에 `Generate 중단: heroImage 파일에 접근할 수 없습니다: C:\Users\webju\Desktop\indesign-magazine-automation\sample\hero.png (fs.stat is not a function)`. 사용자가 직접 확인한 바로는 JSON 폴더 기준 상대 경로 계산 결과가 실제 파일 위치와 정확히 일치했고, 실패 원인은 경로 계산이 아니라 `assertImageFileAccessible()`이 호출한 `fs.stat` API 자체. Generate는 이미지 사전 검사 단계에서 중단됐고 TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변경되지 않음(사전 검사 실패 시 아무것도 안 쓴다는 설계가 의도대로 동작함을 재확인)
+- 사용자가 "Adobe UXP FS API에서는 fs.stat이 아니라 fs.lstat/fs.lstatSync가 제공되는 것으로 보인다"며 현재 InDesign/UXP 환경에서 공식 지원되는 API를 다시 확인해 달라고 요청. WebSearch/WebFetch로 Adobe 공식 InDesign UXP `fs` 모듈 레퍼런스(`developer.adobe.com/indesign/uxp/reference/uxp-api/reference-js/modules/fs/`)를 조회해 확인: 이 모듈은 `stat`/`access`를 제공하지 않고 `lstat`(비동기)/`lstatSync`(동기)만 제공하며 Node.js `Stats` 클래스를 따르는 값을 반환한다고 명시됨. `readFile`/`writeFile`/`open`/`rename`/`copyFile`/`unlink`/`mkdir`/`rmdir`/`readdir` 등 전체 함수 목록도 확인했고 `stat`은 없음을 재확인
+- 최소 범위로 수정: `src/image.js`의 `assertImageFileAccessible()`에서 `fs.stat(...)` 한 줄을 `fs.lstat(...)`로 교체. `resolveHeroImagePath`(경로 계산), `placeHeroImage`(place 로직), `src/text.js`의 doScript 구조(TITLE/POINT_TEXT/BODY 단일 흐름, HERO_IMAGE place를 텍스트보다 먼저 실행하는 순서), WITHOUT_PHOTO 관련 코드는 전혀 건드리지 않음. 프레임 위치/크기/fit 관련 코드도 추가하지 않음
+- `DECISIONS.md`의 D017에 이번 정정 사항을 기록: 1차 테스트 실패 경위, 공식 레퍼런스로 재확인한 내용, `fs.lstat`으로 교체한 이유, 이 실패가 오히려 "실패 시 아무것도 안 쓴다"는 설계가 의도대로 동작했음을 보여준다는 점, 여전히 남는 미검증 위험(lstat의 정확한 오류 형태 등)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계, 서술형 이력에 1차 테스트 결과와 수정 경위 추가, "완료된 기능"/"아직 테스트하지 못한 기능"/"진행 중인 작업"/"알려진 문제"의 D017 관련 항목에 `fs.stat` 실패 → `fs.lstat` 교체 사실 반영, "다음 추천 작업" 1번을 `fs.lstat` 교체 이후 재테스트 절차로 갱신(이미 `sample/hero.png` 준비됐음을 반영)
+- HERO_IMAGE는 여전히 실기 성공으로 기록하지 않음 — 이번 수정은 API 이름을 고쳤을 뿐, 정상 케이스가 실제로 통과한 것은 아님
+
+변경 파일:
+- src/image.js
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음. 문서에 반영한 1차 실패 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함. `fs.lstat` 교체 자체는 아직 실기로 재확인되지 않았다.
+
+남은 문제:
+- `fs.lstat`으로 교체한 뒤 WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 HERO_IMAGE 프레임 위치/크기가 그대로인지)를 실제 InDesign에서 재확인 필요
+- 이미지 누락/접근 불가 실패 케이스에서 TITLE/POINT_TEXT/BODY도 전혀 반영되지 않는지 확인 필요
+- WITHOUT_PHOTO가 이번 변경 이후에도 기존과 동일하게 동작하는지 확인 필요
+- `fs.lstat`이 없는/접근 불가 경로에서 정확히 어떤 형태의 오류를 던지는지, `rectangle.place(nativePath)`의 정확한 동작 모두 이 환경에서 실기로 검증된 적 없음
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음

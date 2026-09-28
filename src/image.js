@@ -34,12 +34,20 @@ function resolveHeroImagePath(articleFileNativePath, heroImageRelativePath) {
 }
 
 // 이미지 파일이 실제로 존재/접근 가능한지 InDesign 문서를 건드리지 않고 미리 확인한다.
-// require("fs")의 "file:" 스킴 경로 조회를 사용한다 — 이 InDesign UXP 환경에서 이 API가
-// 정확히 어떻게 동작하는지(어떤 형태의 오류를 던지는지 등) 아직 실기로 확인된 적이 없다.
+// require("fs")의 "file:" 스킴 경로 조회를 사용한다.
+//
+// D017 최초 구현은 fs.stat()을 썼으나 실기 테스트에서 "fs.stat is not a function"으로
+// 실패했다(2026-09-28) — Adobe 공식 InDesign UXP fs 모듈 레퍼런스
+// (developer.adobe.com/indesign/uxp/reference/uxp-api/reference-js/modules/fs/)를 다시
+// 확인한 결과, 이 모듈은 stat/access를 제공하지 않고 lstat(비동기)/lstatSync(동기)만
+// 제공한다(Node.js의 Stats 클래스를 따르는 값을 반환한다고 명시됨). 그래서 lstat으로
+// 교체했다. lstat이 없는/접근할 수 없는 경로에서 정확히 어떤 오류를 던지는지(Node의
+// ENOENT와 동일한 형태인지 등)까지는 이 프로젝트에서 실기로 확인되지 않았지만, try/catch로
+// 감싸 어떤 형태의 오류든 실패로 처리하므로 안전성 자체는 이 세부 사항에 의존하지 않는다.
 // 실패하면 실제 InDesign 문서 수정 전에 Error를 던진다.
 async function assertImageFileAccessible(imageNativePath) {
     try {
-        await fs.stat(`file:${imageNativePath}`);
+        await fs.lstat(`file:${imageNativePath}`);
     } catch (err) {
         throw new Error(`heroImage 파일에 접근할 수 없습니다: ${imageNativePath} (${err.message})`);
     }

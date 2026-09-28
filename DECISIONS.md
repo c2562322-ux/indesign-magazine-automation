@@ -304,17 +304,19 @@ WITH_PHOTO의 `heroImage`(예: `"hero.jpg"`)를 **Load Article로 불러온 JSON
 - **UXP Entry에는 부모 폴더를 얻는 API가 없다**(공식 `Entry` 클래스 레퍼런스에 `getParent()` 등이 명시적으로 없음 — `copyTo`/`moveTo`/`delete`/`getMetadata`/`toString`과 `nativePath`/`name`/`url`/`isFile`/`isFolder` 프로퍼티만 있음, Adobe 공식 문서 확인). 따라서 "JSON 파일이 있는 폴더"를 얻으려면 `nativePath` 문자열에서 마지막 경로 구분자를 잘라 폴더 경로를 직접 계산하는 수밖에 없다. 이 계산은 순수 JS 문자열 처리이므로 InDesign/UXP API 자체에 의존하지 않아 위험이 적다.
 - **`localFileSystem`에는 임의의 네이티브 경로를 Entry로 변환하는 문서화된 방법이 없다**(공식 `localFileSystem` 모듈 레퍼런스에 `getFileForOpening`/`getFileForSaving`/`getFolder`/`getTemporaryFolder`/`getDataFolder`/`getPluginFolder`/세션·영구 토큰 관련 메서드만 있고, 임의 경로 → Entry 변환 메서드는 없음). 그래서 이미지 경로는 Entry로 변환하지 않고 **네이티브 경로 문자열 그대로** 다룬다.
 - **`Rectangle.place()`는 File Entry가 아니라 네이티브 경로 문자열을 받는다** — 공개된 실제 InDesign UXP 스크립트 예제(Adobe 개발자 포럼, 커뮤니티 스니펫 저장소)에서 `imageFrame.place(imagePath)` 형태(경로 문자열)로 성공했고, 파일 내용을 미리 읽어 넘기는 방식은 실패 사례로 보고됨을 확인했다. 이는 위에서 Entry 변환이 필요 없다는 점과 맞아떨어진다.
-- **파일 접근 확인은 `require("fs")`(UXP가 제공하는 Node 스타일 fs 모듈, `"file:"` 스킴 경로)로 한다** — 같은 공개 예제에서 `fs.writeFile("file:" + path, ...)` 형태로 실제 사용된 것을 확인했다. `fs.stat`가 정확히 어떤 조건에서 어떤 오류를 던지는지는 이 프로젝트에서 실기로 검증된 적이 없다.
+- **파일 접근 확인은 `require("fs")`(UXP가 제공하는 Node 스타일 fs 모듈, `"file:"` 스킴 경로)로 한다** — 같은 공개 예제에서 `fs.writeFile("file:" + path, ...)` 형태로 실제 사용된 것을 확인했다.
 - **파일시스템 확인을 doScript 밖에서 하는 이유**: `assertImageFileAccessible`는 비동기(`await`)이고, 지금까지 이 프로젝트의 모든 `app.doScript` 콜백은 완전히 동기 함수였다(D012 이후 일관). 콜백을 비동기로 바꿔 그 안에서 `await`하는 패턴은 InDesign UXP의 `doScript`가 지원하는지 확인된 적이 없어, 새로운 미검증 영역을 만들지 않기 위해 문서와 무관한 파일시스템 확인은 doScript 진입 전에 끝낸다(D006 "읽기 전용/문서와 무관한 확인은 doScript로 감쌀 필요 없다" 원칙의 연장).
 - **쓰기 순서에서 HERO_IMAGE place를 가장 먼저 실행하는 이유**: `assertImageFileAccessible`의 사전 확인이 완벽하다는 보장이 없다(예: 확인 직후 파일이 삭제되거나, 파일은 있지만 이미지 형식이 손상되어 `place()` 자체가 실패하는 경우). place를 텍스트 필드보다 먼저 실행하면, 이런 뒤늦은 실패가 발생해도 TITLE/POINT_TEXT/BODY는 아직 전혀 쓰이지 않은 채로 남아 "검증 실패 시 문서를 수정하지 않는다"는 원칙이 유지된다 — D014/D015가 확립한 "탐색 전부 → 쓰기 전부"에 "가장 불확실한 쓰기를 먼저"라는 보강을 더한 것이다.
 
+**정정(2026-09-28, 첫 실기 테스트에서 발견)**: 최초 구현은 `fs.stat()`을 썼으나, 실제 InDesign에서 "Generate 중단: heroImage 파일에 접근할 수 없습니다: ... (fs.stat is not a function)"으로 실패했다. 경로 계산 자체는 사용자가 직접 확인한 대로 정확했고(JSON 기준 상대 경로가 실제 파일 위치와 일치), 문제는 API 이름이었다. Adobe 공식 InDesign UXP `fs` 모듈 레퍼런스(`developer.adobe.com/indesign/uxp/reference/uxp-api/reference-js/modules/fs/`)를 다시 확인한 결과, 이 모듈은 `stat`/`access`를 제공하지 않고 **`lstat`(비동기)/`lstatSync`(동기)만 제공하며 Node.js의 `Stats` 클래스를 따르는 값을 반환한다**고 명시되어 있었다. 이에 따라 `assertImageFileAccessible`을 `fs.lstat()`로 교체했다(그 외 경로 계산 로직, `place()` 호출, doScript 구조는 전혀 바꾸지 않음). 이 실패 자체는 오히려 "try/catch로 감싸 실패 시 Generate를 중단시킨다"는 설계가 의도대로 동작했음을 보여준다 — TITLE/POINT_TEXT/BODY/HERO_IMAGE 무엇도 반영되지 않았다.
+
 이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음):
-- `require("fs")`가 이 InDesign UXP 환경(이 프로젝트가 검증된 버전)에서 실제로 사용 가능한지, `fs.stat`의 정확한 성공/실패 시맨틱은 아직 실기로 확인된 적이 없다.
+- `fs.lstat`이 없는/접근할 수 없는 경로에서 정확히 어떤 형태의 오류를 던지는지(Node의 `ENOENT`와 동일한 형태인지 등)는 이 프로젝트에서 아직 실기로 확인되지 않았다 — 다만 try/catch로 모든 오류를 실패로 처리하므로 안전성 자체는 이 세부 사항에 의존하지 않는다.
 - `nativePath` 문자열의 경로 구분자(Windows `\` vs `/`)를 그대로 이어붙이는 것이 이 환경에서 항상 올바른지(예: `place()`가 특정 구분자만 받아들이는지)는 확인되지 않았다.
 - `rectangle.place(nativePath)`가 이 프로젝트의 정확한 InDesign/UXP 버전에서 동일하게 동작하는지는 공개 예제로만 뒷받침했을 뿐, 이 환경에서 직접 실기로 확인된 적은 없다.
 - `resolveHeroImagePath`는 `heroImage` 값에 `..`(상위 폴더 이동) 등이 들어와도 이를 특별히 막지 않는다 — 이 프로젝트는 신뢰할 수 있는 사용자가 자신의 로컬 파일을 다루는 내부 도구이므로 적대적 입력을 가정하지 않았다.
 
-이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+이 결정은 아직 실제 InDesign에서 정상 케이스가 검증되지 않았다 — 1차 실기 테스트는 `fs.stat` API 오류로 사전 검사 단계에서 중단됐다(2026-09-28).
 
 변경 조건:
-실기 테스트에서 (a) WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 프레임 위치/크기가 그대로임), (b) 이미지 누락/접근 불가 실패 케이스(TITLE/POINT_TEXT/BODY도 전혀 반영되지 않음), (c) WITHOUT_PHOTO가 기존과 동일하게 동작함이 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. `require("fs")`가 이 환경에서 동작하지 않는 것으로 확인되면, 파일 접근 확인 방식(예: 확인을 생략하고 `place()` 자체의 실패에만 의존하는 방식 등)을 재검토한다.
+`fs.lstat`으로 교체한 뒤 재실기 테스트에서 (a) WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 프레임 위치/크기가 그대로임), (b) 이미지 누락/접근 불가 실패 케이스(TITLE/POINT_TEXT/BODY도 전혀 반영되지 않음), (c) WITHOUT_PHOTO가 기존과 동일하게 동작함이 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다.
