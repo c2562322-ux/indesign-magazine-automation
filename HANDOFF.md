@@ -184,6 +184,15 @@ Word / Excel / JSON 등 입력
 
 Template Type 선택 시 고려할 수 있는 후보 기준(제목 길이, 본문 길이, 이미지 개수, 대표 이미지 존재 여부, 기사 유형, 인터뷰/Q&A 형식 여부, 캡션 유무, 필요 페이지 수)과 예시 매핑은 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "향후 Template Selection 기준" 섹션에 정리했다 — 전부 미확정이며 디자이너 확인 전이다.
 
+**"자동배치"의 의미(중요, 이 프로젝트 전체에 적용되는 경계 — [DECISIONS.md](DECISIONS.md) D016 참고):** 이 프로젝트에서 "자동배치"는 프로그램이 InDesign 레이아웃의 위치·크기·디자인을 새로 결정하거나 수정한다는 뜻이 아니다.
+- 디자이너가 만든 InDesign 템플릿의 프레임 위치/크기/디자인은 그대로 유지한다.
+- Script Label로 미리 정의된 기존 프레임에 데이터만 입력한다.
+- TITLE/POINT_TEXT/BODY는 기존 TextFrame에 텍스트만 입력한다(지금까지 구현된 방식 그대로).
+- HERO_IMAGE도 기존 Script Label=`HERO_IMAGE` Rectangle에 이미지 파일만 place한다.
+- 프로그램이 HERO_IMAGE 프레임(또는 다른 어떤 프레임)을 생성·이동·리사이즈하거나 레이아웃 자체를 재구성하지 않는다.
+
+향후 Template Selection도 마찬가지로, 프로그램이 레이아웃을 새로 디자인하는 것이 아니라 디자이너가 미리 제작한 여러 템플릿 중 기사 특성에 맞는 하나를 고르는 것뿐이다.
+
 ## 디자이너에게 확인해야 할 사항
 
 인수인계서 5, 6, 7, 8, 19절 기준으로 정리:
