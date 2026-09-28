@@ -1,13 +1,15 @@
 # ARTICLE_DATA_SPEC.md
 
-자동조판 MVP에서 사용할 기사 데이터(JSON)의 최소 규격을 정의하는 문서다. [docs/TEMPLATE_SPEC.md](TEMPLATE_SPEC.md)가 "InDesign 템플릿/프레임 구조"를 다룬다면, 이 문서는 "그 프레임에 채워 넣을 JSON 데이터의 모양"을 다룬다.
+자동조판 MVP에서 사용할 기사 데이터(**Article Data**)의 최소 규격을 정의하는 문서다. [docs/TEMPLATE_SPEC.md](TEMPLATE_SPEC.md)가 "InDesign 템플릿/프레임 구조"를 다룬다면, 이 문서는 "그 프레임에 채워 넣을 데이터의 모양"을 다룬다.
+
+**Article Data는 입력 형식과 분리된 공통 구조다(D016/D019).** 지금은 이 구조를 만드는 방법이 두 가지다 — JSON 파일(아래 이 문서 기준)과 Word `.docx` 원고 파일(마커 기반, [docs/WORD_INPUT_SPEC.md](WORD_INPUT_SPEC.md) 참고). 어느 쪽으로 만들었든 결과는 완전히 같은 구조이고, 같은 `validateArticleData()`로 검증되고 같은 `applyOpeningPageContent()`로 InDesign에 반영된다.
 
 ## 현재 범위
 
-- **"시작 페이지"(Template Type, 자동화 식별자 `OPENING_PAGE`) 2개 변형만** 다룬다: 사진 있는 버전, 사진 없는 버전.
+- **"시작 페이지"(Template Type, 자동화 식별자 `OPENING_PAGE`) 2개 변형만** 다룬다: 사진 있는 버전, 사진 없는 버전. Word 입력은 이 중 사진 있는 버전(`WITH_PHOTO`)만 지원한다.
 - 목차/본문 페이지/인터뷰 레이아웃은 아직 포함하지 않는다.
 - 이 문서는 데이터 구조 정의를 다룬다. 현재 구현 상태(자세한 내용/실기 검증 여부는 [HANDOFF.md](../HANDOFF.md) 참고):
-  - `Load Article` 버튼의 파일 선택/읽기/검증, `Generate` 버튼을 통한 자동조판(TITLE/POINT_TEXT/BODY/HERO_IMAGE)은 구현되어 있다.
+  - `Load Article` 버튼의 파일 선택/읽기/검증(JSON, Word), `Generate` 버튼을 통한 자동조판(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE)은 구현되어 있다.
   - 다른 Template Type용 데이터 로드, Overset 처리, 페이지 생성/복제는 아직 구현하지 않았다.
 
 전제:
@@ -83,5 +85,6 @@
 ## 관련 문서
 
 - [docs/TEMPLATE_SPEC.md](TEMPLATE_SPEC.md) — InDesign 프레임 구조 / Script Label 분석
+- [docs/WORD_INPUT_SPEC.md](WORD_INPUT_SPEC.md) — Word(.docx) 마커 형식으로 이 Article Data 구조를 만드는 방법
 - [HANDOFF.md](../HANDOFF.md) — 현재 프로젝트 상태
-- [DECISIONS.md](../DECISIONS.md) D010 — 이번 단순화 결정과 근거
+- [DECISIONS.md](../DECISIONS.md) D010 — 이번 단순화 결정과 근거, D019 — Word 입력 MVP 결정과 근거

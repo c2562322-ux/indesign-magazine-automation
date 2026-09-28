@@ -6,7 +6,7 @@
 
 ## 현재 프로젝트 단계
 
-**TITLE+POINT_TEXT+BODY+HERO_IMAGE+HERO_IMAGE_GUIDE 모두 `applyOpeningPageContent()`(D014/D015/D017/D018)로 WITH_PHOTO 정상 케이스 실기 검증 완료(2026-09-28).** `heroImage`는 Load Article로 불러온 JSON 파일의 폴더 기준 상대 경로로 해석하고, 기존 `HERO_IMAGE` Rectangle의 위치/크기는 건드리지 않은 채 이미지만 place한다(D016 "자동배치의 의미" 참고). 이미지 위 "대표이미지" 템플릿 안내 문구는 이미지 place 성공 후 자동으로 비워지고(HERO_IMAGE_GUIDE Script Label, 프레임 자체는 유지), Rectangle/TextFrame 위치·크기·스타일 모두 변화 없음이 확인됐다. Overset 처리, 페이지 추가는 이번에도 구현하지 않았다. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.
+**JSON 입력 기반 Opening Page WITH_PHOTO/WITHOUT_PHOTO MVP(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE)는 핵심 정상 케이스가 모두 실기 검증 완료됐다(2026-09-28).** 이어서 Word(.docx) 원고 입력 MVP를 구현했다(D019, OPENING_PAGE/WITH_PHOTO 1종 고정) — DOCX(ZIP+XML) 파싱은 UXP에 내장 API가 없어 RFC 1951(DEFLATE) 압축 해제와 최소 ZIP 리더를 직접 구현했고([src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)), 결과는 기존 JSON과 동일한 Article Data 구조로 만들어져 기존 `applyOpeningPageContent()` 등 검증 완료된 InDesign 배치 로직을 그대로 재사용한다. 기존 JSON `Load Article` 경로는 전혀 수정하지 않았다. **이 Word 입력 코드는 아직 실제 InDesign에서 한 번도 실행해본 적이 없다** — 이 세션에는 실행 가능한 JavaScript 런타임이 없어 자체 실행 검증조차 하지 못했다.
 
 개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
@@ -65,6 +65,8 @@
 
 **사용자가 working .indd의 "대표이미지" 안내 문구 TextFrame에 `HERO_IMAGE_GUIDE` Script Label을 직접 부여한 뒤 실기 테스트해 성공을 확인했다**(2026-09-28): `opening-page-with-photo.json` Load 후 Generate → TITLE·POINT_TEXT·BODY 정상 반영, `hero.png`가 HERO_IMAGE Rectangle에 정상 place, **이미지 place 성공 후 "대표이미지" 안내 문구가 화면에서 사라짐**(HERO_IMAGE_GUIDE TextFrame의 `contents`가 빈 문자열로 바뀜), HERO_IMAGE_GUIDE TextFrame 자체는 삭제되지 않고 유지됨, 그 프레임의 위치/크기/스타일 변화 없음, HERO_IMAGE Rectangle의 위치/크기도 변화 없음, WITHOUT_PHOTO 페이지는 변화 없음. 이로써 D018이 실기 검증 완료됐다. 실패 케이스(HERO_IMAGE_GUIDE Label이 없을 때 아무것도 반영되지 않는지)는 이번 테스트에서 별도로 확인되지 않았다.
 
+"시작 페이지" MVP의 핵심 정상 케이스가 모두 확인된 뒤, (2026-09-28) **Word(.docx) 원고 입력 MVP**를 구현했다([DECISIONS.md](DECISIONS.md) D019, [docs/WORD_INPUT_SPEC.md](docs/WORD_INPUT_SPEC.md)): OPENING_PAGE/WITH_PHOTO 1종만 대상으로, `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커로 구획된 `.docx` 파일 1개를 읽어 기존 JSON과 동일한 Article Data로 변환하고, 기존 `applyOpeningPageContent()` Generate 로직을 그대로 재사용한다. 구현 전에 먼저 분석한 결과: UXP에는 zip 압축 해제 내장 API가 없고, Adobe 공식 JSZip 샘플은 npm+webpack 빌드 파이프라인을 전제로 해 이 프로젝트의 Vanilla JS(빌드 도구 없음, D001/D004) 구조와 맞지 않으며, 서드파티 라이브러리를 파일 하나로 vendoring하는 것도 인터넷에서 파일을 받아와야 해서(안전 규칙상 매번 명시적 허가 필요) 그리고 이 UXP 엔진에서의 동작이 검증되지 않아 피했다. 대신 RFC 1951(DEFLATE, 특허 없는 공개 표준)과 최소 ZIP 리더를 [src/docxZip.js](src/docxZip.js)에 직접 구현하고, [src/docxArticle.js](src/docxArticle.js)가 `word/document.xml`에서 문단/텍스트만 뽑아 마커 기준으로 Article Data를 만든다. [src/data.js](src/data.js)의 `loadArticleFile()`은 파일 확장자로 JSON/DOCX를 분기하되 **기존 JSON 경로는 코드 한 줄도 바꾸지 않았고**, 두 경로 모두 같은 반환 형태로 합쳐져 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않았다. `heroImage` 상대 경로는 기존 `resolveHeroImagePath`를 그대로 재사용해(DOCX 파일의 `nativePath`도 동일하게 처리됨) 추가 구현이 필요 없었다. 실기 테스트용으로 안과 병원 매거진 기사 예시 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)(PowerShell + .NET `System.IO.Compression`으로 만든, 실제 DEFLATE 압축을 쓰는 유효한 .docx)와 [sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)(기존 `hero.png`를 복사한 자리 채움 이미지)도 함께 추가했다. HWP/HWPX, Excel, Template Selection 자동화, WITHOUT_PHOTO DOCX 지원은 이번에 구현하지 않았다. **이 코드는 아직 실제 InDesign에서 한 번도 실행해본 적이 없다 — 이 세션에는 실행 가능한 JavaScript 런타임(Node.js 등)이 전혀 없어, 직접 구현한 압축 해제 코드를 스스로 실행해 검증하는 것조차 하지 못했다.** 실기 테스트가 이 코드의 사실상 첫 실행이 된다.
+
 ## 완료된 기능
 
 - 프로젝트 기본 폴더 구조 ([manifest.json](manifest.json), [index.html](index.html), [styles.css](styles.css), [index.js](index.js), `src/`, `sample/`)
@@ -84,6 +86,7 @@
 - `Generate`에 BODY 자동 입력 추가, 별도 트랜잭션 대신 기존 단일 doScript 흐름에 포함 및 실기 검증 완료(당시 함수명 `applyOpeningPageTextContent`, D015): TITLE·POINT_TEXT 탐색에 이어 WITH_PHOTO는 BODY, WITHOUT_PHOTO는 BODY_COLUMN_1·BODY_COLUMN_2(+텍스트 스레드 연결 확인)까지 탐색을 모두 마친 뒤에만 쓴다. WITHOUT_PHOTO는 `body`를 BODY_COLUMN_1에만 쓴다. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 정상 케이스, BODY_COLUMN_2까지의 텍스트 스레드 흐름, BODY 검증 실패 시 TITLE/POINT_TEXT도 반영되지 않는 실패 원자성까지 모두 확인함(2026-09-28). 이 함수는 이후 HERO_IMAGE 추가와 함께 `applyOpeningPageContent`로 다시 이름이 바뀌었다(아래 항목).
 - `Generate`에 HERO_IMAGE 이미지 배치 추가, 같은 단일 doScript 흐름에 포함 및 실기 검증 완료(D017): [src/text.js](src/text.js)의 `applyOpeningPageContent`(`applyOpeningPageTextContent`에서 개명), [src/image.js](src/image.js) 신규(경로 해석/파일 접근 확인/place). WITH_PHOTO만 대상이며, `heroImage`를 JSON 파일 폴더 기준 상대 경로로 해석해 기존 `HERO_IMAGE` Rectangle에 이미지만 place한다(위치/크기 변경 없음). WITHOUT_PHOTO는 이미지 작업이 아예 없다. 1차 실기 테스트에서 파일 접근 확인 API가 `fs.stat`이 아니라 `fs.lstat`이어야 함을 발견해 수정한 뒤, 2차 실기 테스트에서 WITH_PHOTO 정상 케이스 성공(TITLE·POINT_TEXT·BODY 정상 반영, 이미지 정상 place, HERO_IMAGE 위치/크기 불변, Status 표시 확인)을 확인함(2026-09-28).
 - `Generate`에 HERO_IMAGE_GUIDE("대표이미지" 템플릿 안내 문구) 자동 비우기 추가, 같은 단일 doScript 흐름에 포함 및 실기 검증 완료(D018): 위 HERO_IMAGE 테스트에서 이미지 위에 디자이너의 안내 문구가 그대로 남는 문제가 발견되어, WITH_PHOTO에서 HERO_IMAGE 배치가 성공한 뒤에만 `HERO_IMAGE_GUIDE` Script Label TextFrame의 `contents`를 비우도록 추가했다(프레임 자체는 삭제하지 않음). [src/validation.js](src/validation.js)의 `OPENING_WITH_PHOTO.requiredFrames`에 `HERO_IMAGE_GUIDE`가 추가되어, working .indd에 이 Script Label을 부여하기 전까지는 WITH_PHOTO의 `Generate`(TITLE 포함) 전체가 실패한다. 사용자가 실제 working .indd에 `HERO_IMAGE_GUIDE` Script Label을 직접 부여한 뒤 정상 케이스를 테스트해, 안내 문구가 사라지고 프레임 자체는 유지되며 위치/크기/스타일 변화가 없음을 확인함(2026-09-28).
+- Word(.docx) 원고 입력 MVP 구현(D019, 코드 작성 완료): [src/docxZip.js](src/docxZip.js)(직접 구현한 RFC 1951 DEFLATE 압축 해제 + 최소 ZIP 리더), [src/docxArticle.js](src/docxArticle.js)(`word/document.xml`에서 문단/텍스트 추출 + `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커 파싱 → 기존 Article Data 구조로 변환), [src/data.js](src/data.js)의 `loadArticleFile()` 확장(파일 확장자로 JSON/DOCX 분기, 기존 JSON 경로는 코드 변경 없음). OPENING_PAGE/WITH_PHOTO 1종 고정. 변환 결과는 기존 `validateArticleData()`/`applyOpeningPageContent()`를 그대로 통과하며 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않았다. **아직 실기 테스트 전 — 이 세션에는 실행 가능한 JavaScript 런타임이 없어 자체 실행 검증도 하지 못했다.**
 
 ## 실제 테스트 완료된 기능
 
@@ -119,11 +122,13 @@
 - `Generate`의 안전 검사 실패 케이스: Article을 불러오지 않은 채 `Generate`를 눌렀을 때 문서가 정말 수정되지 않고 Status에 중단 사유가 뜨는지, TITLE/POINT_TEXT가 없거나 2개 이상이거나 TextFrame이 아닌 경우 등은 이번 테스트에서 확인되지 않았다(정상 성공 케이스만 확인됨).
 - `applyTitleAndPointText()`(D014)의 성공 케이스에서 Undo(Ctrl+Z) 한 번으로 TITLE+POINT_TEXT 전체가 함께 되돌아가는지는 아직 구체적으로 확인되지 않았다 — 정상 케이스가 반영됨은 확인됐지만, 그 이후 Undo 동작 자체를 별도로 테스트하지는 않았다.
 - doScript 콜백 안에서 `titleFrame.contents = ...` 대입이 성공한 바로 다음 줄 `pointTextFrame.contents = ...` 대입이 실패하는 경우(이번 실패 케이스는 탐색 단계에서 막혔으므로 이 시나리오는 아니다), `UndoModes.ENTIRE_SCRIPT`가 이미 실행된 대입을 자동 롤백하는지는 여전히 미확인 — 재현 자체가 어려운 이론적 시나리오라 별도 테스트 계획은 없음(알려진 문제 참고).
+- Word(.docx) 원고 입력 MVP(D019, [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js))는 전부 미검증: (a) `sample/article-eye-clinic-with-photo.docx`를 Load Article로 불러왔을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 정확히 추출되는지, (b) Generate까지 실행했을 때 정상 반영되는지, (c) 기존 JSON 샘플 파일들이 이번 변경 이후에도 문제없이 동작하는지(회귀), (d) 직접 구현한 RFC 1951 DEFLATE 압축 해제가 실제 Word `.docx` 파일에 대해 올바르게 동작하는지, (e) `require("uxp").storage.formats.binary`로 `.docx`를 ArrayBuffer로 읽는 것이 이 환경에서 동작하는지, (f) `BODY`의 문단 사이 `\n`이 InDesign TextFrame에서 실제로 별도 문단으로 보이는지 — 어느 것도 아직 실기로 확인된 적이 없다. **이 세션에는 실행 가능한 JavaScript 런타임이 없어 Claude Code가 이 코드를 스스로 실행해본 적도 없다.**
 
 ## 진행 중인 작업
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(pointText가 원래 handoff 문서의 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다. "대표이미지" 안내 문구 프레임 처리 방식은 D018로 실기 검증까지 완료됨(HERO_IMAGE_GUIDE Script Label 부여 후 자동으로 비움) — 다만 이 처리 방식 자체가 디자이너 의도와 맞는지 공식 확인된 것은 아니다.
-- `Generate`의 TITLE·POINT_TEXT·BODY·HERO_IMAGE·HERO_IMAGE_GUIDE 자동 입력은 D014/D015/D017/D018 통합 구조로 WITH_PHOTO 정상 케이스가 모두 실기 테스트로 확인됐다(2026-09-28). HERO_IMAGE_GUIDE 실패 케이스와 D017의 이미지 누락 실패 케이스/WITHOUT_PHOTO 회귀는 아직 확인되지 않았다. 다음 작업으로 HERO_IMAGE(이미지 배치 확정) 이후 단계를 검토한다.
+- `Generate`의 TITLE·POINT_TEXT·BODY·HERO_IMAGE·HERO_IMAGE_GUIDE 자동 입력은 D014/D015/D017/D018 통합 구조로 WITH_PHOTO 정상 케이스가 모두 실기 테스트로 확인됐다(2026-09-28). HERO_IMAGE_GUIDE 실패 케이스와 D017의 이미지 누락 실패 케이스/WITHOUT_PHOTO 회귀는 아직 확인되지 않았다.
+- Word(.docx) 원고 입력 MVP(D019)를 구현했다 — 기존 JSON `Load Article` 경로는 그대로 유지한 채, 파일 확장자로 분기해 `.docx`도 같은 Article Data 구조로 변환하도록 [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)를 새로 작성하고 [src/data.js](src/data.js)를 확장했다. 실기 테스트용 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)/[sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)도 준비했다. 코드는 작성됐지만 실제 InDesign에서 한 번도 실행된 적이 없다 — Word → Generate까지의 end-to-end 실기 테스트가 다음 작업이다.
 
 ## Script Label 부여 및 검증 현황
 
@@ -140,12 +145,13 @@
 
 ## 미구현 기능
 
-- `src/data.js`: JSON 파일 선택/읽기 구현 및 실기 검증 완료. `sample/opening-page-*.json` 외 다른 Template Type용 데이터 로드는 아직 없음
+- `src/data.js`: JSON/DOCX 파일 선택/읽기 구현됨(JSON은 실기 검증 완료, DOCX 분기는 D019·실기 미검증). `sample/opening-page-*.json`/`sample/article-eye-clinic-with-photo.docx` 외 다른 Template Type용 데이터 로드는 아직 없음
+- `src/docxZip.js`/`src/docxArticle.js`: Word(.docx) 원고를 Article Data로 변환하는 기능 구현됨(D019, 코드 작성 완료·실기 미검증 — 직접 구현한 ZIP/DEFLATE 파서 포함). OPENING_PAGE/WITH_PHOTO 마커 형식만 지원, HWP/HWPX/Excel/Template Selection 자동화는 없음
 - `src/template.js`: `templateType`(`OPENING_PAGE` 등)별 템플릿 처리, `variant`에 따른 분기
 - `src/text.js`: TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 입력이 `applyOpeningPageContent()` 하나로 통합 구현되고 WITH_PHOTO 정상 케이스 모두 실기 검증 완료됨(D014/D015/D017/D018). BODY_COLUMN_2에 직접 쓰는 코드는 없음(텍스트 스레드로 자동 유입, D010, 실기로 흐름 확인됨)
 - `src/image.js`: heroImage 경로 해석/파일 접근 확인(`fs.lstat`)/place 구현 및 정상 케이스 실기 검증 완료(D017). 이미지 fit/리사이즈, 다른 이미지 프레임 처리는 없음
 - `src/validation.js`: "시작 페이지" Script Label 기준 프레임 존재/타입 검사, OPENING_PAGE 기사 데이터 검증은 구현됨(둘 다 실기 미검증인 부분이 남아 있음). 이미지 누락, Overset Text 검사, 다른 Template Type에 대한 검증은 아직 없음
-- 여러 기사 지원, 여러 템플릿 지원
+- 여러 기사 지원, 여러 템플릿 지원, Template Selection 자동화(D016 장기 방향 참고), HWP/HWPX/Excel 입력
 - 본문 길이에 따른 추가 페이지 처리 (Linked Text Frame)
 - PDF 자동 출력
 
@@ -170,6 +176,7 @@
 
   이미지 접근 확인은 처음에 `require("fs")`의 `fs.stat()`을 썼으나, 사용자의 1차 실기 테스트(2026-09-28)에서 `Generate 중단: heroImage 파일에 접근할 수 없습니다: ...\sample\hero.png (fs.stat is not a function)`로 실패했다 — JSON 폴더 기준 경로 계산 자체는 사용자가 직접 확인한 대로 정확했다. Adobe 공식 InDesign UXP `fs` 모듈 레퍼런스를 다시 확인해 이 모듈에는 `stat`이 없고 `lstat`(비동기)/`lstatSync`(동기)만 있음을 확인했고, `fs.lstat()`로 교체했다(경로 계산/place/doScript 구조는 그대로). 이 실패 자체는 "사전 검사 실패 시 아무것도 안 쓴다"는 설계가 의도대로 동작했음을 보여준다(TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 무변경). **`fs.lstat` 교체 후 재실기 테스트에서 WITH_PHOTO 정상 케이스 성공을 확인했다**(2026-09-28) — TITLE·POINT_TEXT·BODY 정상 반영, `hero.png`가 HERO_IMAGE Rectangle에 정상 place되고 위치/크기 불변, Status 표시도 정상. 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 아직 별도로 확인되지 않았다.
 - **"대표이미지" 안내 문구 자동 비우기(HERO_IMAGE_GUIDE, [DECISIONS.md](DECISIONS.md) D018, 정상 케이스 실기 검증 완료)**: HERO_IMAGE 정상 케이스 테스트에서 이미지 위에 디자이너의 템플릿 제작 안내 문구가 그대로 남는 문제가 발견됐다. `src/validation.js`의 `OPENING_WITH_PHOTO.requiredFrames`에 `HERO_IMAGE_GUIDE`(TextFrame)를 추가해, WITH_PHOTO 탐색 시 이 Label도 반드시 있어야 하도록 했다 — HERO_IMAGE place가 성공한 바로 다음 줄에서만 `HERO_IMAGE_GUIDE.contents = ""`로 비우고, 프레임 자체는 삭제하지 않는다. 이 변경으로 working .indd에 `HERO_IMAGE_GUIDE` Script Label을 부여하기 전까지는 WITH_PHOTO의 `Inspect Template` 검증과 `Generate` 전체(TITLE 포함)가 실패한다. 사용자가 실제 working .indd에 이 Label을 직접 부여한 뒤 Generate 정상 케이스를 테스트해, 안내 문구가 사라지고 HERO_IMAGE_GUIDE/HERO_IMAGE 프레임 모두 위치/크기/스타일 변화 없이 유지됨을 확인했다(2026-09-28). Label 누락 시의 실패 경로는 별도로 재확인되지 않았다.
+- **Word(.docx) 원고 입력 MVP, 직접 구현한 ZIP/DEFLATE 파서 ([DECISIONS.md](DECISIONS.md) D019, 실기 검증 전)**: UXP에는 zip 압축 해제 내장 API가 없어(공식 문서 확인) [src/docxZip.js](src/docxZip.js)에 RFC 1951(DEFLATE) raw inflate와 최소 ZIP 리더를 직접 구현했다. 서드파티 라이브러리(JSZip 등) 번들은 Adobe 공식 샘플이 npm+webpack 빌드 파이프라인을 전제로 해 이 프로젝트의 빌드 도구 없는 Vanilla JS 구조(D001/D004)와 맞지 않고, 인터넷에서 파일을 받아와 vendoring하는 것도 안전 규칙상 매번 명시적 허가가 필요하며 이 UXP 엔진에서의 동작도 검증되지 않아 피했다. **이 세션에는 실행 가능한 JavaScript 런타임(Node.js 등)이 전혀 없어, 이 압축 해제 코드는 이 프로젝트 안에서도 아직 단 한 번도 실행된 적이 없다** — RFC 1951 표준 자체(Mark Adler의 참고 구현 `puff.c` 기준 테이블)는 확인했지만 구현 버그 가능성은 실기 테스트로만 배제할 수 있다. 실기 테스트용 `.docx`(`sample/article-eye-clinic-with-photo.docx`)는 PowerShell + .NET `System.IO.Compression`으로 만들었고, .NET의 검증된 압축 해제로 내용이 의도대로 들어있음은 확인했다 — 이는 파일 자체의 유효성만 확인한 것이지 이 프로젝트의 JS 파서가 이를 올바르게 읽는지 검증한 것은 아니다. `require("uxp").storage.formats.binary`(파일을 ArrayBuffer로 읽음)와 자체 구현한 UTF-8 디코더(`utf8BytesToString`)도 이 환경에서 처음 쓰는 코드라 미검증이다. `BODY` 필드의 문단 사이 `\n`이 InDesign `TextFrame.contents`에서 실제로 별도 문단으로 나뉘어 보이는지도 미검증.
 
 ## 외부 대기 사항
 
@@ -177,12 +184,17 @@
 
 ## 다음 추천 작업
 
-1. (선택) `HERO_IMAGE_GUIDE`(D018) 실패 케이스를 확인한다: `HERO_IMAGE_GUIDE` Script Label을 일시적으로 지우거나 바꾼 뒤 Generate → TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 반영되지 않고 Status에 중단 사유만 뜨는지 확인한다. 확인 후 Label을 원래대로 되돌린다 — 정상 케이스만 테스트된 상태다.
-2. (선택) D017 HERO_IMAGE의 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀도 별도로 확인한다 — WITH_PHOTO 정상 케이스만 테스트된 상태다.
-3. (선택) WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결을 직접 끊는 경우)도 TITLE/POINT_TEXT가 전혀 반영되지 않는지 별도로 확인한다.
-4. (선택) Article을 불러오지 않은 채 `Generate`를 눌러 문서가 전혀 바뀌지 않고 Status에 중단 사유가 뜨는지 확인한다 — 안전 검사 실패 경로는 아직 테스트되지 않았다.
-5. **"시작 페이지" MVP(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE, WITH_PHOTO/WITHOUT_PHOTO)의 핵심 정상 케이스가 모두 실기 검증 완료됐다.** "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부)을 디자이너와 확인한다 — "대표이미지" 안내 문구 처리 방식은 D018로 해소됨.
-6. 위 MVP가 "시작 페이지"에서 안정된 것으로 보고, "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해 같은 방식으로 분석·검증·데이터 계약을 확장하는 것을 검토한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 순서대로 진행한다.
+1. **Word(.docx) 원고 입력 MVP(D019)의 실기 테스트부터 먼저 진행한다.** UDT에서 Reload 후:
+   - `Load Article`로 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)를 선택한다(같은 폴더에 [sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)가 이미 준비되어 있다). `Article Log`에 "결과: 검증 통과"가 뜨고 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 예시 원고 내용과 일치하는지 확인한다(특히 콘솔 로그로 추출된 값을 직접 눈으로 확인).
+   - `Generate` 실행 → TITLE·POINT_TEXT·BODY·HERO_IMAGE가 모두 정상 반영되는지, BODY의 문단 구분이 InDesign에서 어떻게 보이는지(줄바꿈이 문단으로 나뉘는지) 확인한다.
+   - 기존 JSON 샘플(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json` 등)로도 Load Article/Generate가 이번 변경 이후에도 문제없이 동작하는지(회귀) 확인한다.
+   - 결과를 전달하면 HANDOFF.md/WORKLOG.md/DECISIONS.md D019에 실기 검증 완료로 반영한다. 문제가 있으면 `src/docxZip.js`/`src/docxArticle.js`만 수정하고 InDesign 배치 로직은 건드리지 않는다.
+2. (선택) `HERO_IMAGE_GUIDE`(D018) 실패 케이스를 확인한다: `HERO_IMAGE_GUIDE` Script Label을 일시적으로 지우거나 바꾼 뒤 Generate → TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 반영되지 않고 Status에 중단 사유만 뜨는지 확인한다. 확인 후 Label을 원래대로 되돌린다 — 정상 케이스만 테스트된 상태다.
+3. (선택) D017 HERO_IMAGE의 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀도 별도로 확인한다 — WITH_PHOTO 정상 케이스만 테스트된 상태다.
+4. (선택) WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결을 직접 끊는 경우)도 TITLE/POINT_TEXT가 전혀 반영되지 않는지 별도로 확인한다.
+5. (선택) Article을 불러오지 않은 채 `Generate`를 눌러 문서가 전혀 바뀌지 않고 Status에 중단 사유가 뜨는지 확인한다 — 안전 검사 실패 경로는 아직 테스트되지 않았다.
+6. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부)을 디자이너와 확인한다 — "대표이미지" 안내 문구 처리 방식은 D018로 해소됨.
+7. 위 MVP가 "시작 페이지"에서 안정된 것으로 보고, "목차" 템플릿에서 `Inspect Template`을 실행하고 로그를 전달해 같은 방식으로 분석·검증·데이터 계약을 확장하는 것을 검토한다. 이어서 "본문 페이지", "인터뷰 레이아웃"도 순서대로 진행한다.
 
 ## 장기 개발 방향 (미구현, 방향성만 기록)
 

@@ -344,3 +344,36 @@ WITH_PHOTO의 HERO_IMAGE Rectangle 위에 디자이너가 넣어둔 "대표이�
 
 변경 조건:
 실패 케이스(HERO_IMAGE_GUIDE Label이 없거나 중복되거나 타입이 다를 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 모두 반영되지 않는지)가 별도로 확인되면 이 기록을 갱신한다.
+
+---
+
+## D019 - Word(.docx) 입력 MVP: 직접 구현한 ZIP/DEFLATE 파서 + 마커 기반 Article Data 변환
+
+결정:
+Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파일을 읽어 기존 Article Data 구조로 변환하고 기존 `applyOpeningPageContent()` Generate 로직을 그대로 재사용하는 MVP를 구현한다. 구체적으로:
+
+1. `src/docxZip.js`(신규): UXP에 없는 zip 압축 해제 기능을 서드파티 라이브러리 없이 **직접 구현**한다 — RFC 1951(DEFLATE) raw inflate와 최소 ZIP 리더(End of Central Directory/Central Directory/Local File Header 파싱). `readZipEntry(docxArrayBuffer, entryName)`으로 `.docx` 안의 특정 항목(`word/document.xml`)을 압축 해제된 바이트로 꺼낸다.
+2. `src/docxArticle.js`(신규): `word/document.xml`의 `<w:p>`/`<w:t>` 태그만 정규식으로 뽑아 문단 단위 일반 텍스트로 만들고(`extractTextFromDocumentXml`), `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커로 구획된 텍스트를 파싱해(`parseArticleFromMarkedText`) 기존 JSON과 동일한 `{templateType: "OPENING_PAGE", variant: "WITH_PHOTO", title, pointText, body, heroImage}` Article Data를 만든다(`parseDocxToArticleData`). InDesign API는 전혀 호출하지 않는다.
+3. `src/data.js`의 `loadArticleFile()`을 확장: 선택한 파일의 확장자가 `.docx`면 위 경로로, 아니면 **기존 JSON 경로(코드 변경 없음)**로 분기한다. 두 경로 모두 같은 `{status, fileName, fileNativePath, data}` 형태로 반환되므로 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않았다 — DOCX로 만든 Article Data도 기존 `validateArticleData()`/`applyOpeningPageContent()`를 그대로 통과한다.
+4. `heroImage` 상대 경로는 기존 `src/image.js`의 `resolveHeroImagePath(articleFileNativePath, heroImageRelativePath)`를 그대로 재사용한다 — DOCX 파일의 `nativePath`도 JSON 파일의 `nativePath`와 똑같이 다뤄지므로 별도 처리가 필요 없었다.
+5. 마커 형식/변환 규칙은 [docs/WORD_INPUT_SPEC.md](docs/WORD_INPUT_SPEC.md)에 정리했다.
+
+분석 결과(구현 전에 먼저 확인한 것):
+- **UXP에는 zip/inflate 내장 API가 없다**(공식 InDesign UXP file-operation 레시피, fs 모듈 레퍼런스 어디에도 없음).
+- DOCX는 ZIP(Deflate 압축) + XML 구조라 직접 파싱 자체는 가능하지만, DEFLATE 압축 해제는 알고리즘이 있어야 한다.
+- **서드파티 라이브러리(JSZip 등)를 UXP에 번들하는 것은 Adobe 공식 샘플에서도 확인되지만, 그 샘플은 npm+webpack 빌드 파이프라인을 전제로 한다** — 이 프로젝트는 지금까지 빌드 도구 없이 Vanilla JS 파일을 그대로 UXP가 불러오는 구조였다(D001/D004). 빌드 파이프라인을 새로 들이는 것은 이번 MVP 범위를 크게 벗어나는 아키텍처 변경이다. 단일 파일로 배포되는 서드파티 라이브러리를 빌드 없이 그대로 vendoring하는 방법도 있지만, 그러려면 인터넷에서 파일을 내려받아 리포지토리에 포함시켜야 하는데(안전 규칙상 "파일 다운로드"는 매번 사용자에게 명시적 허가를 구해야 함), 그 라이브러리가 이 UXP 자바스크립트 엔진에서 그대로 동작하는지도 검증된 바 없다.
+- 위 두 대안(빌드 도구 도입, 서드파티 라이브러리 vendoring) 대신, **RFC 1951은 특허 없는 공개 표준 알고리즘**이고 Mark Adler의 참고 구현(`puff.c`)으로 정확한 테이블/알고리즘 구조를 확인할 수 있어, 이 프로젝트에 직접 구현하기로 했다 — 새 의존성이나 빌드 단계 없이 기존 Vanilla JS 구조(D001/D004) 그대로 유지된다.
+
+이번 결정이 범위에 포함하지 않은 것(사용자 명시 지시): HWP/HWPX 지원, Excel 지원, Template Selection 자동화, WITHOUT_PHOTO DOCX 지원, Overset/페이지 추가, InDesign 레이아웃 변경, 기존 JSON 입력 경로 삭제/변경(그대로 유지함).
+
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음) — **이번 세션에는 실행 가능한 JavaScript 런타임(Node.js 등)이 전혀 없어, 아래 코드는 이 프로젝트 안에서도 한 번도 실행해본 적이 없다**:
+- 직접 구현한 raw DEFLATE 압축 해제(`src/docxZip.js`)가 실제 Microsoft Word가 만든 다양한 `.docx` 파일에 대해 항상 올바르게 동작하는지 — RFC 1951 표준 자체는 확인했지만 구현 버그 가능성은 실기 테스트로만 배제할 수 있다.
+- `require("uxp").storage.formats.binary`로 `.docx`를 ArrayBuffer로 읽는 것이 이 InDesign UXP 환경에서 실제로 동작하는지(공식 문서 근거는 있으나 이 프로젝트에서 처음 사용).
+- UXP 전역에 `TextDecoder`가 있는지 확인하지 않고 직접 UTF-8 디코더(`utf8BytesToString`)를 작성해 의존성을 피했다 — 이 디코더 자체의 정확성도 미검증.
+- `BODY` 필드의 문단 사이 `\n`이 InDesign `TextFrame.contents`에서 실제로 별도 문단으로 나뉘어 보이는지(D010 이후에도 여전히 열려 있던 질문의 연장).
+- 실기 테스트를 돕기 위해 실제 DEFLATE 압축을 사용하는 진짜 `.docx` 샘플(`sample/article-eye-clinic-with-photo.docx`)을 PowerShell + .NET `System.IO.Compression`으로 만들었고, .NET의 (검증된) 압축 해제로 내용이 의도대로 들어있음은 확인했다 — 하지만 이는 파일 자체의 유효성만 확인한 것이지, 이 프로젝트가 직접 구현한 JS 파서가 그 파일을 올바르게 읽는지는 검증한 것이 아니다.
+
+이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+
+변경 조건:
+실기 테스트에서 (a) `sample/article-eye-clinic-with-photo.docx`를 Load Article로 불러왔을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 정확히 추출되는지, (b) Generate까지 실행했을 때 기존 JSON 경로와 동일하게 정상 반영되는지, (c) 기존 JSON 샘플 파일들이 이번 변경 이후에도 문제없이 동작하는지(회귀 확인)가 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. 파서 버그가 발견되면 `src/docxZip.js`/`src/docxArticle.js`만 수정하고 InDesign 배치 로직(`src/text.js`/`src/image.js`)은 건드리지 않는다.

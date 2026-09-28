@@ -809,3 +809,46 @@
 - D017 HERO_IMAGE의 이미지 누락 실패 케이스와 WITHOUT_PHOTO 회귀는 여전히 확인되지 않음
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
 - "시작 페이지" MVP 핵심 정상 케이스는 모두 검증됐으므로, 다음 우선순위(다른 Template Type 착수 여부, 남은 선택적 실패 케이스 테스트 여부 등)를 사용자와 논의 필요
+
+---
+
+## 2026-09-28 - Word(.docx) 원고 입력 MVP 구현 (D019, 실기 테스트 전)
+
+완료:
+- 사용자가 다음 작업을 Word(.docx) 원고 입력 MVP로 지정: 기존 실기 검증된 Opening Page WITH_PHOTO 템플릿 1종 대상, DOCX 1개를 읽어 기존 Article Data 구조로 변환 후 기존 InDesign Generate 로직을 그대로 재사용. 기존 JSON 입력 경로는 삭제/변경 금지. 마커 형식(`[ TITLE ]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]`)의 안과 병원 매거진 기사 예시 제공. 구현 전 먼저 다음을 분석해 달라고 요청: UXP에서 DOCX(ZIP/XML) 읽는 현실적 방법, 추가 라이브러리 필요 여부와 UXP 번들 가능성, Load Article UI를 JSON/DOCX 겸용으로 확장하는 가장 작은 방법, Word 입력 계층의 모듈 구조, DOCX nativePath를 기존 HERO_IMAGE 상대경로 처리에 재사용 가능한지
+- WebSearch/WebFetch로 조사한 결과: UXP에는 zip 압축 해제 내장 API가 없음(공식 file-operation 레시피/fs 모듈 레퍼런스 확인). Adobe 공식 JSZip 샘플(`uxp-photoshop-plugin-samples`의 `jszip-sample`)은 존재하지만 npm+webpack 빌드 파이프라인을 전제로 함 — 이 프로젝트의 빌드 도구 없는 Vanilla JS 구조(D001/D004)와 맞지 않음. 서드파티 라이브러리를 단일 파일로 vendoring하는 대안도 검토했으나, 인터넷에서 파일을 받아와 리포지토리에 포함시키는 것은 안전 규칙상 매번 명시적 허가가 필요하고 이 UXP 엔진에서의 동작도 검증되지 않아 피하기로 함. 대신 RFC 1951(DEFLATE, 특허 없는 공개 표준)을 Mark Adler의 참고 구현(`puff.c`)의 정확한 테이블(고정 Huffman 길이, length/distance base·extra bits 테이블, code length 순서 배열)을 확인한 뒤 직접 구현하기로 결정
+- 분석과 가장 작은 구현안을 사용자에게 먼저 설명한 뒤 구현 진행:
+  - `src/docxZip.js`(신규): RFC 1951 raw inflate(Huffman 테이블 구성, 고정/동적 블록, LZ77 역참조 복사)와 최소 ZIP 리더(End of Central Directory/Central Directory/Local File Header 파싱, 저장(0)/DEFLATE(8) 압축 방식 지원)를 직접 구현. UXP 전역에 `TextDecoder`가 있는지 확인된 바 없어 UTF-8 디코더(`utf8BytesToString`)도 직접 구현
+  - `src/docxArticle.js`(신규): `word/document.xml`의 `<w:p>`(문단)/`<w:t>`(텍스트) 태그만 정규식으로 추출해 문단 단위 일반 텍스트로 변환(`extractTextFromDocumentXml`), `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커(대괄호 안쪽 공백 허용)로 구획된 텍스트를 파싱해 기존 JSON과 동일한 `{templateType: "OPENING_PAGE", variant: "WITH_PHOTO", title, pointText, body, heroImage}` Article Data로 변환(`parseArticleFromMarkedText`/`parseDocxToArticleData`). 네 마커 중 하나라도 없거나 내용이 비어 있으면 Error를 던져 InDesign 문서를 전혀 건드리지 않음
+  - `src/data.js`의 `loadArticleFile()` 확장: 파일 확장자가 `.docx`면 위 경로로, 아니면 **기존 JSON 경로(코드 한 줄도 변경 없음)**로 분기. `require("uxp").storage.formats.binary`로 `.docx`를 ArrayBuffer로 읽음(공식 문서 기준 API, 이 프로젝트에서 처음 사용). 두 경로 모두 같은 `{status, fileName, fileNativePath, data}` 반환 형태로 합쳐져 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않음
+  - `heroImage` 상대 경로는 기존 `src/image.js`의 `resolveHeroImagePath(articleFileNativePath, heroImageRelativePath)`를 그대로 재사용 — DOCX 파일의 `nativePath`도 JSON과 동일하게 처리되어 추가 구현 불필요함을 확인
+- 실기 테스트용 실제 파일 준비: PowerShell + .NET `System.IO.Compression`으로 진짜 DEFLATE 압축을 쓰는 유효한 `.docx`(`sample/article-eye-clinic-with-photo.docx`, 안과 병원 매거진 기사 예시, 마커 20개 문단 포함 — 빈 줄은 빈 `<w:p/>`로 표현)를 생성. .NET의 `ZipArchive`로 다시 열어 엔트리 목록/압축·비압축 크기/디코딩된 내용에 마커와 기대 텍스트가 정확히 들어있는지 확인(파일 자체의 유효성 확인, 이 프로젝트의 JS 파서 검증은 아님). `sample/hero.png`를 복사해 `sample/eye-clinic-hero.png`(HERO_IMAGE 실기 테스트용 자리 채움 이미지)도 준비
+- **이 세션에는 실행 가능한 JavaScript 런타임(Node.js 등)이 전혀 없음을 확인**(일반적인 설치 경로 검색으로도 찾지 못함) — 직접 구현한 ZIP/DEFLATE/마커 파싱 코드를 Claude Code가 스스로 실행해 검증할 방법이 없었다. 실제 InDesign에서의 실행이 이 코드의 사실상 첫 실행이 된다는 점을 문서에 명시함
+- `docs/WORD_INPUT_SPEC.md`(신규): 마커 형식 규칙, Article Data 변환 매핑, DOCX 읽기 방식의 기술적 배경, 아직 정해지지 않은 것/미검증 사항을 정리
+- `DECISIONS.md`에 D019 기록: 분석 결과와 근거(라이브러리/빌드 도구를 피한 이유), 범위에서 제외한 것(HWP/HWPX/Excel/Template Selection/WITHOUT_PHOTO DOCX/Overset/레이아웃 변경/기존 JSON 삭제), 남은 미검증 위험(직접 구현한 DEFLATE의 정확성, binary read API, UTF-8 디코더, BODY의 `\n` 렌더링)을 명시
+- `HANDOFF.md`/`README.md`/`docs/ARTICLE_DATA_SPEC.md` 갱신: Word 입력 MVP를 "코드 작성 완료, 실기 테스트 전"으로 반영(현재 프로젝트 단계, 서술형 이력, 완료된 기능, 아직 테스트하지 못한 기능, 진행 중인 작업, 미구현 기능, 알려진 문제, 다음 추천 작업 — 1순위를 Word 입력 MVP 실기 테스트로 재편). `README.md`의 오래된 "MVP 0단계"(TITLE만 구현되던 시절) stale 서술도 현재 상태(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE, JSON+DOCX 입력)로 함께 바로잡음. `docs/ARTICLE_DATA_SPEC.md`에 "Article Data는 입력 형식과 분리된 공통 구조"라는 설명과 WORD_INPUT_SPEC.md 상호 참조 추가
+- 요청받은 범위만 구현: HWP/HWPX/Excel 미구현, Template Selection 자동화 없음, WITH_PHOTO 고정(WITHOUT_PHOTO DOCX 없음), Overset/페이지 추가/InDesign 레이아웃 변경 없음, 기존 JSON `Load Article` 경로 삭제/변경 없음(코드 그대로 유지 확인)
+
+변경 파일:
+- src/docxZip.js (신규)
+- src/docxArticle.js (신규)
+- src/data.js
+- sample/article-eye-clinic-with-photo.docx (신규)
+- sample/eye-clinic-hero.png (신규)
+- docs/WORD_INPUT_SPEC.md (신규)
+- docs/ARTICLE_DATA_SPEC.md
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- 없음. `src/docxZip.js`/`src/docxArticle.js`는 이 프로젝트 안에서도, Claude Code 자신에 의해서도 단 한 번도 실행된 적이 없다(이 세션에 JS 런타임이 없어 자체 실행 검증 자체가 불가능했음). **이번 작업은 실기 테스트 전이므로 문서에 "성공"으로 기록하지 않았다.** 기존 JSON 경로는 코드를 변경하지 않았으므로 기존 실기 검증 결과가 그대로 유효하다고 판단하지만, `src/data.js`가 수정된 파일이라 회귀 여부는 재확인이 필요하다.
+
+남은 문제:
+- `sample/article-eye-clinic-with-photo.docx`를 Load Article로 불러왔을 때 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 정확히 추출되는지 실기 확인 필요
+- Generate까지 실행했을 때 기존 JSON 경로와 동일하게 정상 반영되는지(TITLE/POINT_TEXT/BODY/HERO_IMAGE) 실기 확인 필요
+- 기존 JSON 샘플 파일들이 `src/data.js` 변경 이후에도 문제없이 동작하는지(회귀) 확인 필요
+- 직접 구현한 RFC 1951 DEFLATE 압축 해제, `require("uxp").storage.formats.binary`, 자체 UTF-8 디코더 모두 이 InDesign UXP 환경에서 실기로 검증된 적 없음
+- `BODY` 필드의 문단 사이 `\n`이 InDesign TextFrame에서 실제로 별도 문단으로 나뉘어 보이는지 확인 필요
+- HERO_IMAGE_GUIDE 실패 케이스, D017 이미지 누락 실패 케이스, WITHOUT_PHOTO 회귀, 안전 검사 실패 케이스 등 이전부터 남아있던 선택적 실기 확인 항목들도 여전히 미확인

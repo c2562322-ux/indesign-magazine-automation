@@ -4,13 +4,15 @@ Adobe InDesign용 UXP Plugin. 디자이너가 만든 InDesign 매거진 템플�
 
 Vanilla JavaScript 기반이며 React 등 프레임워크는 사용하지 않는다.
 
-## 현재 단계 (MVP 0단계)
+## 현재 단계
 
-`Generate` 버튼을 클릭하면 `Load Article`로 불러와 검증을 통과한 기사 데이터의 `title`만 InDesign "시작 페이지"의 Script Label `TITLE` Text Frame에 채워 넣는다([src/text.js](src/text.js)의 `applyTitleOnly`). `variant`(`WITH_PHOTO`/`WITHOUT_PHOTO`)에 맞는 대상 페이지는 `page.name` 하드코딩 없이, [src/validation.js](src/validation.js)의 Script Label 프로필(`OPENING_PROFILES_BY_VARIANT`)을 그대로 재사용해 찾는다. Article을 먼저 불러오지 않았거나, 대상 페이지/TITLE 프레임을 찾지 못하거나, TITLE이 2개 이상이거나 TextFrame이 아니면 문서를 전혀 수정하지 않고 중단한다. POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2 입력과 HERO_IMAGE 배치는 아직 구현되지 않았다. (이전 단계의 "Hello Magazine" 텍스트 생성 테스트 코드는 [src/indesign.js](src/indesign.js)에 `addHelloText`로 남아 있지만 더 이상 `Generate` 버튼과 연결되어 있지 않다.)
+`Load Article` 버튼을 클릭하면 로컬 파일(JSON 또는 Word `.docx`)을 선택할 수 있는 파일 선택 대화상자가 뜬다. 파일 확장자로 자동 분기한다: JSON이면 `JSON.parse`, `.docx`면 [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)가 `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커를 파싱한다(자세한 형식은 [docs/WORD_INPUT_SPEC.md](docs/WORD_INPUT_SPEC.md)). 어느 쪽이든 같은 Article Data 구조가 되어 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 `OPENING_PAGE` 계약(templateType/variant/title/pointText/body, WITH_PHOTO일 때 heroImage)으로 검사되고 `Article Log`/콘솔에 결과가 출력된다. 검증을 통과한 데이터만 메모리에 보관한다. 이 단계에서 InDesign 문서는 전혀 건드리지 않는다 — 로컬 파일을 읽고 검증만 한다.
 
-`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록(name, label, 텍스트 미리보기, geometricBounds), 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 같은 버튼 클릭 한 번으로 "시작 페이지"에 필요한 Script Label(TITLE/POINT_TEXT/BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE)이 정확히 1개씩 존재하는지, 타입이 예상과 맞는지도 함께 검증해 같은 로그에 이어서 출력한다 ([src/validation.js](src/validation.js)). 문서를 수정하지 않는다.
+`Generate` 버튼을 클릭하면 검증을 통과한 기사 데이터를 InDesign "시작 페이지"에 채워 넣는다([src/text.js](src/text.js)의 `applyOpeningPageContent`): TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1, WITHOUT_PHOTO는 텍스트 스레드로 BODY_COLUMN_2까지 자동 흐름) Text Frame에 텍스트를 채우고, WITH_PHOTO는 `heroImage`를 기존 HERO_IMAGE Rectangle에 place한 뒤 "대표이미지" 템플릿 안내 문구(HERO_IMAGE_GUIDE)를 비운다. `variant`에 맞는 대상 페이지는 `page.name` 하드코딩 없이 [src/validation.js](src/validation.js)의 Script Label 프로필(`OPENING_PROFILES_BY_VARIANT`)로 찾는다. 필요한 모든 프레임 탐색(및 WITH_PHOTO의 이미지 파일 접근 확인)이 전부 성공했을 때만 실제 쓰기를 시작하며, 하나라도 실패하면 문서를 전혀 수정하지 않고 중단한다. (이전 단계의 "Hello Magazine" 텍스트 생성 테스트 코드는 [src/indesign.js](src/indesign.js)에 `addHelloText`로 남아 있지만 더 이상 `Generate` 버튼과 연결되어 있지 않다.)
 
-`Load Article` 버튼을 클릭하면 로컬 파일(JSON)을 선택할 수 있는 파일 선택 대화상자가 뜬다. 선택한 파일을 읽어 `JSON.parse`한 뒤, [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 `OPENING_PAGE` 계약(templateType/variant/title/pointText/body, WITH_PHOTO일 때 heroImage)을 만족하는지 검사해서 `Article Log` 영역과 콘솔에 결과를 출력한다. 검증을 통과하면 데이터를 메모리에 보관한다(아직 다른 기능과 연결되지 않음). 이 단계에서도 InDesign 문서는 전혀 건드리지 않는다 — 로컬 파일을 읽고 검증만 한다.
+`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록(name, label, 텍스트 미리보기, geometricBounds), 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 같은 버튼 클릭 한 번으로 "시작 페이지"에 필요한 Script Label(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 또는 TITLE/POINT_TEXT/BODY_COLUMN_1/BODY_COLUMN_2)이 정확히 1개씩 존재하는지, 타입이 예상과 맞는지도 함께 검증해 같은 로그에 이어서 출력한다 ([src/validation.js](src/validation.js)). 문서를 수정하지 않는다.
+
+실기 검증 상태(어디까지 실제 InDesign에서 확인됐는지)는 [HANDOFF.md](HANDOFF.md)를 참고한다 — 이 README는 기능 설명이고, 실기 검증 여부의 기준 문서는 HANDOFF.md다.
 
 ## 폴더 구조
 
@@ -24,17 +26,22 @@ indesign-magazine-automation/
 ├─ src/
 │  ├─ indesign.js     InDesign document/page/frame 접근 및 제어 (구현됨)
 │  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
-│  ├─ data.js         JSON 파일 선택/읽기(require("uxp").storage), JSON 파일 nativePath 반환 (구현됨, 실기 검증 완료)
+│  ├─ data.js         JSON/DOCX 파일 선택/읽기(require("uxp").storage), 파일 nativePath 반환 (JSON은 실기 검증 완료, DOCX 분기는 D019·미검증)
+│  ├─ docxZip.js      .docx(ZIP) 안의 항목을 꺼내는 최소 ZIP 리더 + 직접 구현한 RFC 1951(DEFLATE) 압축 해제 (D019, 미검증)
+│  ├─ docxArticle.js  word/document.xml에서 문단/텍스트 추출 + 마커 파싱 → Article Data 변환 (D019, 미검증)
 │  ├─ template.js     templateType별 템플릿 처리 (예정)
-│  ├─ text.js         TITLE/POINT_TEXT/BODY/HERO_IMAGE 입력을 applyOpeningPageContent() 하나로 통합 구현. TITLE/POINT_TEXT/BODY는 실기 검증 완료, HERO_IMAGE는 미검증
-│  ├─ image.js         heroImage 경로 해석/파일 접근 확인/place 구현(미검증). fit/리사이즈 없음
+│  ├─ text.js         TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 입력을 applyOpeningPageContent() 하나로 통합 구현. TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE(WITH_PHOTO 정상 케이스)는 실기 검증 완료
+│  ├─ image.js         heroImage 경로 해석/파일 접근 확인(fs.lstat)/place 구현 및 실기 검증 완료. fit/리사이즈 없음
 │  └─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
 │
 ├─ sample/
-│  ├─ article.json                   개발용 테스트 기사 데이터 (FEATURE 예시, 이번 작업과 무관)
-│  ├─ opening-page-with-photo.json    "시작 페이지"(사진 있음) 샘플 데이터
-│  ├─ opening-page-without-photo.json "시작 페이지"(사진 없음) 샘플 데이터
-│  └─ images/                        개발용 테스트 이미지
+│  ├─ article.json                          개발용 테스트 기사 데이터 (FEATURE 예시, 이번 작업과 무관)
+│  ├─ opening-page-with-photo.json           "시작 페이지"(사진 있음) 샘플 데이터
+│  ├─ opening-page-without-photo.json        "시작 페이지"(사진 없음) 샘플 데이터
+│  ├─ opening-page-without-photo-long-test.json  Text Thread 실기 테스트용(본문을 길게 늘림)
+│  ├─ hero.png / eye-clinic-hero.png         실기 테스트용 이미지(heroImage가 참조하는 JSON/DOCX와 같은 폴더)
+│  ├─ article-eye-clinic-with-photo.docx     Word 입력 MVP 실기 테스트용 샘플(D019, 안과 병원 매거진 예시)
+│  └─ images/                                개발용 테스트 이미지(예전 sample/article.json 전용, 이번 작업과 무관)
 │
 ├─ assets/
 │  ├─ templates/
