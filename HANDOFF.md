@@ -73,6 +73,10 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 같은 작업에서 최종 배포 대비 저장소 정리도 진행했다: 현재 자동조판 코드와 무관한 옛 `sample/article.json`과 `sample/images/`를 저장소에서 완전히 삭제하고, `sample/hero.png`(예전 JSON 테스트용 임시 이미지)와 Word 잠금 파일(`sample/~$ticle-eye-clinic-with-photo.docx`)도 로컬에서 정리했다. `.gitignore`에 Word/Office 잠금 파일 패턴(`~$*`)을 추가해 앞으로 같은 파일이 `git status`에 나타나지 않도록 했다. `sample/opening-page-with-photo.json`/`sample/opening-page-without-photo.json`/`sample/opening-page-without-photo-long-test.json`/`sample/article-eye-clinic-with-photo.docx`/`sample/eye-clinic-hero.png`는 회귀 테스트용으로 저장소에 그대로 유지한다(단, 최종 사용자 배포 패키지에는 포함하지 않는다 — README.md "최종 사용자 배포 패키지" 절 참고). `src/indesign.js`(더 이상 `require`되지 않는 초기 "Hello Magazine" 테스트 코드)와 `src/template.js`(미구현 스텁)는 이번 cleanup에서 삭제하지 않고 저장소에 남겨뒀다 — 기능 코드 정리와는 성격이 다른 별도 판단 대상으로 남겨두되, 배포 패키지에는 포함하지 않는 것으로 기록한다.
 
+이 cleanup을 원격에 push한 뒤(2026-09-28, `origin/main`을 `74de9af`로 갱신), 사용자가 실제 "목차" 페이지에서 `Inspect Template`을 실행해 새로운 문제를 보고했다: 화면에는 제목/부제/페이지번호 등 여러 텍스트가 보이는데 `Inspection Log`에는 `Page Item 수: 22`인데도 `Text Frame: 1개`만 나온 것이다. 코드 분석 결과, [src/inspector.js](src/inspector.js)의 `page.textFrames`/`page.rectangles`는 **페이지에 직접 놓인(=Group 등 컨테이너에 묶이지 않은) 해당 타입 항목만** 담는 타입별 컬렉션이라, Group 내부에 중첩된 TextFrame은 애초에 이 컬렉션에 잡히지 않는다는 것이 원인으로 확인됐다(이미 `formatReport()`의 기존 안내 문구에도 알려진 한계로 적혀 있었다) — 목차 페이지의 나머지 텍스트들이 하나 이상의 Group 안에 있을 가능성이 높다.
+
+이를 보완하기 위해 (2026-09-28) **`page.pageItems`(타입 무관 전체 컬렉션) 기반 읽기 전용 재귀 탐색**을 추가했다([DECISIONS.md](DECISIONS.md) D021): `src/inspector.js`에 `detectPageItemType()`(1차로 `item.constructor.name` 시도, 실패/무의미한 값이면 존재하는 속성 기반 휴리스틱으로 대체, 그래도 안 되면 예외 없이 `"UNKNOWN"` 반환), `hasNestedPageItems()`(pageItems 보유 여부로 컨테이너 판단, 타입 판별과 독립), `buildPageItemNode()`/`buildPageItemForest()`(depth 0부터 재귀, 각 항목마다 개별 try/catch, depth 상한 20)를 새로 추가하고, `inspectPage()`가 계산한 `pageItemTree`를 `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션(└─/├─ 트리 형태)으로 출력한다. **기존 `page.textFrames`/`page.rectangles` 기반 로직과 그 출력 줄은 한 글자도 바꾸지 않고 완전히 추가만 했다** — `app.doScript`를 쓰지 않는 읽기 전용 원칙(D006)도 그대로 유지된다. Script Label을 쓰거나, 자동입력 로직을 만들거나, "목차" 템플릿의 데이터 계약을 정의하는 작업은 이번에 하지 않았다. **이 코드는 아직 실제 InDesign에서 실행해본 적이 없다** — `constructor.name`이 이 UXP 환경에서 기대한 문자열을 주는지가 가장 먼저 확인해야 할 미검증 지점이다.
+
 ## 완료된 기능
 
 - 프로젝트 기본 폴더 구조 ([manifest.json](manifest.json), [index.html](index.html), [styles.css](styles.css), [index.js](index.js), `src/`, `sample/`)
@@ -93,6 +97,7 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 - `Generate`에 HERO_IMAGE_GUIDE("대표이미지" 템플릿 안내 문구) 자동 비우기 추가, 같은 단일 doScript 흐름에 포함 및 실기 검증 완료(D018): 위 HERO_IMAGE 테스트에서 이미지 위에 디자이너의 안내 문구가 그대로 남는 문제가 발견되어, WITH_PHOTO에서 HERO_IMAGE 배치가 성공한 뒤에만 `HERO_IMAGE_GUIDE` Script Label TextFrame의 `contents`를 비우도록 추가했다(프레임 자체는 삭제하지 않음). [src/validation.js](src/validation.js)의 `OPENING_WITH_PHOTO.requiredFrames`에 `HERO_IMAGE_GUIDE`가 추가되어, working .indd에 이 Script Label을 부여하기 전까지는 WITH_PHOTO의 `Generate`(TITLE 포함) 전체가 실패한다. 사용자가 실제 working .indd에 `HERO_IMAGE_GUIDE` Script Label을 직접 부여한 뒤 정상 케이스를 테스트해, 안내 문구가 사라지고 프레임 자체는 유지되며 위치/크기/스타일 변화가 없음을 확인함(2026-09-28).
 - Word(.docx) 원고 입력 MVP 구현(D019, 코드 작성 완료): [src/docxZip.js](src/docxZip.js)(직접 구현한 RFC 1951 DEFLATE 압축 해제 + 최소 ZIP 리더), [src/docxArticle.js](src/docxArticle.js)(`word/document.xml`에서 문단/텍스트 추출 + `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커 파싱 → 기존 Article Data 구조로 변환), [src/data.js](src/data.js)의 `loadArticleFile()` 확장(파일 확장자로 JSON/DOCX 분기, 기존 JSON 경로는 코드 변경 없음). OPENING_PAGE/WITH_PHOTO 1종 고정. 변환 결과는 기존 `validateArticleData()`/`applyOpeningPageContent()`를 그대로 통과하며 `index.js`/`src/validation.js`/`src/text.js`/`src/image.js`는 전혀 수정하지 않았다.
 - 플러그인 패널 빈 화면 문제 수정(D019 정정, 2026-09-28, 재테스트 전): 1차 실기 테스트에서 `Load Article`이 멈추더니 플러그인 재시작 후 패널 전체가 빈 화면으로 뜸. `src/docxZip.js`의 객체 리터럴 getter/setter 접근자(`get bytePos()`/`set bytePos()`, 이 코드베이스 최초 사용)를 가장 유력한 원인으로 보고, 이미 검증된 일반 메서드 형태(`getBytePos()`/`setBytePos()`)로 교체했다(기능 동일, `for (;;)` 2곳도 `while (true)`로 변경). **이 수정이 실제로 문제를 해결했는지는 아직 확인되지 않았다.**
+- `Inspect Template`에 Group 등 컨테이너 내부까지 보는 읽기 전용 재귀 탐색 추가(D021, 2026-09-28, 코드 작성 완료·실기 미검증): "목차" 페이지에서 `page.textFrames`가 실제로 보이는 여러 텍스트 중 1개만 반환하는 문제가 보고되어, `src/inspector.js`에 `detectPageItemType()`(`constructor.name` 1차 시도 + 속성 기반 휴리스틱 대체, 실패해도 `"UNKNOWN"`으로 계속 진행)와 `buildPageItemNode()`/`buildPageItemForest()`(`page.pageItems` 전체를 depth 0부터 재귀, depth 상한 20, 개별 try/catch)를 추가했다. `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션을 기존 Text Frame/Rectangle 목록 아래에 추가로 출력한다(기존 출력은 그대로 유지). 자동입력/Script Label 계약/Word 데이터 구조는 이번에 만들지 않았다.
 
 ## 실제 테스트 완료된 기능
 
@@ -135,7 +140,8 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(pointText가 원래 handoff 문서의 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다. "대표이미지" 안내 문구 프레임 처리 방식은 D018로 실기 검증까지 완료됨(HERO_IMAGE_GUIDE Script Label 부여 후 자동으로 비움) — 다만 이 처리 방식 자체가 디자이너 의도와 맞는지 공식 확인된 것은 아니다.
 - `Generate`의 TITLE·POINT_TEXT·BODY·HERO_IMAGE·HERO_IMAGE_GUIDE 자동 입력은 D014/D015/D017/D018 통합 구조로 WITH_PHOTO 정상 케이스가 모두 실기 테스트로 확인됐다(2026-09-28). HERO_IMAGE_GUIDE 실패 케이스와 D017의 이미지 누락 실패 케이스/WITHOUT_PHOTO 회귀는 아직 확인되지 않았다.
-- Word(.docx) 원고 입력 MVP(D019)를 구현했다 — 기존 JSON `Load Article` 경로는 그대로 유지한 채, 파일 확장자로 분기해 `.docx`도 같은 Article Data 구조로 변환하도록 [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)를 새로 작성하고 [src/data.js](src/data.js)를 확장했다. 실기 테스트용 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)/[sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)도 준비했다. 1차 실기 테스트에서 플러그인 패널이 빈 화면으로 뜨는 문제가 발견되어(getter/setter 접근자 프로퍼티가 원인으로 추정) 일반 메서드로 교체하는 수정을 했다 — 이 수정이 문제를 실제로 해결했는지 재테스트가 필요한 상태이며, Word → Generate까지의 end-to-end 실기 테스트는 아직 시작하지 못했다.
+- Word(.docx) 원고 입력 MVP(D019)를 구현했다 — 기존 JSON `Load Article` 경로는 그대로 유지한 채, 파일 확장자로 분기해 `.docx`도 같은 Article Data 구조로 변환하도록 [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)를 새로 작성하고 [src/data.js](src/data.js)를 확장했다. 실기 테스트용 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)/[sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)도 준비했다. 1차 실기 테스트에서 플러그인 패널이 빈 화면으로 뜨는 문제가 발견되어(getter/setter 접근자 프로퍼티가 원인으로 추정) 일반 메서드로 교체하는 수정을 했다 — 이 수정이 문제를 실제로 해결했는지 재테스트가 필요한 상태이며, Word → Generate까지의 end-to-end 실기 테스트는 아직 시작하지 못했다. HERO_IMAGE가 기존 그래픽이 있는 프레임에서 교체되지 않는 문제(2차 실기 테스트에서 발견)도 원인 미확정인 채로 남아 있다.
+- "목차" 템플릿 분석을 시작했다. `Inspect Template`으로 실제 목차 페이지를 확인했더니 화면에 보이는 텍스트 수와 `Inspection Log`의 `Text Frame` 개수가 맞지 않는 문제가 발견됐고(Group 내부 중첩 항목이 `page.textFrames`에 잡히지 않음), 이를 보완하는 읽기 전용 재귀 탐색을 `src/inspector.js`에 추가했다(D021, 코드 작성 완료·실기 미검증). 아직 "목차" Script Label 계약, 자동입력 로직, 데이터 구조는 전혀 만들지 않았다 — 이번 단계는 순수하게 현재 템플릿 구조를 눈으로 확인하기 위한 읽기 전용 도구 확장이다.
 
 ## Script Label 부여 및 검증 현황
 
@@ -193,6 +199,11 @@ Word DOCX 2차 실기 테스트에서 TITLE/POINT_TEXT/BODY는 정상 반영됐�
 
 ## 다음 추천 작업
 
+0. **"목차" 페이지 Inspector 재귀 탐색(D021) 실기 테스트.** UDT에서 Reload 후 "목차" 페이지에서 `Inspect Template`을 실행해:
+   - 기존 `Text Frame (N개)`/`Rectangle / 이미지 프레임 (N개)` 목록이 이전과 동일하게 나오는지(회귀 없음) 확인한다.
+   - 새로 추가된 "중첩 Page Item 트리" 섹션이 에러 없이 출력되고, 화면에 실제로 보이는 제목/부제/페이지번호 텍스트들이 트리 안에 `TextFrame`으로 나타나는지 확인한다.
+   - 각 노드의 `type`이 `constructor.name` 기반으로 의미 있는 값(`TextFrame`/`Group`/`Rectangle` 등)인지, 아니면 `UNKNOWN`으로 많이 빠지는지 확인한다 — `UNKNOWN`이 많다면 `detectPageItemType()`의 휴리스틱을 보강해야 한다.
+   - 결과를 전달하면 HANDOFF.md/DECISIONS.md D021에 실기 검증 완료로 반영한다. 이 단계에서는 여전히 "목차" 자동입력/Script Label 계약을 만들지 않는다.
 1. **패널 빈 화면 수정 재테스트부터 먼저 진행한다(D019 정정).** UDT에서 Reload 후:
    - 패널이 정상적으로 다시 렌더링되는지(제목뿐 아니라 `Load Article`/`Generate`/`Inspect Template` 버튼과 로그 영역 모두) 확인한다.
    - `Load Article`로 [sample/article-eye-clinic-with-photo.docx](sample/article-eye-clinic-with-photo.docx)를 선택했을 때 "파일 선택 중..."에 멈추지 않고 정상 진행되는지 확인한다(같은 폴더에 [sample/eye-clinic-hero.png](sample/eye-clinic-hero.png)가 이미 준비되어 있다). `Article Log`에 "결과: 검증 통과"가 뜨고 TITLE/POINT_TEXT/BODY/HERO_IMAGE 값이 예시 원고 내용과 일치하는지 확인한다(콘솔 로그로 추출된 값을 직접 눈으로 확인).

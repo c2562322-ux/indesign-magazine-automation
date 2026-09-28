@@ -395,3 +395,21 @@ Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파�
 6. **최종 사용자 배포 패키지 기준을 README.md에 명문화**: `manifest.json`, `index.html`, `styles.css`, `index.js`, `src/inspector.js`, `src/validation.js`, `src/data.js`, `src/docxArticle.js`, `src/docxZip.js`, `src/text.js`, `src/image.js`만 포함. `sample/`, `docs/`, `assets/`, `CLAUDE.md`/`README.md`/`HANDOFF.md`/`WORKLOG.md`/`DECISIONS.md`, `src/indesign.js`, `src/template.js`는 제외.
 
 이번 결정이 바꾸지 않은 것(사용자 명시 지시): Word(.docx)/JSON 입력 기능, TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 동작, Script Label 계약, InDesign 레이아웃 관련 코드 — 전부 이번 cleanup 전후로 동일하다. 새 기능은 추가하지 않았다.
+
+## D021: Inspector에 Group 등 컨테이너 내부 pageItems 읽기 전용 재귀 탐색 추가
+
+날짜: 2026-09-28
+
+배경: 사용자가 실제 "목차" 페이지에서 `Inspect Template`을 실행했더니, 화면에는 제목/부제/페이지번호 등 여러 텍스트가 보이는데 `Inspection Log`에는 `Page Item 수: 22`인데도 `Text Frame: 1개`만 나왔다. 코드를 분석해 달라고 먼저 요청받아, [src/inspector.js](src/inspector.js)의 `inspectPage()`가 `page.textFrames`/`page.rectangles`라는 **타입별·페이지 직계 전용** 컬렉션만 순회한다는 것을 확인했다 — classic InDesign DOM 레퍼런스(`Page.textFrames`)에도 "The text frames on this page"라고만 되어 있고 Group 내부까지 포함한다는 언급이 없다. Group도 `page.pageItems`(타입 무관 전체 컬렉션)에는 최상위 항목 1개로만 잡히고, 그 안의 TextFrame은 `page.textFrames`에 애초에 나타나지 않는다 — `formatReport()`의 기존 안내 문구에도 이미 알려진 한계로 적혀 있었다. 22개 pageItems 중 1개만 순수 TextFrame이고 나머지는 Group 등 다른 타입으로 추정되지만, 정확한 구성은 코드로 실제로 순회해 보기 전에는 단정할 수 없었다.
+
+결정: 기존 `page.textFrames`/`page.rectangles` 기반 로직과 `formatReport()`의 해당 출력 줄은 전혀 건드리지 않고, **완전히 별도의 읽기 전용 재귀 탐색을 추가만 한다.**
+
+1. `detectPageItemType(item)`: pageItem의 타입 이름을 추정한다. 1차로 `item.constructor.name`을 시도하되(classic ExtendScript에서 흔한 패턴이지만 이 UXP 환경에서 검증된 적 없음), 실패하거나 빈 문자열/`"Object"`처럼 의미 없는 값이면 존재하는 속성 기반 휴리스틱으로 대체한다: `pageItems` 보유 → `"Group"`, `contents`가 문자열 → `"TextFrame"`, `images` 컬렉션 보유 → `"Rectangle"`. 그래도 판별하지 못하면 예외를 던지지 않고 `"UNKNOWN"`을 반환한다 — 타입 하나를 못 알아낸다고 전체 탐색이 중단되면 안 된다는 사용자 명시 요구사항을 반영했다.
+2. `hasNestedPageItems(item)`: `item.pageItems`가 존재하고 `.length`가 숫자인지로 컨테이너 여부를 판단한다. `detectPageItemType`과 분리한 이유는, 타입 이름 판별에 실패(`"UNKNOWN"`)하더라도 실제로 `pageItems`를 순회할 수 있는 객체라면 재귀 자체는 계속 시도할 수 있게 하기 위함이다.
+3. `buildPageItemNode(item, depth, parentType, maxDepth)`/`buildPageItemForest(page, maxDepth)`: `page.pageItems`를 depth 0 루트로 삼아 재귀적으로 트리를 만든다. 각 노드의 `name`/`label`/`bounds`는 기존 `getLabelText()`/`getBoundsText()`를 재사용해 그대로 가져오고, `text`는 `contents`가 문자열인 항목에서만 기존 `getTextPreview()`로 채운다. 모든 속성 접근은 개별 `try/catch`로 감싸 한 항목의 읽기 실패가 전체 탐색을 중단시키지 않는다. 순환 참조나 예상 밖의 깊은 중첩에 대한 방어적 안전장치로 depth 상한 20(`MAX_NESTED_ITEM_DEPTH`)을 뒀다 — 실제 템플릿이 이 정도로 깊다고 가정하는 것은 아니다.
+4. `formatPageItemNodeLine`/`formatPageItemForest`: 위 트리를 `type`/`depth`/`parent`/`name`/`label`/`text`/`bounds`/`childCount`를 한 줄에 담아, `├─`/`└─` 연결선으로 들여쓰기한 텍스트로 만든다.
+5. `inspectPage()`가 `buildPageItemForest(page, MAX_NESTED_ITEM_DEPTH)` 결과를 새 필드 `pageItemTree`에 담아 반환하고, `formatReport()`가 각 페이지의 기존 Text Frame/Rectangle 목록 **아래에 추가로** "중첩 Page Item 트리" 섹션을 출력한다. 기존 필드/출력 줄은 전혀 바뀌지 않아, `src/validation.js`(report의 `page.textFrames`/`page.rectangles`만 읽음)도 영향받지 않는다.
+
+읽기 전용 보장: 모든 접근이 `item.pageItems`/`.name`/`.label`/`.contents`/`.geometricBounds`/`.images` 등 값 읽기뿐이며 어떤 속성에도 대입하지 않는다. `app.doScript`로도 감싸지 않는다(D006과 동일 원칙 — 문서를 수정하지 않는 조회는 doScript로 감쌀 필요가 없다). Script Label을 새로 쓰거나, "목차" 자동입력 로직이나 데이터 계약을 만드는 작업은 이번 범위에 포함하지 않았다(사용자 명시 지시).
+
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): `item.constructor.name`이 이 InDesign UXP 환경에서 실제로 `"TextFrame"`/`"Group"`/`"Rectangle"` 같은 의미 있는 문자열을 주는지, Group이 아닌 다른 컨테이너성 타입(MultiStateObject, Button 등)이 목차 페이지에 있고 그것도 `pageItems`로 재귀 진입되는지, 실제 중첩 깊이가 2단계 이상인지 — 전부 이번 세션에는 실행 가능한 JavaScript 런타임이 없어 코드 리뷰로만 확인했고 실기 테스트로만 검증할 수 있다.

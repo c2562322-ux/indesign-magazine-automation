@@ -932,3 +932,28 @@
 남은 문제:
 - HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정 (D020 참고, 재조사 시 로그 재추가 필요)
 - 플러그인 빈 화면 수정(getter/setter → 일반 메서드)이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
+
+---
+
+## 2026-09-28 - "목차" 페이지 Inspector Group 내부 재귀 탐색 추가 (D021, 읽기 전용, 코드 작성 완료·실기 미검증)
+
+완료:
+- 사용자가 cleanup 커밋을 push(`74de9af`)한 뒤 실제 "목차" 페이지에서 `Inspect Template`을 실행해 새 문제를 보고: 화면에는 제목/부제/페이지번호 등 여러 텍스트가 보이는데 `Inspection Log`에는 `Page Item 수: 22`인데도 `Text Frame: 1개`만 나옴. 아직 자동입력/Script Label 계약은 만들지 말고, 먼저 Inspector 코드가 왜 1개만 보이는지 분석하고 최소 변경 제안부터 보고해 달라고 요청함
+- `src/inspector.js`의 `inspectPage()`가 `page.textFrames`/`page.rectangles`(페이지에 직접 놓인, 해당 타입뿐인 컬렉션)만 순회하고 `page.pageItems`(전체 타입, 22개)는 개수만 읽을 뿐 순회하지 않는다는 것을 코드 분석으로 확인, Group 내부 TextFrame이 `page.textFrames`에 잡히지 않는 것이 원인이라는 분석 결과를 보고함(기존 로직은 이미 알려진 한계로 문서화돼 있었음)
+- 최소 변경 제안(기존 로직 유지 + 새 재귀 섹션 추가, `constructor.name` 기반 타입 판별 + 휴리스틱 대체)에 사용자가 동의, 구현 진행 전 먼저 직전 cleanup 커밋(`74de9af`)을 origin/main에 일반 push(force 아님)로 보존 — `git status`/커밋 개수 확인 후 push, 이후 local main == origin/main == `74de9af` 확인함
+- `src/inspector.js`에 `detectPageItemType()`(`constructor.name` 1차 시도, 실패/무의미하면 `pageItems`/`contents`/`images` 존재 여부 기반 휴리스틱으로 대체, 그래도 안 되면 `"UNKNOWN"` 반환하고 계속 진행), `hasNestedPageItems()`(컨테이너 여부, 타입 판별과 독립), `buildPageItemNode()`/`buildPageItemForest()`(`page.pageItems`를 depth 0부터 재귀, 개별 try/catch, depth 상한 20 `MAX_NESTED_ITEM_DEPTH`), `formatPageItemNodeLine()`/`formatPageItemForest()`(`├─`/`└─` 트리 텍스트 생성)를 신규 추가
+- `inspectPage()`가 `pageItemTree` 필드를 추가로 반환하도록, `formatReport()`가 페이지마다 "중첩 Page Item 트리" 섹션을 기존 Text Frame/Rectangle 목록 아래에 추가로 출력하도록 수정 — 기존 `page.textFrames`/`page.rectangles` 순회 로직과 그 출력 줄은 한 글자도 바꾸지 않음. `formatReport()` 상단의 "Group은 분석되지 않는다"는 안내 문구도 새 섹션을 안내하도록 갱신
+- `app.doScript` 사용 없음(D006과 동일 원칙), Script Label 쓰기/텍스트 수정/위치·크기 변경 코드 없음 — 전부 값 읽기(`.name`/`.label`/`.contents`/`.geometricBounds`/`.images`/`.pageItems`)뿐
+- `src/validation.js`는 report의 `page.textFrames`/`page.rectangles`만 읽으므로 새 필드 추가에 영향받지 않음을 확인함(코드 리뷰로 확인, 별도 수정 없음)
+- HANDOFF.md(현재 프로젝트 단계 서술, 완료된 기능, 진행 중인 작업, 다음 추천 작업에 실기 테스트 항목 추가)/DECISIONS.md(D021)에 반영
+
+변경 파일:
+- src/inspector.js (신규 함수 추가, 기존 함수/출력 줄 무변경)
+- HANDOFF.md, DECISIONS.md, WORKLOG.md
+
+테스트:
+- 없음(실행 가능한 JavaScript 런타임이 이 세션에 없어 코드 리뷰로만 확인). `constructor.name`이 이 UXP 환경에서 실제로 동작하는지, Group 내부 텍스트가 트리에 정상적으로 나오는지는 사용자의 다음 실기 테스트로만 확인 가능
+
+남은 문제(이전부터 이어짐, 이번 작업과 무관):
+- HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
+- 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
