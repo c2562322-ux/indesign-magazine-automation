@@ -24,10 +24,10 @@ indesign-magazine-automation/
 ├─ src/
 │  ├─ indesign.js     InDesign document/page/frame 접근 및 제어 (구현됨)
 │  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
-│  ├─ data.js         JSON 파일 선택/읽기(require("uxp").storage) (구현됨, 미검증)
+│  ├─ data.js         JSON 파일 선택/읽기(require("uxp").storage), JSON 파일 nativePath 반환 (구현됨, 실기 검증 완료)
 │  ├─ template.js     templateType별 템플릿 처리 (예정)
-│  ├─ text.js         TITLE 입력만 구현됨(미검증). POINT_TEXT/BODY/BODY_COLUMN_1/2 입력은 예정
-│  ├─ image.js         HERO_IMAGE/IMAGE_01 등 이미지 처리 (예정)
+│  ├─ text.js         TITLE/POINT_TEXT/BODY/HERO_IMAGE 입력을 applyOpeningPageContent() 하나로 통합 구현. TITLE/POINT_TEXT/BODY는 실기 검증 완료, HERO_IMAGE는 미검증
+│  ├─ image.js         heroImage 경로 해석/파일 접근 확인/place 구현(미검증). fit/리사이즈 없음
 │  └─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
 │
 ├─ sample/
@@ -59,7 +59,7 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 
 ## 기사 데이터 규격
 
-자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. `Load Article` 버튼으로 이 JSON을 선택/읽기/검증하는 기능은 구현됐고, `Generate` 버튼으로 `title`/`pointText`/`body`를 TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1) 프레임에 채워 넣는 것까지 구현됐다(`src/text.js`의 `applyOpeningPageTextContent`, 하나의 `app.doScript` 안에서 모든 프레임 탐색·WITHOUT_PHOTO의 텍스트 스레드 연결 확인을 마친 뒤에만 쓰기를 시작함 — [DECISIONS.md](DECISIONS.md) D014/D015). TITLE+POINT_TEXT 범위는 실기 검증 완료, BODY가 포함된 현재 구조는 아직 실기 테스트 전이다. `heroImage` 이미지 배치는 아직 구현되지 않았다.
+자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. `Load Article` 버튼으로 이 JSON을 선택/읽기/검증하는 기능은 구현됐고, `Generate` 버튼으로 `title`/`pointText`/`body`/(WITH_PHOTO는)`heroImage`를 TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1)/HERO_IMAGE 프레임에 채워 넣는 것까지 구현됐다(`src/text.js`의 `applyOpeningPageContent`, 하나의 `app.doScript` 안에서 모든 프레임 탐색·WITHOUT_PHOTO의 텍스트 스레드 연결 확인을 마친 뒤에만 쓰기를 시작함 — [DECISIONS.md](DECISIONS.md) D014/D015/D017). `heroImage`는 `Load Article`로 불러온 JSON 파일이 있는 폴더 기준 상대 경로로 해석하며, 기존 `HERO_IMAGE` Rectangle의 위치/크기는 건드리지 않고 이미지만 place한다([src/image.js](src/image.js)). TITLE+POINT_TEXT+BODY 범위는 실기 검증 완료, HERO_IMAGE가 포함된 현재 구조는 아직 실기 테스트 전이다.
 
 ## UXP Developer Tool에서 실행하는 방법
 
@@ -69,7 +69,7 @@ UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/indesign.js`)
 4. 플러그인 목록에 `Magazine Automation`이 추가되면 InDesign을 실행한 상태에서 `Load`(또는 로드 아이콘)를 눌러 플러그인을 로드한다.
 5. InDesign에서 문서를 하나 새로 만들거나 연다.
 6. InDesign 메뉴 `Plugins`(또는 UDT에서 지정한 위치)에서 `Magazine Automation` 패널을 연다.
-7. 먼저 `Load Article` 버튼으로 `sample/opening-page-with-photo.json`을 불러와 검증을 통과시킨 뒤, `Generate` 버튼을 클릭하면 "시작 페이지(사진 있음)"의 TITLE·POINT_TEXT·BODY 프레임 내용이 JSON의 `title`/`pointText`/`body` 값으로 바뀌는지 확인한다. `sample/opening-page-without-photo.json`을 불러와 `Generate`하면 "시작 페이지(사진 없음)"의 TITLE·POINT_TEXT·BODY_COLUMN_1이 바뀌고 `body`가 텍스트 스레드를 통해 BODY_COLUMN_2까지 흐르는지, 반대쪽 variant 페이지는 바뀌지 않는지 확인한다. Article을 불러오지 않은 상태에서 `Generate`를 누르면 문서 변경 없이 Status에 중단 사유가 표시되는지도 확인한다. (Script Label을 일시적으로 지웠을 때 아무 필드도 반영되지 않는지 등 D014/D015 검증을 위한 추가 테스트는 HANDOFF.md "다음 추천 작업"에 정리되어 있다.)
+7. 먼저 `sample/opening-page-with-photo.json`과 같은 폴더에 JSON의 `heroImage` 값(예: `hero.jpg`)과 정확히 이름이 같은 이미지 파일을 준비한다. `Load Article` 버튼으로 그 JSON을 불러와 검증을 통과시킨 뒤, `Generate` 버튼을 클릭하면 "시작 페이지(사진 있음)"의 TITLE·POINT_TEXT·BODY·HERO_IMAGE가 JSON 값/이미지로 바뀌는지(HERO_IMAGE Rectangle의 위치/크기는 그대로인지) 확인한다. `sample/opening-page-without-photo.json`을 불러와 `Generate`하면 "시작 페이지(사진 없음)"의 TITLE·POINT_TEXT·BODY_COLUMN_1이 바뀌고 `body`가 텍스트 스레드를 통해 BODY_COLUMN_2까지 흐르는지, 반대쪽 variant 페이지는 바뀌지 않는지 확인한다. Article을 불러오지 않은 상태에서 `Generate`를 누르면 문서 변경 없이 Status에 중단 사유가 표시되는지도 확인한다. (Script Label을 일시적으로 지우거나 이미지 파일을 잠시 지웠을 때 아무 필드도 반영되지 않는지 등 D014/D015/D017 검증을 위한 추가 테스트는 HANDOFF.md "다음 추천 작업"에 정리되어 있다.)
 8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보와 함께, Script Label 기준 "시작 페이지" 필수 프레임 검증 결과(`=== Script Label 기반 프레임 검증 ===`로 시작하는 부분)가 `Inspection Log` 영역과 콘솔에 이어서 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
 9. 패널에서 `Load Article` 버튼을 클릭하면 파일 선택 대화상자가 뜨는지, `sample/opening-page-with-photo.json`이나 `sample/opening-page-without-photo.json`을 선택했을 때 `Article Log` 영역에 `=== Load Article 데이터 검증 ===`로 시작하는 결과가 출력되고 "결과: 검증 통과"로 끝나는지 확인한다. 문서 내용은 변경되지 않아야 한다.
 10. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.

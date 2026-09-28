@@ -44,7 +44,9 @@ async function loadArticleFile() {
         return { status: "parse-error", fileName: file.name, message: err.message };
     }
 
-    return { status: "loaded", fileName: file.name, data };
+    // fileNativePath: heroImage 같은 상대 경로를 이 JSON 파일이 있는 폴더 기준으로 해석할 때
+    // 쓴다(src/image.js의 resolveHeroImagePath). file.nativePath는 UXP Entry의 표준 속성이다.
+    return { status: "loaded", fileName: file.name, fileNativePath: file.nativePath, data };
 }
 
 module.exports = {

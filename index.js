@@ -8,15 +8,19 @@ const {
     formatArticleValidationReport,
 } = require("./src/validation.js");
 const { loadArticleFile } = require("./src/data.js");
-const { applyOpeningPageTextContent } = require("./src/text.js");
+const { applyOpeningPageContent } = require("./src/text.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
 const articleFileName = document.getElementById("articleFileName");
 const articleLog = document.getElementById("articleLog");
 
-// 검증을 통과한 기사 데이터만 메모리에 보관한다. 아직 Generate 등 다른 기능과 연결하지 않는다.
+// 검증을 통과한 기사 데이터만 메모리에 보관한다.
 let currentArticleData = null;
+// 검증을 통과한 JSON 파일 자체의 nativePath. WITH_PHOTO의 heroImage 상대 경로를 이 파일이
+// 있는 폴더 기준으로 해석할 때 쓴다(src/image.js의 resolveHeroImagePath). articleData와
+// 별개의 앱 상태로 관리한다 — JSON 데이터 계약 자체에는 포함되지 않는다.
+let currentArticleFileNativePath = null;
 
 function setStatus(message) {
     statusText.textContent = message;
@@ -34,6 +38,7 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
 
         if (loadResult.status === "read-error") {
             currentArticleData = null;
+            currentArticleFileNativePath = null;
             articleFileName.textContent = loadResult.fileName ? `${loadResult.fileName} (읽기 실패)` : "(읽기 실패)";
             articleLog.textContent = `파일 읽기 실패: ${loadResult.message}`;
             setStatus(`Load Article 오류 (파일 읽기 실패): ${loadResult.message}`);
@@ -42,6 +47,7 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
 
         if (loadResult.status === "parse-error") {
             currentArticleData = null;
+            currentArticleFileNativePath = null;
             articleFileName.textContent = `${loadResult.fileName} (JSON 문법 오류)`;
             articleLog.textContent = `JSON 문법 오류: ${loadResult.message}`;
             setStatus(`Load Article 오류 (JSON 문법 오류): ${loadResult.fileName}`);
@@ -56,6 +62,7 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
 
         if (validation.ok) {
             currentArticleData = loadResult.data;
+            currentArticleFileNativePath = loadResult.fileNativePath;
             articleFileName.textContent = `${loadResult.fileName} (검증 통과)`;
             setStatus(
                 `Load Article 완료: ${loadResult.fileName} — templateType=${validation.templateType}, ` +
@@ -63,6 +70,7 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
             );
         } else {
             currentArticleData = null;
+            currentArticleFileNativePath = null;
             const failedFields = validation.checks
                 .filter((c) => c.status !== "정상")
                 .map((c) => c.field)
@@ -73,6 +81,7 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
     } catch (err) {
         console.error(err);
         currentArticleData = null;
+        currentArticleFileNativePath = null;
         setStatus(`Load Article 오류: ${err.message}`);
     }
 });
@@ -85,15 +94,17 @@ document.getElementById("btnGenerate").addEventListener("click", async () => {
     }
 
     try {
-        // TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1) 대상 페이지·프레임 탐색(검증)을 모두
-        // 마친 뒤에만 실제 쓰기를 시작한다(applyOpeningPageTextContent 내부에서 하나의
-        // doScript로 처리, D014/D015). 탐색 중 하나라도 실패하면 셋 중 어느 것도 쓰이지 않는다.
-        setStatus("Generate: TITLE + POINT_TEXT + BODY 검증 및 입력 중...");
-        await applyOpeningPageTextContent(currentArticleData);
+        // TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1)/HERO_IMAGE(WITH_PHOTO만) 대상
+        // 페이지·프레임 탐색(검증)을 모두 마친 뒤에만 실제 쓰기를 시작한다
+        // (applyOpeningPageContent 내부에서 하나의 doScript로 처리, D014/D015/D017).
+        // 탐색 중 하나라도 실패하면 어느 것도 쓰이지 않는다.
+        setStatus("Generate: TITLE + POINT_TEXT + BODY (+ HERO_IMAGE) 검증 및 입력 중...");
+        await applyOpeningPageContent(currentArticleData, currentArticleFileNativePath);
 
+        const heroImageNote = currentArticleData.variant === "WITH_PHOTO" ? ", HERO_IMAGE 배치됨" : "";
         setStatus(
             `Generate 완료: TITLE="${currentArticleData.title}", POINT_TEXT="${currentArticleData.pointText}", ` +
-                `BODY 입력됨(${currentArticleData.body.length}자) (variant=${currentArticleData.variant})`
+                `BODY 입력됨(${currentArticleData.body.length}자)${heroImageNote} (variant=${currentArticleData.variant})`
         );
     } catch (err) {
         console.error(err);

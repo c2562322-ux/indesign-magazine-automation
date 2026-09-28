@@ -288,3 +288,33 @@ Template Type 선택 시 고려할 수 있는 후보 기준(전부 미확정, �
 
 변경 조건:
 실제 업무에서 원고 전달 방식(Word/Excel/기타)이 확인되거나, MVP가 "시작 페이지"에서 충분히 안정되어 여러 Template Type/입력 형식을 지원할 필요가 실제로 생기면, 이 방향을 구체적인 설계(모듈 구조, 데이터 스키마, 선택 규칙)로 발전시키고 별도 결정으로 기록한다.
+
+---
+
+## D017 - HERO_IMAGE 배치: JSON 파일 폴더 기준 상대 경로 + 파일시스템 확인은 doScript 밖에서 선행
+
+결정:
+WITH_PHOTO의 `heroImage`(예: `"hero.jpg"`)를 **Load Article로 불러온 JSON 파일이 있는 폴더 기준 상대 경로**로 해석해 이미지 파일을 찾고, 기존 `HERO_IMAGE` Script Label Rectangle에 `rectangle.place(nativePath)`로 배치한다(위치/크기/디자인은 건드리지 않음, D016 "자동배치의 의미" 참고). 구체적으로:
+
+1. `src/data.js`의 `loadArticleFile()`이 반환값에 `fileNativePath`(UXP `Entry.nativePath`)를 추가로 담아 `index.js`가 `currentArticleFileNativePath`로 별도 보관한다(article JSON 데이터 자체에는 포함하지 않음 — 데이터 계약은 그대로).
+2. 새 모듈 `src/image.js`: `resolveHeroImagePath(articleFileNativePath, heroImageRelativePath)`(순수 문자열 처리로 폴더 경로를 계산해 합침), `assertImageFileAccessible(imageNativePath)`(`require("fs")`로 `"file:"` 스킴 경로 조회, InDesign 문서와 무관한 순수 파일시스템 확인), `placeHeroImage(rectangle, imageNativePath)`(`rectangle.place(nativePath)`만 호출, fit/resize 없음).
+3. `src/text.js`의 `applyOpeningPageTextContent()`를 `applyOpeningPageContent()`로 다시 개명하고(D015에 이어 두 번째 확장 — 이제 텍스트 외 이미지도 다루므로), heroImage 파일 접근 확인(`assertImageFileAccessible`, 비동기)은 **doScript 밖에서** 먼저 수행한다. doScript 콜백 안에서는 지금까지처럼 완전히 동기 함수를 유지하고, HERO_IMAGE Rectangle 탐색까지만 추가한다. 쓰기 단계에서는 HERO_IMAGE place를 TITLE/POINT_TEXT/BODY보다 **먼저** 실행한다.
+
+이유:
+- **UXP Entry에는 부모 폴더를 얻는 API가 없다**(공식 `Entry` 클래스 레퍼런스에 `getParent()` 등이 명시적으로 없음 — `copyTo`/`moveTo`/`delete`/`getMetadata`/`toString`과 `nativePath`/`name`/`url`/`isFile`/`isFolder` 프로퍼티만 있음, Adobe 공식 문서 확인). 따라서 "JSON 파일이 있는 폴더"를 얻으려면 `nativePath` 문자열에서 마지막 경로 구분자를 잘라 폴더 경로를 직접 계산하는 수밖에 없다. 이 계산은 순수 JS 문자열 처리이므로 InDesign/UXP API 자체에 의존하지 않아 위험이 적다.
+- **`localFileSystem`에는 임의의 네이티브 경로를 Entry로 변환하는 문서화된 방법이 없다**(공식 `localFileSystem` 모듈 레퍼런스에 `getFileForOpening`/`getFileForSaving`/`getFolder`/`getTemporaryFolder`/`getDataFolder`/`getPluginFolder`/세션·영구 토큰 관련 메서드만 있고, 임의 경로 → Entry 변환 메서드는 없음). 그래서 이미지 경로는 Entry로 변환하지 않고 **네이티브 경로 문자열 그대로** 다룬다.
+- **`Rectangle.place()`는 File Entry가 아니라 네이티브 경로 문자열을 받는다** — 공개된 실제 InDesign UXP 스크립트 예제(Adobe 개발자 포럼, 커뮤니티 스니펫 저장소)에서 `imageFrame.place(imagePath)` 형태(경로 문자열)로 성공했고, 파일 내용을 미리 읽어 넘기는 방식은 실패 사례로 보고됨을 확인했다. 이는 위에서 Entry 변환이 필요 없다는 점과 맞아떨어진다.
+- **파일 접근 확인은 `require("fs")`(UXP가 제공하는 Node 스타일 fs 모듈, `"file:"` 스킴 경로)로 한다** — 같은 공개 예제에서 `fs.writeFile("file:" + path, ...)` 형태로 실제 사용된 것을 확인했다. `fs.stat`가 정확히 어떤 조건에서 어떤 오류를 던지는지는 이 프로젝트에서 실기로 검증된 적이 없다.
+- **파일시스템 확인을 doScript 밖에서 하는 이유**: `assertImageFileAccessible`는 비동기(`await`)이고, 지금까지 이 프로젝트의 모든 `app.doScript` 콜백은 완전히 동기 함수였다(D012 이후 일관). 콜백을 비동기로 바꿔 그 안에서 `await`하는 패턴은 InDesign UXP의 `doScript`가 지원하는지 확인된 적이 없어, 새로운 미검증 영역을 만들지 않기 위해 문서와 무관한 파일시스템 확인은 doScript 진입 전에 끝낸다(D006 "읽기 전용/문서와 무관한 확인은 doScript로 감쌀 필요 없다" 원칙의 연장).
+- **쓰기 순서에서 HERO_IMAGE place를 가장 먼저 실행하는 이유**: `assertImageFileAccessible`의 사전 확인이 완벽하다는 보장이 없다(예: 확인 직후 파일이 삭제되거나, 파일은 있지만 이미지 형식이 손상되어 `place()` 자체가 실패하는 경우). place를 텍스트 필드보다 먼저 실행하면, 이런 뒤늦은 실패가 발생해도 TITLE/POINT_TEXT/BODY는 아직 전혀 쓰이지 않은 채로 남아 "검증 실패 시 문서를 수정하지 않는다"는 원칙이 유지된다 — D014/D015가 확립한 "탐색 전부 → 쓰기 전부"에 "가장 불확실한 쓰기를 먼저"라는 보강을 더한 것이다.
+
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음):
+- `require("fs")`가 이 InDesign UXP 환경(이 프로젝트가 검증된 버전)에서 실제로 사용 가능한지, `fs.stat`의 정확한 성공/실패 시맨틱은 아직 실기로 확인된 적이 없다.
+- `nativePath` 문자열의 경로 구분자(Windows `\` vs `/`)를 그대로 이어붙이는 것이 이 환경에서 항상 올바른지(예: `place()`가 특정 구분자만 받아들이는지)는 확인되지 않았다.
+- `rectangle.place(nativePath)`가 이 프로젝트의 정확한 InDesign/UXP 버전에서 동일하게 동작하는지는 공개 예제로만 뒷받침했을 뿐, 이 환경에서 직접 실기로 확인된 적은 없다.
+- `resolveHeroImagePath`는 `heroImage` 값에 `..`(상위 폴더 이동) 등이 들어와도 이를 특별히 막지 않는다 — 이 프로젝트는 신뢰할 수 있는 사용자가 자신의 로컬 파일을 다루는 내부 도구이므로 적대적 입력을 가정하지 않았다.
+
+이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+
+변경 조건:
+실기 테스트에서 (a) WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 프레임 위치/크기가 그대로임), (b) 이미지 누락/접근 불가 실패 케이스(TITLE/POINT_TEXT/BODY도 전혀 반영되지 않음), (c) WITHOUT_PHOTO가 기존과 동일하게 동작함이 모두 확인되면 이 기록을 실기 검증 완료로 갱신한다. `require("fs")`가 이 환경에서 동작하지 않는 것으로 확인되면, 파일 접근 확인 방식(예: 확인을 생략하고 `place()` 자체의 실패에만 의존하는 방식 등)을 재검토한다.

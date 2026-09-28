@@ -677,3 +677,46 @@
 
 남은 문제:
 - (해당 없음, 이번 작업은 방향성 명확화일 뿐 구현 아님)
+
+---
+
+## 2026-09-28 - HERO_IMAGE 이미지 배치 구현 (D017, 기존 단일 doScript 흐름에 포함, 실기 테스트 전)
+
+완료:
+- 사용자가 WITH_PHOTO의 HERO_IMAGE 처리를 요청하면서, "자동배치는 레이아웃 재디자인이 아니다"(D016)를 다시 강조하고 절대 하지 않을 것(Rectangle 신규 생성/이동/리사이즈/레이아웃 재구성/다른 프레임과 자리 변경)을 명시함. 구현 전에 먼저 (1) Load Article 과정에서 JSON 파일 위치 정보를 Generate에서 재사용 가능한지, (2) heroImage 상대 경로를 JSON 폴더 기준으로 해석 가능한지, (3) InDesign UXP에서 기존 Rectangle에 이미지 place에 쓸 API/필요한 경로 형태, (4) 이미지 누락/접근 불가 시 쓰기 전 실패 가능 여부, (5) 기존 Generate 흐름에 포함할 때 부분 반영 위험을 어떻게 막을지를 분석해 달라고 요청함
+- WebSearch/WebFetch로 Adobe 공식 UXP API 레퍼런스와 공개 InDesign UXP 스크립트 예제(Adobe 개발자 포럼, RolandDreger/indesign-uxp-script-snippets)를 조사함:
+  - UXP `Entry` 클래스에 부모 폴더를 얻는 API(`getParent()` 등)가 없음을 공식 레퍼런스로 확인(전체 메서드 목록에 없음) — 폴더는 `nativePath` 문자열에서 직접 계산해야 함
+  - `localFileSystem` 모듈에 임의 네이티브 경로를 Entry로 변환하는 문서화된 메서드가 없음을 확인 — 이미지 경로는 Entry로 변환하지 않고 네이티브 경로 문자열로만 다루기로 함
+  - `Rectangle.place(nativePath)`가 File Entry가 아니라 네이티브 경로 문자열을 받는다는 것을 공개 예제 2건에서 확인(파일 내용을 미리 읽어 넘기는 방식은 실패 사례로 보고됨)
+  - `require("fs")`(UXP가 제공하는 Node 스타일 fs 모듈, `"file:"` 스킴 경로)가 실제 InDesign UXP 스크립트에서 사용된 사례를 확인 — 파일 접근 확인에 재사용하기로 함(단, 정확한 성공/실패 시맨틱은 미검증)
+- 분석과 가장 작은 구현안을 사용자에게 먼저 설명한 뒤 구현 진행:
+  - `src/data.js`: `loadArticleFile()` 반환값에 `fileNativePath`(UXP `Entry.nativePath`) 추가
+  - `src/image.js` 신규: `resolveHeroImagePath`(순수 문자열 처리로 JSON 폴더 기준 이미지 경로 계산), `assertImageFileAccessible`(`require("fs")`로 InDesign 문서와 무관한 파일 접근 확인), `placeHeroImage`(`rectangle.place(nativePath)`만 호출, fit/resize 없음)
+  - `src/text.js`: `applyOpeningPageTextContent()`를 `applyOpeningPageContent()`로 다시 개명. heroImage 파일 접근 확인(비동기)은 doScript 밖에서 먼저 수행(콜백은 계속 동기 함수로 유지 — 비동기 doScript 콜백은 미검증 영역이라 회피). doScript 콜백 안에서는 HERO_IMAGE Rectangle 탐색(`findHeroImageFrameForVariant`, 기존 `findLabeledFrameForVariant` 재사용)까지만 추가. 쓰기 단계에서 HERO_IMAGE place를 TITLE/POINT_TEXT/BODY보다 먼저 실행 — 사전 확인이 놓친 실패도 텍스트 필드 부분 반영 없이 막기 위함
+  - `index.js`: `currentArticleFileNativePath` 상태 추가(articleData와 별개, JSON 데이터 계약에는 미포함), Generate 호출에 전달, Status 메시지에 HERO_IMAGE 배치 여부 반영
+- `DECISIONS.md`에 D017 기록: 위 API 조사 결과와 근거, 이 결정이 없애지 못하는 위험(`require("fs")`/`rectangle.place()`의 정확한 동작 미검증, 경로 구분자 처리 미검증, 상위 폴더 이동 등 경로 새니타이즈 없음 — 신뢰할 수 있는 내부 도구 전제)을 명시
+- `docs/ARTICLE_DATA_SPEC.md`: `heroImage` 필드 설명에 "JSON 파일 폴더 기준 상대 경로로 해석" 확정 사항 반영, "아직 정해지지 않은 것"의 관련 문구 갱신, 상단 "현재 범위" 섹션의 오래된 stale 문구(Load Article/Generate 미구현이라고 되어 있던 부분)도 함께 바로잡음
+- `HANDOFF.md`/`README.md`/`sample/images/README.md` 갱신: HERO_IMAGE 배치를 "코드 작성 완료, 실기 테스트 전"으로 기록. `sample/images/README.md`에는 현재 OPENING_PAGE 자동조판의 `heroImage`가 `sample/images/`가 아니라 JSON 파일이 있는 폴더(`sample/` 자체) 기준으로 해석된다는 주의 문구 추가(예전 `sample/article.json` 관례와 혼동 방지)
+- 요청받은 범위만 구현: HERO_IMAGE Rectangle의 위치/크기 변경, 새 Rectangle 생성, 레이아웃 재구성은 전혀 하지 않음. Overset/페이지 추가/다른 이미지 프레임도 다루지 않음
+
+변경 파일:
+- src/image.js (신규)
+- src/data.js
+- src/text.js
+- index.js
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- docs/ARTICLE_DATA_SPEC.md
+- sample/images/README.md
+- WORKLOG.md
+
+테스트:
+- 없음. `applyOpeningPageContent()`의 HERO_IMAGE 부분(`resolveHeroImagePath`/`assertImageFileAccessible`/`placeHeroImage`/`findHeroImageFrameForVariant`)은 아직 실제 InDesign에서 한 번도 실행해본 적이 없다. **이번 작업은 실기 테스트 전이므로 문서에 "성공"으로 기록하지 않았다.** TITLE+POINT_TEXT+BODY 범위(D014/D015)는 이전 엔트리에서 이미 실기 검증된 상태이며 이번 변경으로 그 실행 경로 자체는 바뀌지 않았다고 판단하지만, 함수 개명과 새 분기 추가 이후 재확인된 적은 없다.
+
+남은 문제:
+- WITH_PHOTO 정상 케이스(이미지가 실제로 배치되고 HERO_IMAGE 프레임 위치/크기가 그대로인지)를 실제 InDesign에서 확인 필요 — 테스트하려면 `sample/hero.jpg`(또는 JSON의 `heroImage` 값과 일치하는 파일명) 준비 필요
+- 이미지 누락/접근 불가 실패 케이스에서 TITLE/POINT_TEXT/BODY도 전혀 반영되지 않는지 확인 필요
+- WITHOUT_PHOTO가 이번 변경 이후에도 기존과 동일하게 동작하는지(HERO_IMAGE 관련 코드가 전혀 실행되지 않아야 함) 확인 필요
+- `require("fs")`, `rectangle.place(nativePath)` 둘 다 이 InDesign UXP 환경에서 실기로 검증된 적 없음
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음

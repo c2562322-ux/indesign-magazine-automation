@@ -6,11 +6,9 @@
 
 - **"시작 페이지"(Template Type, 자동화 식별자 `OPENING_PAGE`) 2개 변형만** 다룬다: 사진 있는 버전, 사진 없는 버전.
 - 목차/본문 페이지/인터뷰 레이아웃은 아직 포함하지 않는다.
-- 이 문서는 데이터 구조와 샘플 파일 정의까지만 다룬다. 아래는 **아직 구현하지 않았다**:
-  - `Load Article` 버튼의 실제 파일 선택 동작
-  - JSON 파일 읽기 ([src/data.js](../src/data.js)는 여전히 빈 스텁)
-  - InDesign `contents` 변경, 이미지 배치
-  - `Generate` 버튼을 통한 자동조판
+- 이 문서는 데이터 구조 정의를 다룬다. 현재 구현 상태(자세한 내용/실기 검증 여부는 [HANDOFF.md](../HANDOFF.md) 참고):
+  - `Load Article` 버튼의 파일 선택/읽기/검증, `Generate` 버튼을 통한 자동조판(TITLE/POINT_TEXT/BODY/HERO_IMAGE)은 구현되어 있다.
+  - 다른 Template Type용 데이터 로드, Overset 처리, 페이지 생성/복제는 아직 구현하지 않았다.
 
 전제:
 - "시작 페이지" Script Label(`TITLE`/`POINT_TEXT`/`BODY`/`HERO_IMAGE`, `TITLE`/`POINT_TEXT`/`BODY_COLUMN_1`/`BODY_COLUMN_2`) 기반 프레임 검증이 실제 InDesign에서 두 변형 모두 "정상"으로 확인되었다(2026-09-23, [HANDOFF.md](../HANDOFF.md) 참고).
@@ -47,7 +45,7 @@
 
 | 필드 | 타입 | Required / Optional | 설명 |
 |---|---|---|---|
-| `heroImage` | string (파일명) | **Required** | `HERO_IMAGE` Script Label이 붙은 Rectangle에 배치될 이미지 파일명(아직 배치 로직 미구현). `sample/images/`의 파일명 규칙을 따른다. |
+| `heroImage` | string (파일명 또는 상대 경로) | **Required** | `HERO_IMAGE` Script Label이 붙은 Rectangle에 배치될 이미지 파일. **`Load Article`로 불러온 JSON 파일이 있는 폴더를 기준으로 한 상대 경로로 해석한다**(2026-09-28 확정, [DECISIONS.md](../DECISIONS.md) D017). 예: 기사 폴더에 `opening-page-with-photo.json`과 `hero.jpg`가 나란히 있고 `"heroImage": "hero.jpg"`이면, 그 `hero.jpg`를 사용한다. 이미지가 없거나 접근할 수 없으면 `Generate`가 문서를 전혀 수정하지 않고 중단된다. |
 
 ## `variant = "WITHOUT_PHOTO"`일 때
 
@@ -74,7 +72,7 @@
 - 위 Required 표시는 이번 MVP 개발을 위한 잠정 결정이며, 디자이너와 공식 확인된 것은 아니다. 특히 `pointText`가 항상 있어야 하는지, "대표이미지" 안내 문구 프레임을 실제 조판 시 어떻게 처리할지는 여전히 "확인 필요" 상태다 ([docs/TEMPLATE_SPEC.md](TEMPLATE_SPEC.md) Frame 분석 워크시트, HANDOFF.md "디자이너에게 확인해야 할 사항" 참고).
 - `body`를 `BODY_COLUMN_1`의 `contents`에 쓰는 코드는 아직 구현하지 않았다. `TextFrame.contents`가 "그 프레임이 속한 스토리 전체"를 다룬다는 점([src/inspector.js](../src/inspector.js) 주석 참고)을 감안하면, `BODY_COLUMN_1.contents = body` 형태로 쓰는 것으로 충분할 가능성이 높지만 실제 자동조판 구현 시 검증이 필요하다.
 - 글자 수 제한이나 Overset(본문이 `BODY_COLUMN_2`를 넘어서까지 길 때) 처리 방식은 정의하지 않았다.
-- `heroImage`가 실제로 어떤 방식(로컬 경로/URL/파일명)으로 제공될지는 확정하지 않았다 — 기존 `sample/article.json` 관례(파일명 문자열)를 그대로 따랐다.
+- `heroImage`는 Load Article로 불러온 JSON 파일 폴더 기준 상대 경로로 해석하기로 확정했다(2026-09-28, D017). 다만 `require("fs")`로 파일 접근을 확인하는 방식과 `Rectangle.place(nativePath)`로 배치하는 방식 모두 이 InDesign UXP 환경에서 아직 실기로 검증되지 않았다 — [HANDOFF.md](../HANDOFF.md)/[DECISIONS.md](../DECISIONS.md) D017 참고. URL 등 다른 제공 방식은 여전히 고려하지 않는다.
 - `variant` 값이 잘못되거나 누락됐을 때 코드가 어떻게 반응할지(에러/기본값/무시)는 아직 정의하지 않았다. 검증 로직 자체가 아직 없다.
 
 ## 샘플 파일

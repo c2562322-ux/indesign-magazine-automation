@@ -6,7 +6,7 @@
 
 ## 현재 프로젝트 단계
 
-**TITLE+POINT_TEXT+BODY를 하나의 doScript로 통합한 `applyOpeningPageTextContent()`(D014/D015)가 WITH_PHOTO/WITHOUT_PHOTO 정상 케이스, BODY_COLUMN_1→BODY_COLUMN_2 Text Thread 흐름, 실패 시 원자성(부분 반영 없음)까지 실기 테스트 성공(2026-09-28).** HERO_IMAGE 배치, Overset 처리, 페이지 추가는 이번에도 구현하지 않았다. 다음 작업은 이미지 배치(`heroImage` → `HERO_IMAGE`)다. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.
+**TITLE+POINT_TEXT+BODY는 실기 검증 완료 상태에서, HERO_IMAGE 이미지 배치를 같은 단일 doScript 흐름에 추가한 `applyOpeningPageContent()`(D014/D015/D017)를 구현했다 — 아직 실기 테스트 전이다.** `heroImage`는 Load Article로 불러온 JSON 파일의 폴더 기준 상대 경로로 해석하고, 기존 `HERO_IMAGE` Rectangle의 위치/크기는 건드리지 않은 채 이미지만 place한다(D016 "자동배치의 의미" 참고). Overset 처리, 페이지 추가는 이번에도 구현하지 않았다. 그 외 Template Type(목차/본문 페이지/인터뷰 레이아웃)은 아직 미착수.
 
 개선된 `Inspect Template`을 사용자가 실제 "시작 페이지" 템플릿(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에서 실행하고 로그를 전달했다(2026-09-23, 실기 테스트는 사용자가 직접 수행, Claude Code가 실행한 것은 아니다). 그 로그를 근거로 [docs/TEMPLATE_SPEC.md](docs/TEMPLATE_SPEC.md)의 "Frame 분석 워크시트"에 두 페이지의 모든 Text Frame/Rectangle을 역할과 대응시키고 Proposed Automation Name 후보(TITLE, POINT_TEXT, BODY, BODY_COLUMN_1/2, HERO_IMAGE)를 기록했다. 이 매핑은 아직 디자이너와 확정된 것이 아니라 초안이며, 여러 항목이 "확인 필요"로 남아 있다. 프레임 이름은 InDesign에서 실제로 변경하지 않았다(코드/템플릿 파일 모두 미변경). Template Type 4종(목차, 시작 페이지, 본문 페이지, 인터뷰 레이아웃)은 확정되었지만, "시작 페이지" 외 나머지 3종의 프레임 분석과 자동 조판 로직은 아직 시작하지 않았다.
 
@@ -55,6 +55,8 @@
 
 이 결과로 D015(BODY를 별도 트랜잭션 없이 기존 단일 doScript 흐름에 포함)가 목표한 "TITLE·POINT_TEXT·BODY 중 하나라도 검증 실패 시 Generate 클릭 전체에서 아무것도 쓰이지 않는다"는 실기로 확인됐다.
 
+이 성공을 바탕으로 (2026-09-28) **HERO_IMAGE 이미지 배치**를 같은 단일 doScript 흐름에 추가했다([DECISIONS.md](DECISIONS.md) D017): `applyOpeningPageTextContent()`를 `applyOpeningPageContent()`로 다시 개명하고(더 이상 텍스트만 다루지 않으므로), `heroImage`(예: `"hero.jpg"`)를 **Load Article로 불러온 JSON 파일이 있는 폴더 기준 상대 경로**로 해석하도록 새 모듈 [src/image.js](src/image.js)를 추가했다. UXP `Entry`에는 부모 폴더를 얻는 공식 API가 없어(Adobe 공식 레퍼런스 확인), `nativePath` 문자열에서 폴더 경로를 직접 계산한다. 이미지 파일 접근 확인(`require("fs")` 사용)은 InDesign 문서와 무관한 순수 파일시스템 확인이므로 doScript 밖에서 먼저 수행하고, doScript 콜백 안에서는 HERO_IMAGE Rectangle 탐색까지만 하며, 실제 배치(`rectangle.place(nativePath)`, 공개 InDesign UXP 예제 기준으로 확인된 API)는 쓰기 단계에서 TITLE/POINT_TEXT/BODY보다 **먼저** 실행한다 — 사전 확인이 놓친 경우에도 place 자체가 실패하면 텍스트 필드는 아직 쓰이지 않은 상태로 남기 위함이다. HERO_IMAGE Rectangle의 위치/크기는 전혀 건드리지 않는다(fit/resize 호출 없음). `src/data.js`의 `loadArticleFile()`은 이제 JSON 파일의 `nativePath`도 함께 반환하고, `index.js`가 이를 `currentArticleFileNativePath`로 별도 보관한다(article JSON 데이터 자체에는 포함하지 않음). Overset 처리, 페이지 추가, JSON 데이터 계약 변경은 이번에도 하지 않았다. **이 구현은 아직 실제 InDesign에서 실행해본 적이 없다** — `require("fs")`/`rectangle.place()` 모두 이 InDesign UXP 환경에서 처음 쓰는 API라 미검증이다.
+
 ## 완료된 기능
 
 - 프로젝트 기본 폴더 구조 ([manifest.json](manifest.json), [index.html](index.html), [styles.css](styles.css), [index.js](index.js), `src/`, `sample/`)
@@ -71,7 +73,8 @@
 - `Generate` 버튼으로 자동조판 쓰기(TITLE) 구현 및 실기 검증 완료 ([src/text.js](src/text.js)의 `applyTitleOnly`): `currentArticleData`의 `variant`에 맞는 "시작 페이지"를 `src/validation.js`의 Script Label 프로필로 찾아, 그 페이지의 TITLE Text Frame `contents`에 `title`만 입력. 대상 페이지/TITLE 프레임 존재·개수·타입 안전 검사를 모두 통과해야만 문서를 수정한다. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 둘 다 올바른 페이지만 수정되고 반대쪽·다른 요소는 그대로임을 확인함(2026-09-23).
 - `Generate` 버튼으로 자동조판 쓰기(POINT_TEXT) 구현 및 실기 검증 완료 — **단, 이 검증은 아래 D014 리팩터링 이전 코드(`applyTitleOnly`+`applyPointTextOnly`, 독립된 doScript 2개) 기준이다**: TITLE 성공 후 이어서 POINT_TEXT Text Frame `contents`에 `pointText`만 입력. 대상 페이지/POINT_TEXT 프레임 존재·개수·타입 안전 검사를 모두 통과해야만 문서를 수정한다. BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE는 여전히 건드리지 않음. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 둘 다 올바른 페이지의 TITLE·POINT_TEXT만 바뀌고 BODY/HERO_IMAGE/반대쪽 페이지는 그대로임을 확인함(2026-09-28).
 - `Generate`의 부분 반영 위험을 줄이기 위한 구조 변경 및 실기 검증 완료(당시 함수명 `applyTitleAndPointText`, [DECISIONS.md](DECISIONS.md) D014): 위 `applyTitleOnly`/`applyPointTextOnly` 두 함수를 제거하고, 하나의 `app.doScript` 안에서 "TITLE·POINT_TEXT 탐색 전부 → 쓰기 전부" 순서로 실행하는 함수 하나로 합쳤다. 탐색 중 하나라도 실패하면 TITLE/POINT_TEXT 어느 쪽도 쓰이지 않는다. 사용자가 실제 InDesign에서 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO 둘 다 TITLE·POINT_TEXT 정상 반영, BODY/HERO_IMAGE/반대쪽 변화 없음)와 실패 케이스(POINT_TEXT Label을 임시로 바꿨을 때 TITLE도 전혀 반영되지 않음) 모두 확인함(2026-09-28). 이 함수는 이후 BODY 추가와 함께 `applyOpeningPageTextContent`로 이름이 바뀌었다(아래 항목).
-- `Generate`에 BODY 자동 입력 추가, 별도 트랜잭션 대신 기존 단일 doScript 흐름에 포함 및 실기 검증 완료(D015): [src/text.js](src/text.js)의 `applyOpeningPageTextContent`(`applyTitleAndPointText`에서 개명)가 TITLE·POINT_TEXT 탐색에 이어 WITH_PHOTO는 BODY, WITHOUT_PHOTO는 BODY_COLUMN_1·BODY_COLUMN_2(+텍스트 스레드 연결 확인)까지 탐색을 모두 마친 뒤에만 쓴다. WITHOUT_PHOTO는 `body`를 BODY_COLUMN_1에만 쓴다. HERO_IMAGE/Overset/페이지 추가는 이번에도 구현하지 않음. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 정상 케이스, BODY_COLUMN_2까지의 텍스트 스레드 흐름, BODY 검증 실패 시 TITLE/POINT_TEXT도 반영되지 않는 실패 원자성까지 모두 확인함(2026-09-28).
+- `Generate`에 BODY 자동 입력 추가, 별도 트랜잭션 대신 기존 단일 doScript 흐름에 포함 및 실기 검증 완료(당시 함수명 `applyOpeningPageTextContent`, D015): TITLE·POINT_TEXT 탐색에 이어 WITH_PHOTO는 BODY, WITHOUT_PHOTO는 BODY_COLUMN_1·BODY_COLUMN_2(+텍스트 스레드 연결 확인)까지 탐색을 모두 마친 뒤에만 쓴다. WITHOUT_PHOTO는 `body`를 BODY_COLUMN_1에만 쓴다. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 정상 케이스, BODY_COLUMN_2까지의 텍스트 스레드 흐름, BODY 검증 실패 시 TITLE/POINT_TEXT도 반영되지 않는 실패 원자성까지 모두 확인함(2026-09-28). 이 함수는 이후 HERO_IMAGE 추가와 함께 `applyOpeningPageContent`로 다시 이름이 바뀌었다(아래 항목).
+- `Generate`에 HERO_IMAGE 이미지 배치 추가, 같은 단일 doScript 흐름에 포함(D017, 코드 작성 완료): [src/text.js](src/text.js)의 `applyOpeningPageContent`(`applyOpeningPageTextContent`에서 개명), [src/image.js](src/image.js) 신규(경로 해석/파일 접근 확인/place). WITH_PHOTO만 대상이며, `heroImage`를 JSON 파일 폴더 기준 상대 경로로 해석해 기존 `HERO_IMAGE` Rectangle에 이미지만 place한다(위치/크기 변경 없음). WITHOUT_PHOTO는 이미지 작업이 아예 없다. **아직 실기 테스트 전.**
 
 ## 실제 테스트 완료된 기능
 
@@ -87,7 +90,7 @@
 - `Generate` 버튼의 TITLE 자동 입력([src/text.js](src/text.js)의 `applyTitleOnly`): `opening-page-with-photo.json` Load 후 Generate → "사진 있는 시작 페이지"의 TITLE만 JSON의 `title`로 변경, "사진 없는 시작 페이지"의 TITLE 및 POINT_TEXT/BODY/HERO_IMAGE는 변경 없음을 확인. `opening-page-without-photo.json` Load 후 Generate → "사진 없는 시작 페이지"의 TITLE만 변경, "사진 있는 시작 페이지"는 변경 없음을 확인 (모두 2026-09-23) — `OPENING_PROFILES_BY_VARIANT` 기반 대상 페이지 판별과 doScript 안에서의 탐색+쓰기가 실제로 올바르게 동작함이 확인됨. 안전 검사 실패 케이스(Article 미로드 등)는 이번에 테스트되지 않음.
 - `Generate` 버튼의 TITLE + POINT_TEXT 자동 입력([src/text.js](src/text.js)의 `applyTitleOnly`/`applyPointTextOnly`, `findLabeledFrameForVariant` 일반화 이후): WITH_PHOTO/WITHOUT_PHOTO 두 variant 모두에서 TITLE·POINT_TEXT가 올바른 페이지에만 정상 반영되고 BODY/HERO_IMAGE/반대쪽 페이지는 변화 없음을 확인 (2026-09-28) — 이 테스트로 D013 리팩터링 이후 TITLE도 함께 재확인됨. 안전 검사 실패 케이스는 이번에도 확인되지 않음. 이 테스트는 `applyTitleOnly`/`applyPointTextOnly`(독립된 doScript 2개) 구조에서 수행됐으며, 이후 이 둘은 D014에서 `applyTitleAndPointText`(doScript 1개) 하나로 합쳐졌다 — 아래 항목이 그 새 구조의 실기 테스트 결과다.
 - `Generate` 버튼의 TITLE + POINT_TEXT 자동 입력, D014 통합 구조(당시 함수명 `applyTitleAndPointText`, 하나의 `app.doScript`로 탐색 전부 → 쓰기 전부): 정상 케이스 — WITH_PHOTO/WITHOUT_PHOTO 두 variant 모두에서 TITLE·POINT_TEXT가 올바른 페이지에만 정상 반영되고 BODY/HERO_IMAGE/반대쪽 페이지는 변화 없음을 확인. 실패 케이스 — WITH_PHOTO의 POINT_TEXT Script Label을 임시로 변경한 뒤 Generate를 실행하자 "필요한 Script Label을 가진 페이지를 찾지 못했다"는 오류로 중단됐고, TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변화 없음을 확인(테스트 후 Script Label 원복). 모두 2026-09-28 — 이 테스트로 D014가 목표한 "TITLE·POINT_TEXT 검증 실패 시 Generate 클릭 전체에서 아무것도 쓰이지 않는다"가 실기로 확인됨. 이 테스트는 BODY가 추가되기 전(TITLE+POINT_TEXT만 다루던) 코드 기준이며, 이후 BODY가 추가되면서 `applyOpeningPageTextContent`로 이름이 바뀌었다 — 아래 항목이 그 새 범위(BODY 포함)의 실기 테스트 결과다.
-- `Generate` 버튼의 TITLE + POINT_TEXT + BODY 자동 입력, D015 통합 구조([src/text.js](src/text.js)의 `applyOpeningPageTextContent`, 하나의 `app.doScript`로 TITLE·POINT_TEXT·BODY(또는 BODY_COLUMN_1/2+Text Thread 연결) 탐색 전부 → 쓰기 전부): WITH_PHOTO 정상 케이스(`opening-page-with-photo.json`) — TITLE·POINT_TEXT·BODY 모두 정상 반영, HERO_IMAGE·반대쪽 페이지는 변화 없음을 확인. WITHOUT_PHOTO 정상 케이스 + Text Thread(`opening-page-without-photo-long-test.json`, body 약 3,995자) — TITLE·POINT_TEXT 정상 반영, `body`가 BODY_COLUMN_1에 입력된 뒤 넘친 분량이 텍스트 스레드를 통해 BODY_COLUMN_2까지 실제로 이어지는 것을 육안으로 확인(BODY_COLUMN_2는 직접 쓰지 않음), 반대쪽 페이지는 변화 없음. 실패 케이스(원자성) — WITH_PHOTO의 BODY Script Label을 `BODY` → `BODY_TEMP`로 임시 변경한 뒤 Generate 실행 → Generate 중단, TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변화 없음을 확인(테스트 후 Script Label·Text Thread 상태 정상 복구). 모두 2026-09-28 — 이 테스트로 D015가 목표한 "TITLE·POINT_TEXT·BODY 중 하나라도 검증 실패 시 아무것도 쓰이지 않는다"와, `verifyBodyColumnsLinked()`가 doScript 쓰기 경로에서도 정상 동작함이 함께 확인됨. **다만 실패 케이스 당시 Status에 표시된 정확한 오류 메시지 문자열은 기록되지 않았다** — "Generate 중단, 문서 변화 없음"이라는 동작 자체만 확인된 상태다.
+- `Generate` 버튼의 TITLE + POINT_TEXT + BODY 자동 입력, D015 통합 구조(당시 함수명 `applyOpeningPageTextContent`, 하나의 `app.doScript`로 TITLE·POINT_TEXT·BODY(또는 BODY_COLUMN_1/2+Text Thread 연결) 탐색 전부 → 쓰기 전부): WITH_PHOTO 정상 케이스(`opening-page-with-photo.json`) — TITLE·POINT_TEXT·BODY 모두 정상 반영, HERO_IMAGE·반대쪽 페이지는 변화 없음을 확인. WITHOUT_PHOTO 정상 케이스 + Text Thread(`opening-page-without-photo-long-test.json`, body 약 3,995자) — TITLE·POINT_TEXT 정상 반영, `body`가 BODY_COLUMN_1에 입력된 뒤 넘친 분량이 텍스트 스레드를 통해 BODY_COLUMN_2까지 실제로 이어지는 것을 육안으로 확인(BODY_COLUMN_2는 직접 쓰지 않음), 반대쪽 페이지는 변화 없음. 실패 케이스(원자성) — WITH_PHOTO의 BODY Script Label을 `BODY` → `BODY_TEMP`로 임시 변경한 뒤 Generate 실행 → Generate 중단, TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변화 없음을 확인(테스트 후 Script Label·Text Thread 상태 정상 복구). 모두 2026-09-28 — 이 테스트로 D015가 목표한 "TITLE·POINT_TEXT·BODY 중 하나라도 검증 실패 시 아무것도 쓰이지 않는다"와, `verifyBodyColumnsLinked()`가 doScript 쓰기 경로에서도 정상 동작함이 함께 확인됨. **다만 실패 케이스 당시 Status에 표시된 정확한 오류 메시지 문자열은 기록되지 않았다** — "Generate 중단, 문서 변화 없음"이라는 동작 자체만 확인된 상태다. 이 테스트는 HERO_IMAGE가 추가되기 전(TITLE+POINT_TEXT+BODY만 다루던) 코드 기준이며, 이후 HERO_IMAGE가 추가되면서 `applyOpeningPageContent`로 다시 이름이 바뀌었다 — 이 새 범위(HERO_IMAGE 포함)는 아직 실기로 재확인되지 않았다(아래 "아직 테스트하지 못한 기능" 참고).
 
 **아직 확인되지 않은 부분**: `doc.paragraphStyles`/`doc.objectStyles`(스타일 목록) 출력이 올바른지, "시작 페이지" 외 나머지 페이지(목차/본문 페이지/인터뷰 레이아웃)에서도 동일하게 동작하는지는 아직 보고되지 않았다. 아래 "아직 테스트하지 못한 기능"에 남겨둔다.
 
@@ -98,6 +101,8 @@
 - Group으로 묶인 개체나 스타일 그룹 내부 스타일이 실제 템플릿에 얼마나 있는지, 그로 인해 워크시트 작성 시 어떤 항목이 누락되는지 (현재 버전은 이런 항목을 집계하지 않음 — 알려진 문제 참고)
 - D015 실패 케이스는 WITH_PHOTO의 BODY Script Label 변경으로만 테스트됐다 — WITHOUT_PHOTO의 BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결 자체를 끊었을 때(`verifyBodyColumnsLinked`가 직접 실패로 처리하는 경로)도 TITLE/POINT_TEXT/BODY가 전혀 반영되지 않는지는 아직 별도로 확인되지 않았다.
 - D015 실패 케이스 당시 Status에 표시된 정확한 오류 메시지 문자열은 기록되지 않았다 — Generate 중단과 문서 무변경이라는 동작은 확인됐지만 메시지 문구까지 확인된 것은 아니다.
+- `applyOpeningPageContent()`(D017)의 HERO_IMAGE 부분이 실제 InDesign에서 에러 없이 동작하는지 전부 미확인: (a) WITH_PHOTO 정상 케이스 — 이미지가 실제로 배치되고 HERO_IMAGE 프레임의 위치/크기가 그대로인지, (b) 이미지 누락/접근 불가 실패 케이스 — `heroImage` 파일이 없거나 잘못된 경로일 때 TITLE/POINT_TEXT/BODY도 전혀 반영되지 않는지, (c) WITHOUT_PHOTO가 이 변경 이후에도 기존과 동일하게 동작하는지(HERO_IMAGE 관련 코드가 전혀 실행되지 않아야 함) — 모두 아직 실기로 확인된 적이 없다.
+- `require("fs")`(D017, 이미지 파일 접근 확인에 사용)와 `Rectangle.place(nativePath)`(D017, 이미지 배치에 사용) 둘 다 이 InDesign UXP 환경에서 이번에 처음 쓰는 API라 실기로 검증된 적이 없다 — 공개된 InDesign UXP 예제를 근거로 삼았을 뿐이다.
 - `Load Article`의 오류 케이스(파일 선택 취소, JSON 문법 오류, 필드 누락/값 오류)가 화면에 올바르게 표시되는지는 아직 실기로 확인되지 않았다 — 정상 케이스만 확인됨.
 - `Generate`의 안전 검사 실패 케이스: Article을 불러오지 않은 채 `Generate`를 눌렀을 때 문서가 정말 수정되지 않고 Status에 중단 사유가 뜨는지, TITLE/POINT_TEXT가 없거나 2개 이상이거나 TextFrame이 아닌 경우 등은 이번 테스트에서 확인되지 않았다(정상 성공 케이스만 확인됨).
 - `applyTitleAndPointText()`(D014)의 성공 케이스에서 Undo(Ctrl+Z) 한 번으로 TITLE+POINT_TEXT 전체가 함께 되돌아가는지는 아직 구체적으로 확인되지 않았다 — 정상 케이스가 반영됨은 확인됐지만, 그 이후 Undo 동작 자체를 별도로 테스트하지는 않았다.
@@ -106,7 +111,7 @@
 ## 진행 중인 작업
 
 - "시작 페이지" 프레임 매핑 초안은 작성했지만, "확인 필요"로 남은 항목(pointText가 원래 handoff 문서의 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식 등)이 많아 디자이너 확인 전까지는 확정판(Frame Name/Data Field Mapping 등)으로 옮기지 않는다.
-- `Generate`의 TITLE·POINT_TEXT·BODY 자동 입력은 D014/D015 통합 구조(`applyOpeningPageTextContent`, doScript 1개)로 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO), Text Thread 흐름, 실패 원자성까지 실기 테스트 성공이 확인됐다(2026-09-28). 다음 작업으로 이미지 배치(`heroImage` → `HERO_IMAGE`)를 시작한다 — 아직 착수하지 않았다.
+- `Generate`의 TITLE·POINT_TEXT·BODY 자동 입력은 D014/D015 통합 구조로 정상 케이스(WITH_PHOTO/WITHOUT_PHOTO), Text Thread 흐름, 실패 원자성까지 실기 테스트 성공이 확인됐다(2026-09-28). 같은 날 이어서 HERO_IMAGE 이미지 배치(D017)를 같은 단일 doScript 흐름(`applyOpeningPageContent`)에 추가했다 — 코드 작성은 완료됐지만 사용자가 실제 InDesign에서 확인해주기 전까지는 "성공"으로 기록하지 않는다.
 
 ## Script Label 부여 및 검증 현황
 
@@ -123,8 +128,8 @@
 
 - `src/data.js`: JSON 파일 선택/읽기 구현 및 실기 검증 완료. `sample/opening-page-*.json` 외 다른 Template Type용 데이터 로드는 아직 없음
 - `src/template.js`: `templateType`(`OPENING_PAGE` 등)별 템플릿 처리, `variant`에 따른 분기
-- `src/text.js`: TITLE/POINT_TEXT/BODY 입력이 `applyOpeningPageTextContent()` 하나로 통합 구현되고 실기 검증 완료됨(D014/D015). BODY_COLUMN_2에 직접 쓰는 코드는 없음(텍스트 스레드로 자동 유입, D010, 실기로 흐름 확인됨)
-- `src/image.js`: HERO_IMAGE 등 이미지 프레임 배치
+- `src/text.js`: TITLE/POINT_TEXT/BODY/HERO_IMAGE 입력이 `applyOpeningPageContent()` 하나로 통합 구현됨(D014/D015/D017). TITLE/POINT_TEXT/BODY 범위는 실기 검증 완료(D014/D015), HERO_IMAGE 부분은 코드 작성 완료·실기 미검증. BODY_COLUMN_2에 직접 쓰는 코드는 없음(텍스트 스레드로 자동 유입, D010, 실기로 흐름 확인됨)
+- `src/image.js`: heroImage 경로 해석/파일 접근 확인/place 구현됨(D017, 코드 작성 완료·실기 미검증). 이미지 fit/리사이즈, 다른 이미지 프레임 처리는 없음
 - `src/validation.js`: "시작 페이지" Script Label 기준 프레임 존재/타입 검사, OPENING_PAGE 기사 데이터 검증은 구현됨(둘 다 실기 미검증인 부분이 남아 있음). 이미지 누락, Overset Text 검사, 다른 Template Type에 대한 검증은 아직 없음
 - 여러 기사 지원, 여러 템플릿 지원
 - 본문 길이에 따른 추가 페이지 처리 (Linked Text Frame)
@@ -147,6 +152,7 @@
 - `src/text.js`의 `findTitleFrameForVariant`를 `findLabeledFrameForVariant`로 일반화하고 `findPointTextFrameForVariant`를 추가했다([DECISIONS.md](DECISIONS.md) D013). 이 리팩터링 이후 TITLE도 POINT_TEXT와 함께 두 variant 모두 실기로 재확인되어(2026-09-28), 실행 경로/에러 메시지가 바뀌지 않았음이 확인됐다. (이 탐색 함수들은 이후 D014에서도 그대로 재사용됨 — 바뀐 적 없음.)
 - **`Generate`의 부분 반영 위험을 하나의 doScript로 통합해 줄임 ([DECISIONS.md](DECISIONS.md) D014, TITLE+POINT_TEXT 범위에서 실기 검증 완료)**: 기존에는 `applyTitleOnly()`와 `applyPointTextOnly()`가 각각 자기 자신의 범위 안에서는 안전했지만(각 함수는 자신의 안전 검사를 모두 통과해야만 그 함수가 담당하는 프레임에 씀), 서로 **별개의 `app.doScript` 호출(별개의 Undo 트랜잭션)**이라 `Generate` 클릭 전체로 보면 "TITLE만 반영되고 POINT_TEXT는 안 바뀐" 부분 반영 상태가 남을 수 있었다. 이를 줄이기 위해 두 함수를 하나로 합쳐, 단 하나의 `app.doScript` 콜백 안에서 TITLE·POINT_TEXT 탐색을 모두 마친 뒤에만 두 `contents` 쓰기를 실행하도록 순서를 바꿨다 — 탐색 중 하나라도 실패하면 쓰기 코드에 도달하기 전에 예외가 발생해 둘 다 안 쓰인다. 사용자가 실제 InDesign에서 POINT_TEXT Script Label을 임시로 바꾼 뒤 Generate를 실행해 TITLE도 전혀 반영되지 않음을 확인했다(2026-09-28) — 부분 반영 상태가 더 이상 재현되지 않음이 실기로 확인됨. 다만 이 코드로 없애지 못하는 이론적 위험은 여전히 남아 있다: `titleFrame.contents = ...`가 성공한 바로 다음 줄 `pointTextFrame.contents = ...`가 실패하는 경우(이번 실패 케이스 테스트는 탐색 단계에서 막혀 이 시나리오를 재현한 것은 아니다), `UndoModes.ENTIRE_SCRIPT`가 예외 발생 시 이미 실행된 대입을 자동으로 롤백하는지는 이 프로젝트에서 검증된 적이 없어 단정하지 않는다(두 탐색이 모두 성공한 뒤의 단순 대입이 실패할 가능성은 낮다고 보지만, 확인된 적은 없다).
 - **BODY 자동 입력을 같은 단일 doScript 흐름에 포함, `applyOpeningPageTextContent`로 개명 ([DECISIONS.md](DECISIONS.md) D015, 실기 검증 완료)**: 위 D014 함수(`applyTitleAndPointText`)를 `applyOpeningPageTextContent`로 이름을 바꾸고, TITLE·POINT_TEXT 탐색 뒤에 WITH_PHOTO는 BODY, WITHOUT_PHOTO는 BODY_COLUMN_1·BODY_COLUMN_2(+`verifyBodyColumnsLinked`로 텍스트 스레드 연결 확인)까지 탐색하도록 확장했다. `applyBodyOnly` 같은 별도 함수/트랜잭션은 만들지 않아, D014가 확립한 "탐색 전부 → 쓰기 전부, 하나의 doScript" 원칙이 BODY에도 그대로 적용된다. 사용자가 실제 InDesign에서 WITH_PHOTO/WITHOUT_PHOTO 정상 케이스, `body`가 텍스트 스레드로 BODY_COLUMN_2까지 흐르는 것, WITH_PHOTO의 BODY Script Label을 임시로 바꿨을 때 TITLE/POINT_TEXT도 전혀 반영되지 않는 실패 원자성까지 모두 확인했다(2026-09-28) — `verifyBodyColumnsLinked`가 재사용하는 `getLinkedFrameInfo()`를 doScript 쓰기 경로(live 객체)에서 호출하는 것도 이 정상 케이스 테스트를 통해 함께 확인됨. 다만 WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/2 Script Label 변경, 또는 텍스트 스레드 연결 자체를 끊는 경우)는 별도로 테스트되지 않았고, 실패 시 Status에 표시된 정확한 오류 메시지 문자열도 기록되지 않았다(동작만 확인).
+- **HERO_IMAGE 이미지 배치를 같은 단일 doScript 흐름에 포함, `applyOpeningPageContent`로 개명 ([DECISIONS.md](DECISIONS.md) D017, 실기 검증 전)**: `heroImage` 상대 경로를 Load Article로 불러온 JSON 파일의 `nativePath`를 기준으로 문자열 계산해 해석한다(UXP `Entry`에는 부모 폴더를 얻는 공식 API가 없어 — Adobe 공식 레퍼런스 확인 — 폴더 객체 대신 경로 문자열을 직접 다룸). 이미지 접근 확인은 `require("fs")`("file:" 스킴 경로), 배치는 `rectangle.place(nativePath)` — 둘 다 공개된 InDesign UXP 스크립트 예제로 뒷받침했을 뿐, 이 프로젝트의 정확한 InDesign/UXP 버전에서 실기로 확인된 적은 없다. 비동기 파일 확인은 `doScript` 밖에서 먼저 끝내고(콜백은 계속 동기 함수로 유지), HERO_IMAGE place는 쓰기 단계에서 텍스트 필드보다 먼저 실행해 사전 확인이 놓친 실패도 문서를 부분 반영시키지 않도록 했다. **이 구현 전체가 아직 실제 InDesign에서 실행된 적이 없다.**
 
 ## 외부 대기 사항
 
@@ -154,7 +160,11 @@
 
 ## 다음 추천 작업
 
-1. **이미지 배치(`heroImage` → `HERO_IMAGE` Rectangle) 자동 입력을 추가한다.** BODY와 마찬가지로 별도 트랜잭션 대신 `applyOpeningPageTextContent()`의 같은 단일 doScript 흐름에 포함할지, 이미지 배치의 API 특성상 별도로 분리해야 하는지 먼저 검토한다.
+1. **`applyOpeningPageContent()`(D017, HERO_IMAGE 포함)의 실기 테스트부터 먼저 진행한다.** 먼저 `sample/opening-page-with-photo.json`과 같은 폴더에 `hero.jpg`(JSON의 `heroImage` 값과 정확히 일치하는 파일명)를 준비한 뒤, UDT에서 Reload 후:
+   - WITH_PHOTO 정상 케이스: Load 후 Generate → TITLE·POINT_TEXT·BODY·HERO_IMAGE가 모두 올바른 페이지에만 반영되는지, HERO_IMAGE Rectangle의 위치/크기가 배치 전후로 그대로인지 확인.
+   - 이미지 누락 실패 케이스: `hero.jpg`를 잠시 다른 이름으로 바꾸거나 지운 뒤 Generate → TITLE/POINT_TEXT/BODY도 전혀 반영되지 않고 Status에 중단 사유만 뜨는지 확인(부분 반영이 없는지가 핵심). 확인 후 파일을 원래대로 되돌린다.
+   - WITHOUT_PHOTO가 기존과 동일하게 동작하는지: `opening-page-without-photo(-long-test).json`으로 Generate했을 때 이번 변경 이후에도 HERO_IMAGE 관련 코드가 실행되지 않고 기존과 같은 결과가 나오는지 확인.
+   - 결과를 전달하면 HANDOFF.md/WORKLOG.md/DECISIONS.md D017에 실기 검증 완료로 반영한다.
 2. (선택) WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결을 직접 끊는 경우)도 TITLE/POINT_TEXT가 전혀 반영되지 않는지 별도로 확인한다 — WITH_PHOTO 쪽만 테스트된 상태다.
 3. (선택) Article을 불러오지 않은 채 `Generate`를 눌러 문서가 전혀 바뀌지 않고 Status에 중단 사유가 뜨는지 확인한다 — 안전 검사 실패 경로는 아직 테스트되지 않았다.
 4. "시작 페이지" 워크시트에서 "확인 필요"로 남긴 항목(pointText가 원래 subtitle 개념과 같은지, HERO_IMAGE의 템플릿 레벨 Optional 여부, "대표이미지" 안내 문구 프레임 처리 방식)을 디자이너와 확인한다.
