@@ -598,3 +598,36 @@
 - `getLinkedFrameInfo()`를 doScript 쓰기 경로(live 객체)에서 호출하는 것이 읽기 전용 경로와 동일하게 동작하는지 미확인
 - 두 번째 `.contents` 대입이 첫 번째 성공 이후 실패하는 극단적 경우의 자동 롤백 여부는 여전히 미검증(D014부터 이어지는 이론적 위험)
 - HERO_IMAGE 이미지 배치는 아직 구현 전
+
+---
+
+## 2026-09-28 - BODY(D015) 실기 테스트 성공 확인: 정상 케이스 + Text Thread + 실패 원자성
+
+완료:
+- 사용자가 실기 테스트용 샘플 [sample/opening-page-without-photo-long-test.json](sample/opening-page-without-photo-long-test.json)을 요청해 추가함: 기존 `sample/opening-page-without-photo.json`을 복사해 `templateType`/`variant`/`title`/`pointText`는 동일하게 유지하고 `body`만 같은 문단을 약 22회 반복해 약 3,995자로 늘림 — BODY_COLUMN_1이 다 담지 못하고 BODY_COLUMN_2로 넘쳐 흐르는지 확인하기 위한 실기 테스트 전용 파일(제품 코드/데이터 계약 변경 없음)
+- 사용자가 실제 InDesign에서 `applyOpeningPageTextContent()`(D015)를 정상 케이스·Text Thread·실패 원자성까지 모두 테스트한 결과를 확인해 전달:
+  - WITH_PHOTO 정상 케이스(`opening-page-with-photo.json`): TITLE·POINT_TEXT·BODY 모두 정상 반영, HERO_IMAGE·WITHOUT_PHOTO 페이지는 변화 없음
+  - WITHOUT_PHOTO 정상 케이스 + Text Thread(`opening-page-without-photo-long-test.json`): TITLE·POINT_TEXT 정상 반영, `body` 전체가 BODY_COLUMN_1에 입력된 뒤 넘친 분량이 기존 텍스트 스레드를 통해 BODY_COLUMN_2까지 실제로 이어지는 것을 육안으로 확인(BODY_COLUMN_2에 별도 입력 없음), WITH_PHOTO 페이지는 변화 없음 — 이 결과로 `verifyBodyColumnsLinked()`(`getLinkedFrameInfo()`의 doScript 쓰기 경로 호출)도 함께 정상 동작함이 확인됨
+  - 실패 케이스(원자성): WITH_PHOTO의 BODY Script Label을 `BODY` → `BODY_TEMP`로 임시 변경한 뒤 Generate 실행 → Generate 중단, TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변화 없음을 확인 — BODY 검증 실패 시 TITLE/POINT_TEXT의 부분 반영도 없음이 확인됨. 다만 이때 Status에 표시된 정확한 오류 메시지 문자열은 기록되지 않아, 동작(Generate 중단·무변경)만 문서에 반영하고 메시지 문구는 단정하지 않음
+  - 테스트 후 `BODY_TEMP` → `BODY` 복구 완료, BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드도 정상 상태 유지 확인, working .indd 정상 구조로 복구 완료
+  - 이 테스트에서 다루지 않은 것: WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결을 직접 끊는 경우)는 테스트되지 않음 — 실패 유도는 WITH_PHOTO의 BODY Script Label 변경 한 가지로만 이루어짐
+- `DECISIONS.md`의 D015에 실기 검증 완료 기록 추가(정상/Text Thread/실패 케이스 결과, 다루지 않은 시나리오 명시)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계(D015 실기 검증 완료 + 다음 작업은 HERO_IMAGE로 명시), 서술형 이력에 이번 테스트 결과와 실기 테스트 전용 샘플 추가 경위 서술, "완료된 기능"의 BODY 항목을 실기 검증 완료로 갱신, "실제 테스트 완료된 기능"에 D015 통합 구조 기준 테스트 결과 항목 추가(이전 D014 테스트 항목의 "주의" 문구는 "아래 항목이 새 범위의 결과" 안내로 정리), "아직 테스트하지 못한 기능"에서 BODY 전체 미검증 항목을 제거하고 WITHOUT_PHOTO 쪽 실패 케이스 미검증 + 정확한 오류 메시지 미기록 항목으로 대체, "진행 중인 작업"·"미구현 기능" 갱신, "알려진 문제"의 D015 항목을 실기 검증 완료로 갱신(WITHOUT_PHOTO 실패 케이스 미검증 명시), "다음 추천 작업" 1순위를 HERO_IMAGE 구현으로 승격(D015 테스트 항목 제거, WITHOUT_PHOTO 실패 케이스 확인을 선택 항목으로 추가)
+- `README.md`는 이번에 별도 변경 없음(이전 커밋에서 이미 BODY/D014/D015 반영 완료 — 실기 검증 완료 여부는 HANDOFF.md가 단일 기준 문서이므로 README 자체 문구는 유지)
+- HERO_IMAGE는 이번에도 구현/수정하지 않음(요청 범위 유지)
+
+변경 파일:
+- sample/opening-page-without-photo-long-test.json (신규)
+- DECISIONS.md
+- HANDOFF.md
+- WORKLOG.md
+
+테스트:
+- Claude Code가 직접 실행한 테스트는 없음(문서화 작업만 수행). 문서에 반영한 D015 정상/Text Thread/실패 케이스 성공 결과는 사용자가 실제 InDesign에서 수행하고 전달한 테스트에 근거함.
+
+남은 문제:
+- WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 텍스트 스레드 연결을 직접 끊는 경우)는 아직 별도로 확인되지 않음
+- D015 실패 케이스 당시 Status에 표시된 정확한 오류 메시지 문자열은 기록되지 않음(동작만 확인)
+- 두 번째 `.contents` 대입이 첫 번째 성공 이후 실패하는 극단적 경우의 자동 롤백 여부는 여전히 미검증(D014부터 이어지는 이론적 위험)
+- 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
+- HERO_IMAGE 이미지 배치가 다음 작업으로 확정됨 — 아직 구현 시작 전

@@ -233,9 +233,14 @@ BODY/HERO_IMAGE를 추가할 때 이 "탐색 전부 → 쓰기 전부" 패턴을
 
 이번 결정이 범위에 포함하지 않은 것(사용자 명시 지시): HERO_IMAGE 이미지 배치, Overset 텍스트 처리, 페이지 추가/복제, JSON 데이터 계약 변경(`bodyColumn1`/`bodyColumn2` 등 새 필드 추가 없음 — 기존 단일 `body` 필드 그대로 사용).
 
-이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): `verifyBodyColumnsLinked()`가 통과한 뒤에도 `bodyColumn1Frame.contents = ...` 대입 자체가 실패하는 경우의 자동 롤백 여부는 D014와 동일하게 미검증이다. 또한 `getLinkedFrameInfo()`는 지금까지 `src/inspector.js`의 읽기 전용 경로(Inspect Template)에서만 실기로 확인됐고, `src/text.js`의 쓰기 경로(`doScript` 콜백 안, live 객체)에서 호출하는 것은 이번이 처음이라 — 같은 API이므로 동일하게 동작할 것으로 기대하지만 이 정확한 호출 경로 자체는 아직 실기로 확인된 적이 없다.
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): `verifyBodyColumnsLinked()`가 통과한 뒤에도 `bodyColumn1Frame.contents = ...` 대입 자체가 실패하는 경우의 자동 롤백 여부는 D014와 동일하게 미검증이다.
 
-이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+**실기 검증 완료(2026-09-28)**: 사용자가 실제 InDesign에서 다음을 확인했다.
+- WITH_PHOTO 정상 케이스(`sample/opening-page-with-photo.json`): TITLE·POINT_TEXT·BODY 모두 JSON 값으로 정상 반영, HERO_IMAGE·WITHOUT_PHOTO 페이지는 변화 없음.
+- WITHOUT_PHOTO 정상 케이스 + Text Thread(`sample/opening-page-without-photo-long-test.json`, body를 여러 번 반복해 약 3,995자로 늘린 실기 테스트 전용 샘플 — templateType/variant/title/pointText는 기존 샘플과 동일, 제품 코드/데이터 계약 변경 없음): TITLE·POINT_TEXT 정상 반영, `body` 전체가 BODY_COLUMN_1에 입력된 뒤 넘친 분량이 기존 텍스트 스레드를 통해 BODY_COLUMN_2까지 실제로 이어지는 것을 육안으로 확인(BODY_COLUMN_2에 별도로 값을 쓰지 않음). WITH_PHOTO 페이지는 변화 없음. 이 정상 케이스가 통과했다는 것은 `verifyBodyColumnsLinked()`(따라서 `getLinkedFrameInfo()`의 doScript 쓰기 경로 호출)도 정상 동작했다는 뜻이므로, 위에서 남겨뒀던 "이 호출 경로 자체가 미검증"이라는 위험도 이 테스트로 해소됐다.
+- 실패 케이스(원자성): WITH_PHOTO의 BODY Script Label을 `BODY` → `BODY_TEMP`로 임시 변경한 뒤 `opening-page-with-photo.json` Load 후 Generate 실행 → Generate가 중단됐고 TITLE/POINT_TEXT/BODY/HERO_IMAGE 전부 변화 없음을 확인(테스트 후 `BODY_TEMP` → `BODY`로 복구, 텍스트 스레드도 정상 상태 유지 확인). 이로써 BODY 검증 실패 시 TITLE/POINT_TEXT의 부분 반영도 없음이 확인됐다. **다만 이때 Status에 정확히 어떤 오류 메시지 문자열이 표시됐는지는 기록되지 않았다** — "Generate 중단, 문서 변화 없음"이라는 동작만 확인됐고 정확한 문구는 단정하지 않는다.
+
+이 테스트에서 다루지 않은 것(추후 필요 시 별도 확인): WITHOUT_PHOTO 쪽 실패 케이스(BODY_COLUMN_1/BODY_COLUMN_2 Script Label 변경, 또는 텍스트 스레드 연결 자체를 끊는 경우)는 테스트되지 않았다 — 실패 유도는 WITH_PHOTO의 BODY Script Label 변경 한 가지 방법으로만 이루어졌다.
 
 변경 조건:
-실기 테스트에서 (a) WITH_PHOTO 정상 케이스(BODY가 올바르게 반영됨), (b) WITHOUT_PHOTO 정상 케이스(BODY_COLUMN_1에 쓴 내용이 BODY_COLUMN_2까지 실제로 흐름), (c) 실패 케이스(BODY/BODY_COLUMN_1/BODY_COLUMN_2 관련 검사 중 하나라도 실패시켰을 때 TITLE/POINT_TEXT도 전혀 반영되지 않음)가 모두 확인되면 실기 검증 완료로 갱신한다. HERO_IMAGE를 추가할 때 이 패턴(탐색 전부 → 쓰기 전부)을 그대로 확장할지는 그 시점에 다시 검토한다.
+HERO_IMAGE를 추가할 때 이 패턴(탐색 전부 → 쓰기 전부)을 그대로 확장할지, 이미지 배치의 API 특성상 별도 구조가 필요할지는 그 구현 시점에 다시 검토한다.
