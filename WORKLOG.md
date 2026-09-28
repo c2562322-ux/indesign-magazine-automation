@@ -880,3 +880,24 @@
 - `Load Article`이 "파일 선택 중..."에서 멈추던 증상이 재현되는지, 재현된다면 실제 OS 파일 선택 대화상자가 화면에 나타나는지(숨겨져 있는지) 확인 필요
 - 위 두 가지가 해결된 뒤에야 Word DOCX end-to-end 실기 테스트(TITLE/POINT_TEXT/BODY/HERO_IMAGE 추출·Generate 반영·기존 JSON 회귀 확인)를 진행할 수 있음
 - getter/setter 접근자 프로퍼티가 InDesign UXP JS 엔진에서 실제로 문제였는지는 콘솔 로그로 확정되지 않았다 — 다른 원인의 가능성도 완전히 배제하지 않음
+
+---
+
+## 2026-09-28 - HERO_IMAGE 경로 진단 로그 추가 (기존 그래픽 교체 문제 조사, 코드 동작 변경 없음)
+
+완료:
+- 사용자가 패널 빈 화면 문제 해결 후 진행한 Word DOCX 재테스트에서 새 증상을 보고: DOCX의 `[HERO_IMAGE]` 값과 `sample/eye-clinic-hero.png` 파일이 모두 정확히 존재하는데도, InDesign의 HERO_IMAGE 프레임에는 이전 JSON 테스트에서 배치했던 `hero.png`가 계속 보임. 코드 수정 없이 원인만 분석해 달라고 요청 — DOCX 파싱 결과 heroImage 값, currentArticleData.heroImage, currentArticleFileNativePath, resolveHeroImagePath 결과, `rectangle.place(newPath)`가 이미 그래픽이 있는 프레임에서 교체/추가/유지 중 무엇을 하는지, 기존 그래픽을 명시적으로 제거해야 하는지를 확인해 달라고 함
+- `src/docxArticle.js`/`src/image.js`/`src/text.js`를 코드 추적한 결과, 데이터/경로 계산 로직(1~4번 질문) 자체는 문제를 찾지 못함 — 다만 `Article Log`/콘솔에 실제 필드 값(heroImage 문자열 등)이 출력되지 않아 육안으로 직접 확인할 방법이 없다는 한계를 확인함. Adobe 공식 InDesign DOM 레퍼런스(`Rectangle.place()`)를 조회했지만 "Places the file." 한 줄뿐이고, 이미 그래픽이 있는 프레임에 다시 `place()`를 호출했을 때의 동작은 공식 문서에 전혀 명시되어 있지 않음을 확인. 우리 코드(`placeHeroImage()`)는 기존 그래픽 확인/제거 없이 `place()`만 호출하며, 이번이 "이미 내용이 있는 프레임에 처음 다시 place()하는" 첫 실기 사례임을 짚어 가장 유력한 가설로 제시
+- 사용자가 A안(진단 우선, 기존 이미지 제거/교체 로직 추가 없이 실제 전달되는 경로부터 확정)으로 진행해 달라고 요청. 조건: 이미지 배치 동작 자체 변경 금지, `rectangle.place(...)` 로직 유지, 그래픽 remove 로직 추가 금지, Word/JSON 파싱 로직 변경 금지, Generate 안전 검증 구조 변경 금지, 프레임 위치/크기/fit 변경 금지
+- `src/text.js`의 `applyOpeningPageContent()`에 진단용 `console.log` 3줄만 추가: (1) doScript 밖에서 `articleData.heroImage`(DOCX/JSON 파싱 원본 값), (2) 같은 위치에서 `resolveHeroImagePath()` 결과(`resolvedHeroImagePath`), (3) doScript 콜백 안, `placeHeroImage()` 호출 직전에 실제로 전달되는 값(변수가 doScript 클로저를 거치며 바뀌지 않는지 재확인용). 그 외 로직은 한 줄도 바꾸지 않음(`rectangle.place()` 호출부, 안전 검증 순서, 파싱 코드, 프레임 위치/크기/fit 관련 코드 모두 그대로)
+
+변경 파일:
+- src/text.js
+
+테스트:
+- 없음. 진단용 로그만 추가했고, 실제 값이 무엇인지는 사용자의 재테스트(UDT Console 확인)로만 알 수 있다. 기존 이미지 교체 문제 자체는 여전히 미해결 상태이며 이번 커밋으로 "해결"을 주장하지 않는다.
+
+남은 문제:
+- 콘솔에 찍힌 `articleData.heroImage`/`resolvedHeroImagePath`/`placeHeroImage에 전달되는 경로` 세 값이 서로 일치하고 모두 `eye-clinic-hero.png` 기준으로 올바른지 재테스트로 확인 필요
+- 위 값들이 모두 정확하다면, "이미 그래픽이 있는 프레임에서 place()가 교체하지 않는다"는 가설이 유력해지므로 다음 단계로 B안(기존 그래픽 명시적 제거/교체) 검토 필요
+- 값 자체가 틀리다면(예: 여전히 hero.png로 나온다면) 데이터/경로 쪽 문제이므로 원인 재분석 필요

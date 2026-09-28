@@ -224,6 +224,10 @@ async function applyOpeningPageContent(articleData, articleFileNativePath) {
     let heroImageNativePath = null;
     if (articleData.variant === "WITH_PHOTO") {
         heroImageNativePath = resolveHeroImagePath(articleFileNativePath, articleData.heroImage);
+        // 진단용 로그(2026-09-28, 기존 그래픽이 있는 프레임에서 잘못된 이미지가 보이는 문제
+        // 조사용) — heroImage 배치 동작 자체는 바꾸지 않는다. UDT Console에서 확인한다.
+        console.log(`[HERO_IMAGE 진단] articleData.heroImage=${articleData.heroImage}`);
+        console.log(`[HERO_IMAGE 진단] resolvedHeroImagePath=${heroImageNativePath}`);
         await assertImageFileAccessible(heroImageNativePath);
     }
 
@@ -265,6 +269,9 @@ async function applyOpeningPageContent(articleData, articleFileNativePath) {
             //    가장 검증이 덜 된 동작이므로 텍스트 필드보다 먼저 실행한다 — place() 자체가
             //    실패하더라도 TITLE/POINT_TEXT/BODY는 아직 쓰이지 않은 상태로 남는다.
             if (heroImageFrame) {
+                // 진단용 로그(위 참고) — placeHeroImage()에 실제로 전달되는 값을 doScript
+                // 콜백 안에서도 한 번 더 확인한다(값이 바뀌지 않고 그대로인지 검증).
+                console.log(`[HERO_IMAGE 진단] placeHeroImage에 전달되는 경로=${heroImageNativePath}`);
                 placeHeroImage(heroImageFrame, heroImageNativePath);
                 // 이미지 place가 성공했을 때만(위 줄에서 예외 없이 통과했을 때만) 안내
                 // 문구를 비운다 — place가 실패하면 이 줄에 도달하지 않는다.
