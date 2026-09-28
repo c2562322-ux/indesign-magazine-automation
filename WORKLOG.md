@@ -565,3 +565,36 @@
 - `applyTitleAndPointText()` 성공 후 Undo(Ctrl+Z) 한 번으로 TITLE+POINT_TEXT 전체가 함께 되돌아가는지는 아직 별도로 확인되지 않음
 - 안전 검사 실패 케이스(Article 미로드 등)는 여전히 실기로 확인되지 않음
 - BODY(WITH_PHOTO)/BODY_COLUMN_1(WITHOUT_PHOTO) 자동 입력이 다음 작업으로 확정됨 — 아직 구현 시작 전
+
+---
+
+## 2026-09-28 - BODY 자동 입력을 기존 단일 doScript 흐름에 추가 (D015)
+
+완료:
+- 사용자가 BODY 자동 입력을 요청하면서, `applyBodyOnly` 같은 별도 트랜잭션을 만들지 말고 D014의 TITLE+POINT_TEXT 단일 검증/쓰기 흐름에 BODY까지 포함시켜 달라고 명시적으로 지정함(목표: (1) 실제 수정 전 TITLE/POINT_TEXT/BODY 검증을 모두 끝낼 것, (2) 검증 중 하나라도 실패하면 셋 다 수정하지 않을 것, (3) 모두 통과한 뒤에만 같은 doScript 안에서 쓸 것). WITH_PHOTO는 BODY Script Label 존재/타입 확인 후 `contents`에 입력, WITHOUT_PHOTO는 BODY_COLUMN_1/BODY_COLUMN_2가 각각 정확히 1개·TextFrame인지 확인하고 텍스트 스레드 연결까지 쓰기 전에 확인한 뒤 `body` 전체를 BODY_COLUMN_1에만 한 번 입력(BODY_COLUMN_2는 직접 쓰지 않고 InDesign 텍스트 스레드로 자동 유입되게 함). HERO_IMAGE, Overset 처리, 페이지 추가, JSON 계약 변경(`bodyColumn1`/`bodyColumn2` 필드 추가 등)은 이번 범위에서 제외
+- `src/inspector.js`: `getLinkedFrameInfo`를 `module.exports`에 추가(로직 변경 없음) — Inspect Template에서 이미 실기로 확인된 `nextTextFrame`/`previousTextFrame` 읽기 로직을 텍스트 스레드 연결 확인에 재사용하기 위함
+- `src/text.js`: `findBodyFrameForVariant`/`findBodyColumn1FrameForVariant`/`findBodyColumn2FrameForVariant`(기존 `findLabeledFrameForVariant` 재사용, D013과 같은 패턴) 추가. `verifyBodyColumnsLinked(bodyColumn1Frame, bodyColumn2Frame)` 신규 구현: `getLinkedFrameInfo`로 정방향(`nextTextFrame`)·역방향(`previousTextFrame`)이 서로를 가리키는지 label 기준으로 확인, 하나라도 안 되면 Error. `applyTitleAndPointText()`를 `applyOpeningPageTextContent()`로 이름을 바꾸고, 기존 "탐색 전부 → 쓰기 전부" 단일 `app.doScript` 콜백 안에 BODY 탐색/검증과 쓰기를 그대로 포함시킴 — TITLE·POINT_TEXT 탐색 뒤 variant에 따라 분기(WITH_PHOTO는 BODY 탐색, WITHOUT_PHOTO는 BODY_COLUMN_1/2 탐색+연결 확인)하고, 이 모든 탐색/검증이 성공했을 때만 TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1) 세 곳에 순서대로 씀. articleData의 `body` 존재 검사(doScript 밖, 순수 데이터 검사)도 추가
+- `index.js`: `applyTitleAndPointText` → `applyOpeningPageTextContent` 이름 변경 반영, Status 메시지에 BODY 포함(전체 내용 대신 글자 수만 표시)
+- `DECISIONS.md`에 D015 기록: BODY를 별도 트랜잭션으로 분리하지 않은 이유, 탐색 함수 재사용 근거, 텍스트 스레드 연결 확인을 쓰기 전에 넣은 이유, 함수 개명 이유, 이번 결정이 없애지 못하는 위험(두 번째 `.contents` 대입 실패 시 자동 롤백 여부는 여전히 미검증, `getLinkedFrameInfo`를 쓰기 경로에서 호출하는 것 자체가 이번이 처음), 범위에서 명시적으로 제외한 것(HERO_IMAGE/Overset/페이지 추가/JSON 계약 변경)
+- `HANDOFF.md` 갱신: 현재 프로젝트 단계, 서술형 이력에 BODY 추가 경위 서술, "완료된 기능"에 BODY 항목 추가(미검증 명시) 및 기존 D014 항목에 함수 개명 각주 추가, "실제 테스트 완료된 기능"의 D014 테스트 항목에 "BODY 추가 전 코드 기준" 주의 문구 추가, "아직 테스트하지 못한 기능"에 BODY 정상/실패 케이스 및 `getLinkedFrameInfo` 쓰기 경로 최초 호출 항목 추가, "진행 중인 작업"·"미구현 기능"·"알려진 문제" 갱신(D015 신규 항목), "다음 추천 작업" 1순위를 D015 실기 테스트(정상 케이스 2개 + 실패 케이스, 텍스트 스레드 확인 포함)로 재편
+- `README.md` 갱신: 기사 데이터 규격 설명과 UDT 실행 절차(7번)에 BODY/`applyOpeningPageTextContent`/D015를 반영
+- HERO_IMAGE는 이번에도 구현/수정하지 않음(요청 범위 유지)
+
+변경 파일:
+- src/inspector.js
+- src/text.js
+- index.js
+- DECISIONS.md
+- HANDOFF.md
+- README.md
+- WORKLOG.md
+
+테스트:
+- 없음. `applyOpeningPageTextContent()`의 BODY 부분(`findBodyFrameForVariant` 등, `verifyBodyColumnsLinked`)은 아직 실제 InDesign에서 한 번도 실행해본 적이 없다. **이번 작업은 실기 테스트 전이므로 문서에 "성공"으로 기록하지 않았다.** TITLE+POINT_TEXT 범위는 이전 엔트리(D014)에서 이미 실기 검증된 상태이며 이번 변경으로 그 실행 경로 자체는 바뀌지 않았다고 판단하지만, 함수 개명과 새 분기 추가 이후 재확인된 적은 없다.
+
+남은 문제:
+- WITH_PHOTO/WITHOUT_PHOTO 각각의 BODY 정상 케이스(특히 `body`가 BODY_COLUMN_1 → BODY_COLUMN_2로 실제로 흐르는지)를 실제 InDesign에서 확인 필요
+- BODY/BODY_COLUMN_1/BODY_COLUMN_2 관련 검사 실패 시 TITLE/POINT_TEXT도 전혀 반영되지 않는지(부분 반영 재현 여부) 확인 필요
+- `getLinkedFrameInfo()`를 doScript 쓰기 경로(live 객체)에서 호출하는 것이 읽기 전용 경로와 동일하게 동작하는지 미확인
+- 두 번째 `.contents` 대입이 첫 번째 성공 이후 실패하는 극단적 경우의 자동 롤백 여부는 여전히 미검증(D014부터 이어지는 이론적 위험)
+- HERO_IMAGE 이미지 배치는 아직 구현 전

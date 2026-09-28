@@ -217,3 +217,25 @@ BODY/BODY_COLUMN_1/BODY_COLUMN_2/HERO_IMAGE를 추가할 때도 이 패턴(공�
 
 변경 조건:
 BODY/HERO_IMAGE를 추가할 때 이 "탐색 전부 → 쓰기 전부" 패턴을 그대로 확장할지, 아니면 다른 구조가 필요할지는 그 구현 시점에 다시 검토한다.
+
+---
+
+## D015 - BODY 자동 입력을 별도 트랜잭션 대신 기존 단일 doScript 흐름에 포함, Text Thread 연결도 쓰기 전 확인
+
+결정:
+`src/text.js`의 `applyTitleAndPointText()`를 `applyOpeningPageTextContent()`로 이름을 바꾸고(더 이상 TITLE+POINT_TEXT만 쓰지 않으므로), D014에서 만든 "탐색 전부 → 쓰기 전부" 단일 `app.doScript` 콜백 안에 BODY를 포함시켰다. `applyBodyOnly()` 같은 별도 함수/별도 트랜잭션은 만들지 않았다. WITH_PHOTO는 `findBodyFrameForVariant`로 BODY TextFrame 하나를 찾고, WITHOUT_PHOTO는 `findBodyColumn1FrameForVariant`/`findBodyColumn2FrameForVariant`로 두 TextFrame을 각각 찾은 뒤 `verifyBodyColumnsLinked()`로 BODY_COLUMN_1 → BODY_COLUMN_2 텍스트 스레드 연결까지 확인한다. 이 모든 탐색/검증이 성공했을 때만(TITLE·POINT_TEXT 포함) 쓰기 단계로 넘어가며, WITHOUT_PHOTO는 `body`를 `BODY_COLUMN_1`에만 쓴다(`BODY_COLUMN_2`는 쓰지 않음, D010 그대로). `verifyBodyColumnsLinked()`는 `src/inspector.js`의 `getLinkedFrameInfo()`(이미 실기로 확인된 `nextTextFrame`/`previousTextFrame` 읽기 로직)를 그대로 재사용하며, 이를 위해 `getLinkedFrameInfo`를 `src/inspector.js`의 `module.exports`에 추가했다(로직 자체는 변경하지 않음).
+
+이유:
+- D014가 확립한 "탐색 전부 → 쓰기 전부, 하나의 doScript" 패턴을 BODY까지 그대로 확장하면, TITLE/POINT_TEXT/BODY 중 어느 것의 검증이 실패해도 셋 다 안 쓰인다는 원칙이 유지된다. BODY를 별도 트랜잭션으로 분리했다면 D013→D014로 이어진 부분 반영 문제가 BODY에서 다시 재현될 수 있었다.
+- `findLabeledFrameForVariant`/탐색 함수들은 이미 순수 탐색(찾아서 반환, 실패 시 throw)이라 BODY/BODY_COLUMN_1/BODY_COLUMN_2에도 그대로 재사용 가능했다 — `findBodyFrameForVariant` 등 3개의 얇은 래퍼만 추가하면 됐다(D013과 같은 패턴).
+- WITHOUT_PHOTO는 `body`를 `BODY_COLUMN_1`에만 쓰고 InDesign 텍스트 스레드가 `BODY_COLUMN_2`로 자동으로 흘려보내는 것에 의존한다(D010). 이 의존이 실제로 성립하는지(두 프레임이 여전히 연결돼 있는지)를 쓰기 전에 확인하지 않으면, 텍스트 스레드가 끊어진 템플릿에서 `body` 전체가 `BODY_COLUMN_1`에만 들어가고 `BODY_COLUMN_2`는 비거나 이전 상태로 남는 조용한 오류가 날 수 있다. `src/inspector.js`의 `getLinkedFrameInfo()`가 이미 이 프로젝트에서 실기로 확인된 `nextTextFrame`/`previousTextFrame` 읽기 로직을 갖고 있어, 새로 만들지 않고 export만 추가해 재사용했다.
+- `applyTitleAndPointText` → `applyOpeningPageTextContent`로 이름을 바꾼 이유: 함수가 더 이상 TITLE+POINT_TEXT만 쓰지 않는데 이전 이름을 유지하면 코드가 실제로 하는 일과 이름이 어긋난다. `applyOpeningPageTextContent`는 "OPENING_PAGE의 텍스트 계열 필드(HERO_IMAGE 같은 이미지 배치는 제외)"를 의미하도록 골랐다.
+
+이번 결정이 범위에 포함하지 않은 것(사용자 명시 지시): HERO_IMAGE 이미지 배치, Overset 텍스트 처리, 페이지 추가/복제, JSON 데이터 계약 변경(`bodyColumn1`/`bodyColumn2` 등 새 필드 추가 없음 — 기존 단일 `body` 필드 그대로 사용).
+
+이번 결정이 없애지 못하는 위험(미검증, 추측하지 않음): `verifyBodyColumnsLinked()`가 통과한 뒤에도 `bodyColumn1Frame.contents = ...` 대입 자체가 실패하는 경우의 자동 롤백 여부는 D014와 동일하게 미검증이다. 또한 `getLinkedFrameInfo()`는 지금까지 `src/inspector.js`의 읽기 전용 경로(Inspect Template)에서만 실기로 확인됐고, `src/text.js`의 쓰기 경로(`doScript` 콜백 안, live 객체)에서 호출하는 것은 이번이 처음이라 — 같은 API이므로 동일하게 동작할 것으로 기대하지만 이 정확한 호출 경로 자체는 아직 실기로 확인된 적이 없다.
+
+이 결정은 아직 실제 InDesign에서 실행해 검증되지 않았다 — 코드만 작성된 상태다.
+
+변경 조건:
+실기 테스트에서 (a) WITH_PHOTO 정상 케이스(BODY가 올바르게 반영됨), (b) WITHOUT_PHOTO 정상 케이스(BODY_COLUMN_1에 쓴 내용이 BODY_COLUMN_2까지 실제로 흐름), (c) 실패 케이스(BODY/BODY_COLUMN_1/BODY_COLUMN_2 관련 검사 중 하나라도 실패시켰을 때 TITLE/POINT_TEXT도 전혀 반영되지 않음)가 모두 확인되면 실기 검증 완료로 갱신한다. HERO_IMAGE를 추가할 때 이 패턴(탐색 전부 → 쓰기 전부)을 그대로 확장할지는 그 시점에 다시 검토한다.

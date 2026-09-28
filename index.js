@@ -8,7 +8,7 @@ const {
     formatArticleValidationReport,
 } = require("./src/validation.js");
 const { loadArticleFile } = require("./src/data.js");
-const { applyTitleAndPointText } = require("./src/text.js");
+const { applyOpeningPageTextContent } = require("./src/text.js");
 
 const statusText = document.getElementById("statusText");
 const inspectLog = document.getElementById("inspectLog");
@@ -85,15 +85,15 @@ document.getElementById("btnGenerate").addEventListener("click", async () => {
     }
 
     try {
-        // TITLE/POINT_TEXT 대상 페이지·프레임 탐색(검증)을 모두 마친 뒤에만 실제 쓰기를
-        // 시작한다(applyTitleAndPointText 내부에서 하나의 doScript로 처리, D014). 탐색 중
-        // 하나라도 실패하면 TITLE/POINT_TEXT 어느 쪽도 쓰이지 않는다.
-        setStatus("Generate: TITLE + POINT_TEXT 검증 및 입력 중...");
-        await applyTitleAndPointText(currentArticleData);
+        // TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1) 대상 페이지·프레임 탐색(검증)을 모두
+        // 마친 뒤에만 실제 쓰기를 시작한다(applyOpeningPageTextContent 내부에서 하나의
+        // doScript로 처리, D014/D015). 탐색 중 하나라도 실패하면 셋 중 어느 것도 쓰이지 않는다.
+        setStatus("Generate: TITLE + POINT_TEXT + BODY 검증 및 입력 중...");
+        await applyOpeningPageTextContent(currentArticleData);
 
         setStatus(
-            `Generate 완료: TITLE="${currentArticleData.title}", POINT_TEXT="${currentArticleData.pointText}" 입력됨 ` +
-                `(variant=${currentArticleData.variant})`
+            `Generate 완료: TITLE="${currentArticleData.title}", POINT_TEXT="${currentArticleData.pointText}", ` +
+                `BODY 입력됨(${currentArticleData.body.length}자) (variant=${currentArticleData.variant})`
         );
     } catch (err) {
         console.error(err);

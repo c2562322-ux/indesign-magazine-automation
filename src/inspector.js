@@ -242,4 +242,5 @@ function formatReport(report) {
 module.exports = {
     inspectDocument,
     formatReport,
+    getLinkedFrameInfo,
 };
