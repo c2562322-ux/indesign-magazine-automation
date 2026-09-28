@@ -1008,3 +1008,31 @@
 남은 문제(이전부터 이어짐, 이번 작업과 무관):
 - HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
 - 플러그인 빈 화면 수정이 실제로 문제를 해결했는지도 여전히 재테스트 확인 전
+
+---
+
+## 2026-09-28 - D023 실기 검증 확인, 목차샘플1 구조/Script Label 계약 확정, Inspection Log 복사 편의 개선, 인수인계 문서 정리
+
+완료:
+- 사용자가 목차샘플1 페이지 안의 객체를 직접 선택한 뒤 `Inspect Current Page`를 재실기 테스트해 `Current Page source: selection.parentPage`, `Current Page: index=1, name=2`, `Page Item 수: 22`가 전체 문서 Inspect 값과 정확히 일치함을 확인함 — D023(selection.parentPage 우선 판별)이 실기 검증 완료로 전환됨
+- 사용자가 D021~D023 재귀 Inspector(`Inspect Current Page`, "중첩 Page Item 트리")를 이용해 목차샘플1(index=1, name=2, Page Item 수=22)의 실제 구조를 InDesign에서 직접 전수 분석함: 22개 최상위 pageItem 중 20개가 목차 슬롯, 나머지 2개는 자동화 대상이 아닌 상단 고정 디자인 요소("매거진 / 목차샘플1")임을 확정
+- 사용자가 목차 슬롯 20개 각각에 `TOC_ITEM_01`~`TOC_ITEM_20`(Group) Script Label을, 그 내부에 `TOC_TEXT`(제목+부제 통합 TextFrame)/`TOC_PAGE`(페이지 번호 TextFrame) Script Label을 InDesign에서 직접 부여함(점선/구분선은 무라벨 유지). `Inspect Current Page`로 20개 슬롯 전부(`childCount=3`, `TOC_TEXT`/`TOC_PAGE` 존재, 점선 무라벨)를 확인함
+- 위 확정된 구조를 근거로 [목차 슬롯 식별](Script Label 기반, index/좌표 기반 금지), [목차 Label 구조](Group=TOC_ITEM_NN, 내부 TOC_TEXT/TOC_PAGE, 점선 무라벨, 상단 고정요소 비대상), [가변 슬롯 정책](N개 데이터면 TOC_ITEM_01~0N만 검증, N>20이면 전체 중단, 사용 슬롯 Label 누락 시 부분 입력 없이 전체 중단, 미사용 슬롯은 그대로 유지)을 `DECISIONS.md`에 D024(구조/Label 확정, 실기 검증 완료)/D025(가변 슬롯 정책, 설계 확정·구현 예정)로 기록함
+- Word(.docx) 원고 입력 MVP(D019)의 end-to-end 실기 테스트가 완료되어 사용자가 "구현 및 검증 완료"로 확인함 — 이는 D019 정정(getter/setter 접근자 → 일반 메서드)의 블랭크 패널 수정도 간접적으로 검증됐음을 시사함(패널이 정상 렌더링되지 않았다면 테스트 자체가 불가능했을 것). HERO_IMAGE-교체-안-되는-문제는 이번 확인에서 별도 언급이 없어 여전히 미해결로 유지함
+- Inspection Log 사용성 개선을 구현 및 실기 검증함 — 이전 여러 턴에 걸쳐 만들어졌으나 계속 "commit하지 말라"는 지시로 uncommitted 상태였던 변경사항을 이번에 정리해 기록: (1) `Inspection Log`를 `<pre>`에서 읽기 전용 `<textarea readonly>`로 변경해 Ctrl+A/Ctrl+C로 전체 로그 선택/복사 가능하게 함, (2) `Copy Log` 버튼과 UXP 공식 클립보드 API(`navigator.clipboard.setContent()`, `manifest.json`에 `"clipboard": "readAndWrite"` 권한 추가) + `document.execCommand("copy")` 대체 경로 구현, (3) UXP 웹뷰의 기본 textarea 스타일이 텍스트를 거의 안 보이게 만들던 가독성 문제를 `textarea.log-area` 전용 CSS(배경/글자색을 기존 `.log-area`와 같은 Spectrum 변수 패턴으로 명시)로 수정. 사용자가 실제 InDesign에서 Ctrl+A/Ctrl+C/Ctrl+V로 Inspection Log 전체가 정상 복사됨을 확인함 — **다만 `Copy Log` 버튼 자체의 프로그램적 클립보드 성공 여부는 실기로 확정되지 않았다.** `articleLog`(여전히 `<pre>`)와 기존 Inspector 로직(D021~D023), Opening Page/목차 관련 코드는 전혀 건드리지 않음
+- `git status`/`git diff`/`git log --oneline -10`으로 현재 상태를 직접 확인한 뒤(추측 없이), HANDOFF.md(핵심 요약 TL;DR 신설, 현재 프로젝트 단계 서술 마무리, 완료된 기능/실제 테스트 완료된 기능/아직 테스트하지 못한 기능/진행 중인 작업/Script Label 부여 및 검증 현황/미구현 기능/알려진 문제/다음 추천 작업 전면 갱신)와 DECISIONS.md(D023 정정 추가, D024/D025 신설)를 현재 실제 상태에 맞게 정리함. "목차 자동화 완료"/"TABLE_OF_CONTENTS Generate 완료" 등 과장된 표현은 쓰지 않고, "목차샘플1의 InDesign 구조 분석 및 Script Label 계약/부여/검증 완료"로 정확히 기술함
+
+변경 파일:
+- index.html, index.js, manifest.json, styles.css (Inspection Log 복사 편의 개선 — 이전 턴들의 uncommitted 작업을 이번에 정리)
+- HANDOFF.md, DECISIONS.md, WORKLOG.md
+
+테스트:
+- Inspection Log textarea 수동 복사(Ctrl+A/Ctrl+C/Ctrl+V)는 사용자가 실제 InDesign에서 검증 완료
+- `Copy Log` 버튼의 `navigator.clipboard.setContent()`/`execCommand("copy")` 성공 여부는 미확인
+- D023(selection.parentPage), D024(목차 Script Label 계약)는 사용자가 실제 InDesign에서 검증 완료
+- Word DOCX MVP(D019)는 사용자가 종합 확인("구현 및 검증 완료") — 세부 실패 케이스별 개별 결과는 미기록
+
+남은 문제:
+- HERO_IMAGE가 이미 그래픽이 있는 프레임에서 교체되지 않는 문제는 여전히 미해결·원인 미확정
+- `TABLE_OF_CONTENTS` 데이터 계약/가변 슬롯 validation/JSON 입력/Generate 함수/Word 반복 TOC 파서 — 전부 미구현(설계만 확정, D024/D025)
+- `Copy Log` 버튼의 프로그램적 클립보드 복사 성공 여부 미확인

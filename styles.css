@@ -29,3 +29,15 @@ body {
     border-radius: 4px;
     background: var(--spectrum-global-color-gray-75, #f5f5f5);
 }
+
+/* Inspection Log가 <pre>에서 읽기 전용 <textarea>로 바뀐 뒤(Ctrl+A/Ctrl+C 지원을 위해),
+   이 UXP 패널의 기본 textarea 스타일이 .log-area의 배경/글자색보다 우선 적용되어 텍스트가
+   거의 보이지 않는 문제가 실기로 확인됐다. articleLog는 여전히 <pre>라 영향받지 않도록
+   태그를 포함한 선택자(textarea.log-area)로 범위를 textarea(현재는 inspectLog) 하나로
+   한정한다. 배경은 기존 .log-area와 같은 변수를 재사용하고, 글자색은 같은 패턴으로 새
+   Spectrum 전역 색상 변수를 추가한다(호스트가 지원하지 않으면 폴백 hex 사용). 호스트가
+   주입하는 기본 textarea 스타일을 확실히 덮어쓰기 위해 이 두 속성에 한해 !important를 둔다. */
+textarea.log-area {
+    background-color: var(--spectrum-global-color-gray-75, #f5f5f5) !important;
+    color: var(--spectrum-global-color-gray-800, #2b2b2b) !important;
+}

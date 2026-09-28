@@ -456,3 +456,56 @@ Opening Page WITH_PHOTO 템플릿 1종을 대상으로, Word(.docx) 원고 파�
 읽기 전용 보장: `app.activeDocument.selection`/`app.selection`/`firstItem.parentPage`/`doc.pages.item(i)` 전부 값 읽기이며 어떤 속성에도 대입하지 않는다. `app.doScript` 미사용. Script Label 쓰기, 텍스트/위치/크기 변경, 목차 Generate, 기존 Opening Page 코드 수정 — 전부 이번 범위 밖(사용자 명시 지시).
 
 이번 결정이 없애지 못하는 위험(미검증, 다음 실기 테스트로만 확인 가능): `app.activeDocument.selection`(또는 `app.selection`)이 이 UXP 환경에서 실제로 선택된 객체를 반영하는지, `firstItem.parentPage`가 이 환경에서 지원되는지, 선택된 객체가 여러 개일 때 첫 번째 객체만 보는 것으로 충분한지(이번 범위에서는 다루지 않음), `app.activeWindow.activePage`가 여전히 index=0을 반환하는지(2순위 fallback 경로 자체의 재확인).
+
+**정정(2026-09-28, 실기 검증 완료)**: 사용자가 목차샘플1 페이지 안의 객체를 직접 선택한 뒤 `Inspect Current Page`를 실기 테스트해 `Current Page source: selection.parentPage`, `Current Page: index=1, name=2`, `Page Item 수: 22`가 정확히 나옴을 확인했다 — 이는 전체 문서 Inspect로 이미 확인된 실제 목차 페이지 값과 정확히 일치한다. 이로써 위 "없애지 못하는 위험" 중 `app.activeDocument.selection`/`firstItem.parentPage`가 이 UXP 환경에서 실제로 동작한다는 점은 해소됐다. D023은 더 이상 "실기 검증 전" 상태가 아니다.
+
+## D024: 목차샘플1 실제 구조 확정 + Script Label 계약 확정 (읽기 전용 분석, 실기 검증 완료)
+
+날짜: 2026-09-28
+
+배경: D021~D023으로 갖춰진 재귀 Inspector(`Inspect Current Page`, "중첩 Page Item 트리")를 이용해, 사용자가 목차샘플1 페이지(`index=1`, `name=2`)를 실제 InDesign에서 직접 분석했다.
+
+**확정된 실제 구조**:
+- `Page Item 수` = 22 (전체 최상위 pageItem 개수)
+- 그중 20개가 목차 슬롯(반복 항목), 나머지 2개는 상단 고정 디자인 요소("매거진 / 목차샘플1" 영역)
+- 상단 고정 요소 2개는 **이번 자동화 대상이 아니며, Script Label을 붙이지 않는다** — 매 호마다 바뀌지 않는 고정 디자인이라는 전제(사용자 확인).
+
+**확정된 Script Label 계약 (목차 슬롯 20개 전부에 사용자가 직접 부여, `Inspect Current Page`로 전수 확인 완료)**:
+
+```
+TOC_ITEM_01 (Group, childCount=3)
+ ├─ TOC_TEXT   (TextFrame — 제목 + 부제가 같은 TextFrame 안에 함께 들어 있음, 별도 SUBTITLE 프레임 없음)
+ ├─ (label 없음: 점선/구분선 — 데이터 필드 아님, 자동화 대상 아님)
+ └─ TOC_PAGE   (TextFrame — 페이지 번호)
+
+... (TOC_ITEM_02 ~ TOC_ITEM_20까지 동일 구조 반복)
+```
+
+- Group 자체에 `TOC_ITEM_01`~`TOC_ITEM_20` Script Label 부여(슬롯 단위 식별, [목차 슬롯 식별] 절 참고).
+- Group 내부에는 `TOC_TEXT`(TextFrame, 제목+부제 통합 — 원래 설계 초안에서는 TITLE/SUBTITLE 분리를 검토했지만 실제 템플릿은 하나의 TextFrame에 둘 다 들어있는 구조로 확정됨)와 `TOC_PAGE`(TextFrame, 페이지 번호)만 Script Label을 부여한다.
+- 점선/장식 객체는 Script Label을 붙이지 않는다 — 데이터 입력 대상이 아니므로 코드가 찾을 필요가 없다.
+- 사용자가 `TOC_ITEM_01`~`TOC_ITEM_20` 전부와 그 내부 `TOC_TEXT`/`TOC_PAGE`를 InDesign에서 직접 부여한 뒤, `Inspect Current Page`로 20개 슬롯 전부 확인했다: 각 `TOC_ITEM_NN`의 `childCount=3`(Group/TOC_TEXT/점선/TOC_PAGE 중 Script Label이 있는 2개 + 무라벨 점선 1개), `TOC_TEXT`/`TOC_PAGE` 존재, 점선은 무라벨로 확인됨.
+
+**[목차 슬롯 식별] 결정**: 화면 좌표나 `page.pageItems`의 등록 순서(index)로 목차 슬롯을 찾지 않는다 — 레이아웃 편집으로 순서가 바뀔 위험이 있기 때문이다(D008 원칙의 연장). `TOC_ITEM_01`~`TOC_ITEM_20` Script Label만으로 슬롯을 명시적으로 식별한다.
+
+범위: 이번 결정은 **읽기 전용 분석과 Script Label 부여/검증까지만**이다. `TABLE_OF_CONTENTS` Generate 코드, Word 반복 TOC 파서, 가변 슬롯 검증 로직은 이번에 구현하지 않았다(설계는 D025 참고). 기존 Opening Page 코드(`src/text.js`/`src/image.js`/`src/validation.js`)와 Word/JSON 파서는 이번에도 전혀 수정하지 않았다.
+
+## D025: 목차(TABLE_OF_CONTENTS) 가변 슬롯 검증 정책 (설계 확정, 구현 예정 — 아직 코드 없음)
+
+날짜: 2026-09-28
+
+**이 결정은 정책 설계이며, 아직 어떤 코드로도 구현되지 않았다.** `TABLE_OF_CONTENTS` Generate를 실제로 만들 때 이 정책을 그대로 따른다.
+
+배경: 목차 항목 수는 원고마다 달라진다. D024에서 확정한 템플릿은 슬롯을 최대 20개(`TOC_ITEM_01`~`TOC_ITEM_20`) 제공하지만, 실제 원고 데이터는 그보다 적은 경우가 대부분일 것으로 예상된다. `OPENING_PAGE`의 `OPENING_PROFILES_BY_VARIANT`처럼 "정의된 Label이 항상 전부 있어야 통과"하는 고정 검증 방식을 그대로 쓰면, 데이터가 8개뿐인데 `TOC_ITEM_09`~`TOC_ITEM_20`에 대응하는 데이터가 없다는 이유로 Generate 전체가 실패하게 된다 — 이는 목차의 실제 사용 패턴과 맞지 않는다.
+
+**확정된 정책**:
+1. Article Data의 `items.length`로 실제 데이터 개수 N을 구한다.
+2. 템플릿이 제공하는 최대 슬롯 수(현재 20, `TOC_ITEM_01`~`TOC_ITEM_20`)를 초과하면(N > 20) **쓰기 시작 전에 Generate 전체를 중단**한다.
+3. `TOC_ITEM_01`~`TOC_ITEM_0N`(실제로 쓰일 슬롯만)에 대해서만 `TOC_TEXT`/`TOC_PAGE` Script Label이 모두 존재하고 타입이 맞는지 검증한다. `TOC_ITEM_0(N+1)`~`TOC_ITEM_20`은 이 검증에서 완전히 제외한다 — 존재 여부/Label 누락 여부를 따지지 않는다.
+4. 3번 검증에서 사용되는 슬롯(1~N) 중 하나라도 필요한 객체(`TOC_TEXT` 또는 `TOC_PAGE`)가 없으면, 기존 `applyOpeningPageContent()`가 지켜온 "탐색 전부 → 쓰기 전부, 하나라도 실패하면 아무것도 안 씀" 원칙(D014)을 그대로 따라 **부분 입력 없이 Generate 전체를 중단**한다.
+5. N이 20보다 작은 것(예: N=8)은 정상 케이스다 — `TOC_ITEM_09`~`TOC_ITEM_20`가 사용되지 않는다는 이유로 검증 오류를 내지 않는다.
+6. 사용되지 않는 나머지 슬롯(`TOC_ITEM_0(N+1)`~`TOC_ITEM_20`)은 **손대지 않는다** — 텍스트도, 프레임도, Script Label도 그대로 둔다(디자이너가 넣어둔 placeholder 문구가 남아 있는 채로 유지). 이 MVP에서는 "안 쓰는 슬롯의 placeholder를 비우는" 것도 하지 않기로 잠정 결정했다 — 실제 목차 구조(특히 빈 텍스트 프레임이 점선/장식과 함께 시각적으로 어떻게 보이는지)를 실기로 확인하기 전까지는 "그대로 유지"가 가장 안전한 기본값이라고 판단했기 때문이다. 필요하면 Generate 구현 이후 별도로 재검토한다.
+
+**데이터 배열 순서 ↔ Script Label 슬롯 매핑**: `items[0]`~`items[N-1]`을 정렬된 슬롯 목록(Label 문자열의 번호 `01`~`0N` 기준으로 정렬 — 화면상 위치나 등록 순서가 아니다)에 순서대로 대응시킨다. InDesign 객체 자체를 순서만으로 찾지 않는다는 원칙(D024 [목차 슬롯 식별])은 그대로 유지된다.
+
+이 정책은 아직 코드로 구현되지 않았다 — 다음 개발 단계에서 `TABLE_OF_CONTENTS` 데이터 계약 확정 → 이 정책을 반영한 validation 함수 구현 → JSON 기반 목차 입력 구현 → 실제 Generate 함수 구현 순서로 진행한다.

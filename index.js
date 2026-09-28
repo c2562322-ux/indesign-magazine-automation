@@ -122,12 +122,12 @@ document.getElementById("btnInspect").addEventListener("click", () => {
         const validationText = formatValidationReport(validationResults);
 
         const combinedText = `${inspectionText}\n\n${validationText}`;
-        inspectLog.textContent = combinedText;
+        inspectLog.value = combinedText;
         console.log("[Inspect Template]\n" + combinedText);
         setStatus(`완료: 페이지 ${report.pageCount}개 분석 + Label 검증 (읽기 전용, 문서 변경 없음)`);
     } catch (err) {
         console.error(err);
-        inspectLog.textContent = `오류: ${err.message}`;
+        inspectLog.value = `오류: ${err.message}`;
         setStatus(`오류: ${err.message}`);
     }
 });
@@ -140,7 +140,7 @@ document.getElementById("btnInspectCurrentPage").addEventListener("click", () =>
         setStatus("Inspecting current page...");
         const result = inspectActivePage();
         const text = formatActivePageReport(result);
-        inspectLog.textContent = text;
+        inspectLog.value = text;
         console.log("[Inspect Current Page]\n" + text);
 
         if (result.ok) {
@@ -150,7 +150,58 @@ document.getElementById("btnInspectCurrentPage").addEventListener("click", () =>
         }
     } catch (err) {
         console.error(err);
-        inspectLog.textContent = `오류: ${err.message}`;
+        inspectLog.value = `오류: ${err.message}`;
         setStatus(`오류: ${err.message}`);
     }
+});
+
+// Inspection Log 전체 문자열을 클립보드로 복사한다. UXP 공식 클립보드 API
+// (navigator.clipboard.setContent, MIME 타입 키 객체 — 브라우저의 navigator.clipboard.
+// writeText()와는 다른 UXP 전용 인터페이스, manifest.json의 "clipboard": "readAndWrite"
+// 권한 필요)를 1차로 시도한다. 이 프로젝트에서 클립보드 API를 쓰는 것은 이번이 처음이고,
+// InDesign 최소 버전(manifest.json minVersion 17.0)에서 실제 지원되는지는 Adobe 공식 문서도
+// "호스트 앱마다 다르니 릴리스 노트를 확인하라"고만 되어 있어 미검증이다 — 실패하면 임시
+// textarea + document.execCommand("copy")(Chromium 기반 웹뷰에서 폭넓게 동작하는 구식
+// 방식)로 대체한다. Inspector의 조회/판별 로직(D021~D023)은 전혀 건드리지 않는다 — 이미
+// 화면에 표시된 inspectLog.value(전체 문자열, 스크롤로 안 보이는 부분 포함)를 읽기만 한다.
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.setContent === "function") {
+        try {
+            await navigator.clipboard.setContent({ "text/plain": text });
+            return true;
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return copied;
+    } catch (err) {
+        console.error(err);
+        return false;
+    }
+}
+
+document.getElementById("btnCopyInspectLog").addEventListener("click", async () => {
+    const text = inspectLog.value;
+    if (!text || text.trim().length === 0) {
+        setStatus("복사할 Inspection Log가 없습니다.");
+        return;
+    }
+
+    const copied = await copyTextToClipboard(text);
+    setStatus(
+        copied
+            ? "완료: Inspection Log를 클립보드에 복사했습니다."
+            : "Inspection Log 복사 실패: 이 환경에서 클립보드 복사가 지원되지 않는 것 같습니다."
+    );
 });

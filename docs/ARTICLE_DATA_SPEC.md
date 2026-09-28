@@ -7,7 +7,8 @@
 ## 현재 범위
 
 - **"시작 페이지"(Template Type, 자동화 식별자 `OPENING_PAGE`) 2개 변형만** 다룬다: 사진 있는 버전, 사진 없는 버전. Word 입력은 이 중 사진 있는 버전(`WITH_PHOTO`)만 지원한다.
-- 목차/본문 페이지/인터뷰 레이아웃은 아직 포함하지 않는다.
+- 목차(`TABLE_OF_CONTENTS`)는 이 문서에 아직 포함하지 않는다 — Script Label 계약(`TOC_ITEM_01`~`TOC_ITEM_20`, 내부 `TOC_TEXT`/`TOC_PAGE`)은 확정·실기 검증됐지만([docs/TEMPLATE_SPEC.md](TEMPLATE_SPEC.md), [DECISIONS.md](../DECISIONS.md) D024), Article Data 구조와 가변 슬롯 검증 정책은 [DECISIONS.md](../DECISIONS.md) D025에 잠정안으로만 있고 아직 코드로 구현되지 않았다. 구현 시점에 이 문서에 정식으로 편입한다.
+- 본문 페이지/인터뷰 레이아웃은 아직 포함하지 않는다.
 - 이 문서는 데이터 구조 정의를 다룬다. 현재 구현 상태(자세한 내용/실기 검증 여부는 [HANDOFF.md](../HANDOFF.md) 참고):
   - `Load Article` 버튼의 파일 선택/읽기/검증(JSON, Word), `Generate` 버튼을 통한 자동조판(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE)은 구현되어 있다.
   - 다른 Template Type용 데이터 로드, Overset 처리, 페이지 생성/복제는 아직 구현하지 않았다.

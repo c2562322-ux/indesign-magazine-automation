@@ -2,7 +2,7 @@
 
 디자이너의 InDesign 템플릿 규칙(페이지 유형, 프레임 이름, 데이터 매핑, 스타일 이름, 예외 처리 규칙 등)을 기록하는 문서다.
 
-## 현재 상태: "시작 페이지" Script Label 적용 및 검증 완료, JSON 데이터 계약 정의 완료 (그 외 Template Type은 미착수)
+## 현재 상태: "시작 페이지" Script Label 적용 및 검증 완료, JSON 데이터 계약 정의 완료. "목차" Script Label 적용 및 검증 완료(자동입력/데이터 계약은 미구현). "본문 페이지"/"인터뷰 레이아웃"은 미착수
 
 디자이너로부터 실제 InDesign 원본 템플릿(.indd/.idml)과 폰트 파일을 전달받아 `assets/templates/original/`에 보관 중이다(2026-09-22). `assets/templates/working/`에 작업용 복사본을 만들어 `Inspect Template` 버튼(읽기 전용 문서 분석 기능)으로 실제 InDesign에서 열어본 결과, "시작 페이지" 템플릿의 두 페이지 변형(사진 있는 버전 page.name=2/index=3, 사진 없는 버전 page.name=3/index=4)에 대해 실제 Text Frame / Rectangle 정보를 확인했다(2026-09-23, 실기 테스트는 사용자가 InDesign에서 직접 수행하고 결과를 공유함 — Claude Code가 직접 실행/검증한 것은 아니다). 아래 "Frame 분석 워크시트"에 이 두 페이지의 분석 결과를 기록했다.
 
@@ -10,7 +10,9 @@
 
 이어서 `BODY_COLUMN_1`/`BODY_COLUMN_2`가 InDesign 텍스트 스레드로 실제 연결되어 있음을 확인했다(2026-09-23, `src/validation.js`의 연결 검사로 "연결됨" 확인). 이를 근거로 JSON 데이터 계약을 단순화했다 — 사진 없는 변형도 `bodyColumn1`/`bodyColumn2` 두 필드 대신 `body` 필드 하나만 받고, `BODY_COLUMN_1`에만 채워 넣으면 텍스트 스레드로 `BODY_COLUMN_2`까지 자동으로 흐른다([docs/ARTICLE_DATA_SPEC.md](ARTICLE_DATA_SPEC.md), [DECISIONS.md](../DECISIONS.md) D010).
 
-목차/본문 페이지/인터뷰 레이아웃은 아직 분석하지 않았다. **프레임 단위의 이름 규칙(확정판), 데이터 매핑, 스타일 규칙은 아직 디자이너와 공식 확정된 것이 아니다** — "시작 페이지"의 Script Label은 기술적으로 적용/검증되었지만, 이것이 디자이너와 합의된 영구 명명 규칙인지는 별개의 확인 사항으로 남아 있다. 임의로 프레임 이름을 실제로 변경하거나, 확인되지 않은 항목을 추측해서 확정 짓지 않는다.
+본문 페이지/인터뷰 레이아웃은 아직 분석하지 않았다. **프레임 단위의 이름 규칙(확정판), 데이터 매핑, 스타일 규칙은 아직 디자이너와 공식 확정된 것이 아니다** — "시작 페이지"/"목차"의 Script Label은 기술적으로 적용/검증되었지만, 이것이 디자이너와 합의된 영구 명명 규칙인지는 별개의 확인 사항으로 남아 있다. 임의로 프레임 이름을 실제로 변경하거나, 확인되지 않은 항목을 추측해서 확정 짓지 않는다.
+
+"목차" 템플릿(목차샘플1, page index=1/name=2)은 (2026-09-28) `Inspect Current Page`의 읽기 전용 재귀 탐색(D021~D023)으로 실제 구조를 전수 분석하고 Script Label까지 부여/검증했다(D024) — 전체 22개 pageItem 중 20개가 목차 슬롯(`TOC_ITEM_01`~`TOC_ITEM_20`, 각각 Group)이고, 나머지 2개는 이번 자동화 대상이 아닌 상단 고정 디자인 요소("매거진 / 목차샘플1")다. 각 슬롯 내부에는 제목+부제가 하나로 합쳐진 `TOC_TEXT`(TextFrame)와 페이지 번호 `TOC_PAGE`(TextFrame)만 Script Label을 부여했고, 점선/구분선은 무라벨로 남겨뒀다. 자세한 내용은 아래 "Frame 분석 워크시트"와 [DECISIONS.md](../DECISIONS.md) D024/D025 참고. **다만 이 계약을 사용하는 `TABLE_OF_CONTENTS` Generate 코드와 가변 슬롯 검증(N개 데이터면 슬롯 20개 중 앞의 N개만 사용, D025)은 아직 구현되지 않았다** — "목차 자동화 완료"가 아니라 "목차샘플1의 구조 분석 및 Script Label 계약/부여/검증 완료" 단계다.
 
 아래 "Frame 분석 워크시트"에 `Inspect Template` 결과를 페이지/프레임 단위로 옮겨 적으면서 분석을 진행한다. 워크시트가 충분히 채워지고 디자이너와 확인이 끝나면, 그 내용을 일반화해 뒤쪽의 "Frame Name" / "Data Field Mapping" / "Required / Optional" / "Paragraph Style" / "Object Style" 표(템플릿 전체에 적용되는 확정 규칙)를 채운다. (관련 요청 사항은 [HANDOFF.md](../HANDOFF.md)의 "디자이너에게 확인해야 할 사항" 참고)
 
@@ -24,12 +26,12 @@
 
 | Template Type | 자동화용 식별자 | 설명 | 사용되는 Category 예시 |
 |---|---|---|---|
-| 목차 | (미정) | | |
+| 목차 | `TABLE_OF_CONTENTS` (2026-09-28 잠정 확정 — Article Data `templateType` 값으로 D025에서 제안, 디자이너 공식 확인 전) | 목차샘플1(index=1, name=2) 1종. 목차 슬롯 20개(`TOC_ITEM_01`~`TOC_ITEM_20`) + 상단 고정 디자인 요소(자동화 대상 아님)로 구성됨을 확인 (2026-09-28) | |
 | 시작 페이지 | `OPENING_PAGE` (2026-09-23 확정, [docs/ARTICLE_DATA_SPEC.md](ARTICLE_DATA_SPEC.md) 참고) | 사진 있는 버전(`variant: "WITH_PHOTO"`, 대표 이미지 프레임 포함)과 사진 없는 버전(`variant: "WITHOUT_PHOTO"`, 본문 2단 구성, 대표 이미지 프레임 없음) 2가지 변형이 실제로 존재함을 확인 (2026-09-23) | |
 | 본문 페이지 | (미정) | | |
 | 인터뷰 레이아웃 | (미정) | | |
 
-나머지 3종의 "자동화용 식별자"(예: `TOC` 같은 영문 코드)는 아직 확정하지 않는다. "설명"/"사용되는 Category 예시"도 디자이너 확인 전이므로 비워둔다.
+나머지 2종("본문 페이지"/"인터뷰 레이아웃")의 "자동화용 식별자"는 아직 확정하지 않는다. "설명"/"사용되는 Category 예시"도 디자이너 확인 전이므로 비워둔다.
 
 ## Frame 분석 워크시트
 
@@ -47,6 +49,11 @@
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (왼쪽 단, 텍스트 스레드 시작점) | (이름 없음) | (적용됨) `BODY_COLUMN_1` | TextFrame | `body` — 이 프레임에만 쓴다 (docs/ARTICLE_DATA_SPEC.md) | `variant: "WITHOUT_PHOTO"`일 때 Required | 왼쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23). **`BODY_COLUMN_1.nextTextFrame`이 `BODY_COLUMN_2`를 가리키는 텍스트 스레드로 실제 연결되어 있음을 확인**(2026-09-23, `src/validation.js` linkChecks로 "연결됨" 확인) — 여기 채운 본문이 넘치면 InDesign이 자동으로 BODY_COLUMN_2로 흘려보낸다 |
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | 본문 (오른쪽 단, 텍스트 스레드로 자동 연결) | (이름 없음) | (적용됨) `BODY_COLUMN_2` | TextFrame | 없음 — 데이터로 직접 쓰지 않음 (docs/ARTICLE_DATA_SPEC.md) | 해당 없음 (직접 채우는 대상이 아님) | 오른쪽 컬럼 본문 텍스트 프레임. Script Label 실제 부여 및 검증 완료(2026-09-23). `BODY_COLUMN_2.previousTextFrame`이 `BODY_COLUMN_1`을 가리키는 텍스트 스레드로 연결되어 있어(확인됨 2026-09-23) `BODY_COLUMN_1`에 채운 본문이 넘치면 자동으로 이어짐 |
 | 시작 페이지 | 3 (index=4) | 사진 없는 시작 페이지 | (대표 이미지 프레임 없음) | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 (`heroImage`는 `WITHOUT_PHOTO`에서 사용 안 함) | 해당 없음 (프레임 자체가 없음) | 이 페이지 변형에는 HERO_IMAGE에 대응하는 Rectangle이 존재하지 않음 — "사진 없는 시작 페이지"의 특징으로 사용자가 직접 확인함 |
+| 목차 | 2 (index=1) | 목차 (목차샘플1) | 목차 항목 슬롯(반복 단위) | (이름 없음) | (적용됨) `TOC_ITEM_01` ~ `TOC_ITEM_20` | Group | 없음(슬롯 자체는 데이터 필드가 아니며, 내부 `TOC_TEXT`/`TOC_PAGE`가 데이터를 받음) | 데이터 개수 N개면 `TOC_ITEM_01`~`TOC_ITEM_0N`만 Required, 나머지는 검증 대상 아님(D025) | 20개 슬롯 전부 동일 구조 반복(`childCount=3`). `Inspect Current Page`로 전수 확인(2026-09-28). 슬롯 식별은 Label 번호 기준, 화면 좌표/등록 순서 아님 |
+| 목차 | 2 (index=1) | 목차 (목차샘플1) | 제목 + 부제 (하나의 TextFrame에 통합) | (이름 없음) | (적용됨) `TOC_TEXT` | TextFrame | `items[i].title`/`items[i].subtitle` — 한 TextFrame에 같이 들어감(D025 데이터 계약 잠정안, 디자이너 확인 전) | 사용되는 슬롯(1~N)에서 Required | 별도 SUBTITLE 프레임 없음 — 제목/부제가 분리된 프레임이 아니라는 점이 "시작 페이지"(TITLE/POINT_TEXT 분리)와 다름. 20개 슬롯 전부 `Inspect Current Page`로 확인(2026-09-28) |
+| 목차 | 2 (index=1) | 목차 (목차샘플1) | 페이지 번호 | (이름 없음) | (적용됨) `TOC_PAGE` | TextFrame | `items[i].page` (D025 데이터 계약 잠정안) | 사용되는 슬롯(1~N)에서 Required | 20개 슬롯 전부 `Inspect Current Page`로 확인(2026-09-28) |
+| 목차 | 2 (index=1) | 목차 (목차샘플1) | 점선/구분선 (데이터 필드 아님) | (이름 없음) | Script Label 없음(의도적) | 해당 없음 | 없음 | 해당 없음(자동화 대상 아님) | 각 슬롯 내부에 있으나 코드가 찾을 필요가 없어 무라벨 상태로 확정 |
+| 목차 | 2 (index=1) | 목차 (목차샘플1) | 상단 고정 디자인 요소("매거진 / 목차샘플1") | (이름 없음) | Script Label 없음(자동화 대상 아님) | 해당 없음 | 없음 | 해당 없음(자동화 대상 아님) | 매 호마다 바뀌지 않는 고정 디자인이라는 전제(사용자 확인) — 22개 pageItem 중 목차 슬롯 20개를 제외한 나머지 2개 |
 
 열 설명:
 

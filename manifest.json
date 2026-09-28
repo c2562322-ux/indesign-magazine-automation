@@ -34,6 +34,7 @@
         }
     ],
     "requiredPermissions": {
-        "localFileSystem": "fullAccess"
+        "localFileSystem": "fullAccess",
+        "clipboard": "readAndWrite"
     }
 }
