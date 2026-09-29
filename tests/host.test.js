@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const L=require('../src/layout-engine');
 function host(options={}){
- const docs=[],calls=[];let counter=0;
+ const docs=[],calls=[],metrics={fontItems:0};let counter=0;
  const status=()=>options.objectEnums?{equals:other=>other===1}:1;
  const coll=arr=>({get length(){return arr.length;},item:i=>arr[i]});
  function document(){
@@ -29,10 +29,10 @@ function host(options={}){
  }
  const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1},Justification:{LEFT_ALIGN:1},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
  const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
- if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>options.fonts[i],itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
+ if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>{metrics.fontItems++;return options.fonts[i];},itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
  const module={exports:{}};
- vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
- return {api:module.exports,docs,calls};
+ vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.imageGate)await options.imageGate;if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
+ return {api:module.exports,docs,calls,metrics};
 }
 const a={title:'제목',subtitle:'',body:'본문입니다 '.repeat(150),images:[]};
 test('new document generation never reads/mutates the active document; body is complete',async()=>{const h=host();const p=L.candidates(a)[0],r=await h.api.create(a,p);assert.equal(h.docs.length,1);assert.equal(r.errors.length,0);const body=Array.from({length:h.docs[0].stories.length},(_,i)=>h.docs[0].stories.item(i)).find(s=>s.data===a.body);assert.ok(body);});
@@ -159,4 +159,22 @@ test('style rejection exposes the role, exact requested face and property stage'
  const h=host({fonts:[face('Example','Book')],strictFonts:true,rejectStyle:true});
  await assert.rejects(()=>h.api.create(a,L.candidates(a,{bodyFont:'Example\tBook',titleFont:'Example\tBook'})[0]),e=>e.message.includes('body.fontStyle')&&e.message.includes('style=Book'));
  assert.equal(h.docs[0].isValid,false);
+});
+
+test('font catalog and aliases enumerate once until explicit refresh or session reset',()=>{
+ const h=host({fonts:[face('Example','Book'),face('Example','Heavy')]});
+ h.api.listFonts();h.api.listFonts();h.api.validateFonts({bodyFont:'Example Book',titleFont:'Example-Heavy'});
+ assert.equal(h.metrics.fontItems,2);
+ h.api.listFonts(true);assert.equal(h.metrics.fontItems,4);
+ h.api.resetSession();h.api.listFonts();assert.equal(h.metrics.fontItems,6);
+});
+test('session reset clears latest without closing a document; creation after reset works',async()=>{
+ const h=host();await h.api.create(a,L.candidates(a)[0]);h.api.resetSession();
+ assert.equal(h.docs[0].isValid,true);assert.throws(()=>h.api.check(),/먼저/);
+ await h.api.create(a,L.candidates(a)[0]);assert.equal(h.api.check().errors.length,0);
+});
+test('an in-flight old-session creation cannot publish a document after reinitialization',async()=>{
+ let release;const h=host({imageGate:new Promise(r=>release=r)}),raw={...a,images:[{path:'photo.jpg'}]};
+ const pending=h.api.create(raw,L.candidates(raw)[0]);h.api.resetSession();release();
+ await assert.rejects(()=>pending,/다시 초기화/);assert.equal(h.docs.length,0);assert.throws(()=>h.api.check());
 });

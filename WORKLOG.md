@@ -1074,3 +1074,13 @@
 - 전수 정적 35개+동적 컨트롤 추적. 사진 취소/삭제 안내, stale 시안 예외, 페이지 경계, 브라우저의 Host 전용 버튼 상태, 비우기 잔여 표시 보완.
 - 무료 3안=규칙 기반; assets INDD/IDML 미사용. src/template.js는 연결된 엔진이 아닌 빈 placeholder. 등록 템플릿/상세 텍스트 편집은 설계만 docs/STUDIO_AUDIT.md에 기록.
 - 기존56+추가20=76 Node 테스트 통과. 실제 Adobe 폰트/UI/API/AI 실행 성공으로 해석하지 않음. 기존 시작페이지/Inspector/목차/사용자 INDD 파일 미변경.
+
+
+## 2026-09-29 — stability-01 전체 안정화
+
+- 네 기준점 commit 객체 확인. 시작 HEAD=606e39c, tracked clean/untracked 사용자 INDD 존재; INDD 미변경·미stage. reset/revert 없이 비교.
+- mount 중복/DOM 교체/이전 비동기 작업, 선택적 DOM·listener 실패, Host 초기화 실패를 격리. 세션 종료 후 picker 쓰기 및 생성 latest 재등록 방지. 원고 변경 시 이전 문서 연결 해제.
+- 폰트 열기/refresh 분리, Host catalog cache, UI 검색결과/이름 Map으로 일반 버튼의 catalog 탐색 제거. Family 아래 실제 Style 선택 후 본문/제목 적용. preview demand 반복 계산 1회화.
+- 작업/Host 단계 ms, 초기화 단계와 stability-01 표식. 기존 stroke/typography/좌표 및 기존 양식/Inspector/목차 코드 보존.
+- index.html 트리/복수 listener/해제/범위 query fixture 보강. 기존76+14=90 통과. 수정 전 HEAD의 핵심 3회귀 테스트 실패, 수정 후 통과(메모리 비교). 실제 PC 성능/Reload/Host 렌더 성공은 미확정.
+- docs/STABILITY.md에 비교/전수표/5~10분 Smoke Test.

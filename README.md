@@ -2,7 +2,7 @@
 
 기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
-**상태: 개발 검증판. Node 자동 테스트 76개 통과.** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 수정본은 실제 InDesign 재검증이 필요합니다. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
+**상태: 개발 검증판. Node 자동 테스트 90개 통과.** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 안정화는 초기화/세션/폰트 캐시를 보강했으며 실제 InDesign 검증은 남아 있습니다. 먼저 [5~10분 Smoke Test](docs/STABILITY.md)를 진행해주세요. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
 
 ## 바로 시작
 

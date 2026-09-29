@@ -21,12 +21,14 @@
         return result;
     }
     function step(stage,fn,progress){
+        const start=Date.now();
         if(progress)progress(stage);
-        try{return fn();}catch(error){throw failure(stage,error);}
+        try{const result=fn();if(progress)progress(stage+' 완료 '+(Date.now()-start)+'ms');return result;}catch(error){throw failure(stage,error);}
     }
     async function asyncStep(stage,fn,progress){
+        const start=Date.now();
         if(progress)progress(stage);
-        try{return await fn();}catch(error){throw failure(stage,error);}
+        try{const result=await fn();if(progress)progress(stage+' 완료 '+(Date.now()-start)+'ms');return result;}catch(error){throw failure(stage,error);}
     }
     return {redact,failure,step,asyncStep};
 });

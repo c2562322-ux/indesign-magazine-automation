@@ -3,19 +3,32 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const Studio=require('../src/studio-ui');
 class Element{
- constructor(id=''){this.id=id;this.value='';this.children=[];this.style={display:''};this.className='';this.disabled=false;this.listeners={};this.clientWidth=440;this._text='';}
- set textContent(v){this._text=String(v);this.children=[];}get textContent(){return this._text;}
- appendChild(e){this.children.push(e);return e;}setAttribute(){}
- addEventListener(t,f){this.listeners[t]=f;}click(){if(!this.disabled&&this.listeners.click)this.listeners.click();}
+ constructor(id='',tag='div'){this.id=id;this.tagName=tag.toLowerCase();this.value='';this.children=[];this.style={display:''};this.className='';this.disabled=false;this.listeners={};this.handlers={};this.attributes={};this.clientWidth=440;this._text='';}
+ set textContent(v){this._text=String(v);this.children.forEach(c=>c.parentNode=null);this.children=[];}get textContent(){return this._text;}
+ appendChild(e){this.children.push(e);e.parentNode=this;return e;}setAttribute(k,v){this.attributes[k]=v;}
+ addEventListener(t,f){(this.handlers[t]||(this.handlers[t]=[])).push(f);this.listeners[t]=(...args)=>{for(const fn of [...this.handlers[t]])fn(...args);};}
+ removeEventListener(t,f){this.handlers[t]=(this.handlers[t]||[]).filter(fn=>fn!==f);}
+ click(){if(!this.disabled&&this.listeners.click)this.listeners.click();}
 }
-function setup(native=false,overrides={}){
- const html=fs.readFileSync('index.html','utf8'),elements={};for(const m of html.matchAll(/id="([^"]+)"/g))elements[m[1]]=new Element(m[1]);
- elements.aiModel.value='gpt-4.1-mini';elements.settingsPanel.style.display='none';elements.aiPanel.style.display='none';
- global.document={getElementById:id=>elements[id],querySelectorAll:()=>Object.values(elements),createElement:()=>new Element()};
+function fixture(omit=[]){
+ const html=fs.readFileSync('index.html','utf8'),elements={},body=new Element('fixture'),stack=[body];
+ for(const m of html.matchAll(/<\/?([a-z][\w-]*)\b[^>]*>/gi)){
+  const tag=m[1].toLowerCase();if(m[0].startsWith('</')){const ix=stack.map(n=>n.tagName).lastIndexOf(tag);if(ix>0)stack.length=ix;continue;}
+  const id=(m[0].match(/\bid="([^"]+)"/)||[])[1]||'',node=new Element(id,tag);stack.at(-1).appendChild(node);if(id&&!omit.includes(id))elements[id]=node;
+  node.value=(m[0].match(/\bvalue="([^"]*)"/)||[])[1]||'';if(m[0].includes('display:none'))node.style.display='none';
+  if(!['input','meta','link','br','img','hr'].includes(tag))stack.push(node);
+ }
+ function descendants(n){return n.children.flatMap(c=>[c,...descendants(c)]);}
+ const document={getElementById:id=>elements[id]||null,createElement:tag=>new Element('',tag),querySelectorAll:selector=>selector==='[id]'?Object.values(elements):descendants(elements.studioPanel).filter(n=>['button','input','textarea'].includes(n.tagName))};
+ return {document,e:elements};
+}
+function setup(native=false,overrides={},omit=[]){
+ const {document,e:elements}=fixture(omit);global.document=document;
  const saved=[],calls=[];
  const report={pageCount:1,errors:[],warnings:[]};
- const app=Studio.mount({native,load:async()=>null,image:async()=>({path:'p.jpg',name:'사진',preview:''}),fonts:async()=>[],saveProject:async obj=>{saved.push(obj);return true;},create:async()=>{calls.push('create');return report;},check:()=>{calls.push('check');return report;},saveIndd:()=>{calls.push('save');return report;},exportPdf:()=>{calls.push('pdf');return report;},...overrides});
- return {app,e:elements,saved,calls};
+ const adapter={native,load:async()=>null,image:async()=>({path:'p.jpg',name:'사진',preview:''}),fonts:async()=>[],saveProject:async obj=>{saved.push(obj);return true;},create:async()=>{calls.push('create');return report;},check:()=>{calls.push('check');return report;},saveIndd:()=>{calls.push('save');return report;},exportPdf:()=>{calls.push('pdf');return report;},...overrides};
+ const app=Studio.mount(adapter);
+ return {app,e:elements,saved,calls,adapter,document};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 test('all static controller IDs exist once in both HTML entrypoints',()=>{
@@ -170,12 +183,12 @@ test('font browser opens, paginates and searches real styles',async()=>{
 test('font query failure shows diagnostics and allows retry and empty results',async()=>{
  let fail=true;const {e}=setup(true,{fonts:()=>{if(fail)throw new Error('font host failed');return [];}});
  e.btnFonts.click();await tick();assert.match(e.fontSummary.textContent,/조회 실패/);assert.equal(e.btnFonts.disabled,false);
- fail=false;e.btnFonts.click();await tick();assert.match(e.studioStatus.textContent,/설치 폰트가 없습니다/);
+ fail=false;e.btnFontRefresh.click();await tick();assert.match(e.studioStatus.textContent,/설치 폰트가 없습니다/);
 });
 test('choosing installed replacements updates preview and creation plan, invalidates old output',async()=>{
  let received;const {app,e}=setup(true,{fonts:()=>fontRows,create:(a,p)=>{received=p;return {pageCount:1,errors:[],warnings:[]};}});
  e.btnCreateAuto.click();await tick();e.btnFonts.click();await tick();
- e.fontChoices.children[0].children[1].click();await tick();e.fontChoices.children[1].children[2].click();await tick();
+ e.fontChoices.children[0].children[1].click();e.btnFontBody.click();await tick();e.fontChoices.children[1].children[1].click();e.btnFontTitle.click();await tick();
  assert.equal(e.bodyFont.value,fontRows[0].name);assert.equal(e.titleFont.value,fontRows[1].name);assert.equal(e.btnExportPdf.disabled,true);
  const sheet=e.largePreview.children[0];assert.equal(sheet.children.find(n=>n.className==='preview-title').style.fontFamily,'"Family1", sans-serif');
  e.btnCreateAuto.click();await tick();assert.equal(received.settings.bodyFont,fontRows[0].name);assert.equal(received.settings.titleFont,fontRows[1].name);
@@ -243,7 +256,86 @@ test('native load and image pickers, project write and font adapter actually con
 });
 test('preview uses catalog Medium style without requesting nonexistent styles from Host',async()=>{
  const {e}=setup(true,{fonts:()=>[{name:'Actual\tMedium',family:'Actual',style:'Medium'}]});
- e.btnFonts.click();await tick();e.fontChoices.children[0].children[2].click();await tick();
+ e.btnFonts.click();await tick();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();
  assert.equal(e.largePreview.children[0].children.find(n=>n.className==='preview-title').style.fontWeight,'500');
  assert.equal(e.titleFont.value,'Actual\tMedium');
+});
+
+test('same-DOM initialization is idempotent; destroy and remount have one listener and one action',async()=>{
+ const {app,e,adapter,calls}=setup(true);
+ assert.equal(Studio.mount(adapter),app);assert.equal(e.btnCreateAuto.handlers.click.length,1);
+ e.btnCreateAuto.click();await tick();assert.equal(calls.length,1);
+ app.destroy();const next=Studio.mount(adapter);assert.notEqual(next,app);assert.equal(e.btnCreateAuto.handlers.click.length,1);
+ e.btnCreateAuto.click();await tick();assert.equal(calls.length,2);assert.match(e.studioDiagnostics.textContent,/Studio ready/);
+});
+test('new DOM mount detaches old listeners and an old async load cannot update the new panel',async()=>{
+ let complete;const old=setup(true,{load:()=>new Promise(r=>complete=r)});
+ old.e.btnLoadAuto.click();const next=setup(true);complete({article:{...Studio.SAMPLE,title:'old async result'}});await tick();
+ assert.equal(old.app.disposed,true);assert.equal(old.e.btnSample.handlers.click.length,0);
+ assert.equal(next.e.autoTitle.value,Studio.SAMPLE.title);next.e.btnClear.click();await tick();assert.equal(next.e.autoTitle.value,'');
+});
+test('missing optional font or AI controls do not prevent core binding and preview use',async()=>{
+ for(const missing of ['fontSearch','btnFonts','apiKey','btnAI']){
+  const {e}=setup(true,{},[missing]);assert.equal(e.btnPrepare.handlers.click.length,1);
+  e.btnClear.click();await tick();e.btnSample.click();await tick();assert.equal(e.candidateList.children.length,3);
+  assert.match(e.studioDiagnostics.textContent,/선택 기능 요소 누락/);
+ }
+});
+test('a failed optional listener and failed Host session initialization leave core UI usable',async()=>{
+ const fx=fixture();global.document=fx.document;
+ fx.e.btnFonts.addEventListener=()=>{throw new Error('optional binding failure');};
+ const app=Studio.mount({native:true,resetSession:()=>{throw new Error('host init failure');}});
+ fx.e.btnClear.click();await tick();fx.e.btnSample.click();await tick();
+ assert.equal(app.state.plans.length,3);assert.equal(fx.e.btnCreateAuto.disabled,true);assert.match(fx.e.studioDiagnostics.textContent,/binding 실패/);
+});
+test('missing core DOM fails before binding; restoring it permits a clean initialization',()=>{
+ const bad=fixture(['autoBody']);global.document=bad.document;
+ assert.throws(()=>Studio.mount({native:true}),/autoBody/);assert.equal(bad.e.btnPrepare.handlers.click,undefined);
+ const good=setup(true);assert.equal(good.e.btnPrepare.handlers.click.length,1);
+});
+test('font family/style grouping uses cache for reopen/search/general actions and explicit refresh only',async()=>{
+ let queries=0;const faces=[{name:'Family\tBook',family:'Family',style:'Book'},{name:'Family\tMedium',family:'Family',style:'Medium'}];
+ const {e}=setup(true,{fonts:refresh=>{queries++;if(queries===2)assert.equal(refresh,true);return faces;}});
+ e.btnFonts.click();await tick();assert.equal(e.fontChoices.children.length,1);assert.equal(e.fontChoices.children[0].children.length,3);
+ e.fontChoices.children[0].children[2].click();assert.match(e.fontSelection.textContent,/Medium/);e.btnFontTitle.click();await tick();assert.match(e.fontCurrent.textContent,/Family — Medium/);
+ e.btnFonts.click();await tick();e.btnSample.click();await tick();e.btnPrepare.click();await tick();e.candidateList.children[1].click();
+ e.btnFonts.click();await tick();e.fontSearch.value='Book';e.fontSearch.listeners.input();assert.equal(queries,1);
+ e.btnFontRefresh.click();await tick();assert.equal(queries,2);
+});
+test('edited source cannot revive an old output by restoring its previous value',async()=>{
+ const {e}=setup(true);e.btnCreateAuto.click();await tick();const original=e.autoTitle.value;
+ e.autoTitle.value+='change';e.autoTitle.listeners.input();e.autoTitle.value=original;e.autoTitle.listeners.input();
+ assert.equal(e.btnSaveIndd.disabled,true);assert.equal(e.btnExportPdf.disabled,true);
+ e.btnCreateAuto.click();await tick();assert.equal(e.btnSaveIndd.disabled,false);
+});
+test('production recovers across create failure, check failure, save cancel and PDF failure',async()=>{
+ const report={pageCount:1,errors:[],warnings:[]};let step='create';
+ const {e}=setup(true,{create:()=>{if(step==='create')throw new Error('font style failure');return report;},check:()=>{if(step==='check')throw new Error('check failed');return report;},saveIndd:()=>step==='save'?null:report,exportPdf:()=>{if(step==='pdf')throw new Error('pdf failed');return report;}});
+ e.btnCreateAuto.click();await tick();assert.equal(e.btnCreateAuto.disabled,false);step='';e.btnCreateAuto.click();await tick();
+ step='check';e.btnCheckAuto.click();await tick();assert.equal(e.btnCheckAuto.disabled,false);assert.equal(e.btnExportPdf.disabled,true);
+ step='';e.btnCheckAuto.click();await tick();step='save';e.btnSaveIndd.click();await tick();assert.equal(e.btnSaveIndd.disabled,false);
+ step='';e.btnSaveIndd.click();await tick();step='pdf';e.btnExportPdf.click();await tick();assert.equal(e.btnCheckAuto.disabled,false);
+ step='';e.btnCheckAuto.click();await tick();e.btnExportPdf.click();await tick();assert.match(e.studioStatus.textContent,/성공/);
+});
+test('the actual entrypoint waits for DOM readiness and tolerates unavailable Host',()=>{
+ const vm=require('node:vm');let ready,mounts=0,adapter;
+ const ctx={require:n=>{
+  if(n==='uxp')return {storage:{localFileSystem:{}}};
+  if(n==='./src/auto-indesign.js')throw new Error('Host unavailable');
+  if(n==='./src/studio-ui.js')return {mount:a=>{mounts++;adapter=a;}};
+  return require('../'+n);
+ },document:{readyState:'loading',addEventListener:(name,fn,options)=>{assert.equal(name,'DOMContentLoaded');assert.equal(options.once,true);ready=fn;},getElementById:()=>({})}};
+ vm.runInNewContext(fs.readFileSync('studio.js','utf8'),ctx);assert.equal(mounts,0);ready();assert.equal(mounts,1);assert.equal(adapter.native,false);assert.match(adapter.hostError,/unavailable/);
+});
+test('a pending save picker from a disposed panel cannot write into a new session',async()=>{
+ let choose,writes=0,session=0;
+ const adapter=nativeAdapter({resetSession:()=>session++,sessionId:()=>session,save:()=>writes++},()=>new Promise(r=>choose=r));
+ adapter.resetSession();const pending=adapter.saveIndd();adapter.dispose();choose({nativePath:'C:\\private\\out.indd'});
+ await assert.rejects(()=>pending,/다시 초기화/);assert.equal(writes,0);
+});
+test('a control-query exception cannot leave the controller permanently busy',async()=>{
+ const {app,e,document}=setup(true),query=document.querySelectorAll;let fail=true;
+ document.querySelectorAll=s=>{if(fail&&s!=='[id]')throw new Error('controls unavailable');return query(s);};
+ e.btnSample.click();await tick();assert.equal(app.state.busy,false);assert.match(e.studioStatus.textContent,/controls unavailable/);
+ fail=false;e.btnSample.click();await tick();assert.equal(app.state.plans.length,3);assert.equal(e.btnCreateAuto.disabled,false);
 });

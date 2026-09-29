@@ -542,3 +542,8 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 ## D032 — 실제 설치 face 선택과 명시적 대체 (2026-09-29)
 
 새 모드는 app.fonts의 INSTALLED face를 name/family/style/fullName/PostScript로 조회한다. 저장 식별자는 Font.name, 적용은 실제 Font 객체 후 실제 fontStyleName 순서다. 없는 스타일명을 합성하지 않으며 모호한 family나 없는 face는 오류로 안내하고 사용자가 실제 목록에서 대체한다. 기본 Freesentation은 예시 설정일 뿐 자동 fallback이 아니다. 파일 이동 시 누락 폰트를 경고한다. UI catalog와 생성 시 검증을 분리하여 마지막 순간 폰트 비활성화도 차단한다. 큰 템플릿 시스템은 구현하지 않고 geometry/template 두 renderer의 공존 설계만 기록했다.
+
+
+## D033 — Studio lifecycle와 폰트 캐시 안정화 (2026-09-29)
+
+동일 root의 mount는 재사용하고 새로운 root/해제 후에는 listener와 state/Host 세션을 새로 만든다. 이전 비동기 결과는 새 패널·문서에 쓰지 않는다. 선택 UI/Host 초기화 실패는 핵심 원고·시안 binding과 분리한다. 폰트 catalog는 세션 단위 캐시, 명시 새로고침만 전체 열거한다. 생성 시에는 선택 face의 현재 상태를 검증한다. 원고/설정 편집은 이전 출력 대상을 무효화하며 실제 문서 창은 유지한다. 자동 테스트와 실제 UDT Reload 성공은 구분하고 stability-01 시간 진단과 Smoke Test로 실기를 받는다.

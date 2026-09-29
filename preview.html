@@ -18,9 +18,9 @@
           <div class="row"><div class="field"><label>본문 pt</label><input id="bodySize" type="number" step="0.5" /></div><div class="field"><label>재단 여백 mm</label><input id="pageBleed" type="number" /></div><div class="field"><label>강조색</label><input id="accent" /></div></div>
           <div class="field"><label>매거진 이름</label><input id="publication" /></div>
           <div class="field"><label>본문 폰트</label><input id="bodyFont" /></div><div class="field"><label>제목 폰트</label><input id="titleFont" /></div>
-          <button id="btnFonts" class="quiet">폰트 더보기 · 설치 목록 새로고침</button>
-          <div id="fontBrowser" style="display:none"><label for="fontSearch">폰트 이름 / 스타일 검색</label><input id="fontSearch" placeholder="예: Freesentation, Medium" />
-          <p id="fontSummary" class="small"></p><div id="fontChoices"></div><button id="btnFontMore" class="quiet">목록 30개 더 표시</button>
+          <button id="btnFonts" class="quiet">폰트 더보기 / 닫기</button>
+          <div id="fontBrowser" style="display:none"><button id="btnFontRefresh" class="quiet">설치 폰트 새로고침</button><label for="fontSearch">폰트 이름 / 스타일 검색</label><input id="fontSearch" placeholder="예: Freesentation, Medium" />
+          <p id="fontCurrent" class="small"></p><p id="fontSelection" class="small"></p><button id="btnFontBody">본문에 적용</button><button id="btnFontTitle">제목에 적용</button><p id="fontSummary" class="small"></p><div id="fontChoices"></div><button id="btnFontMore" class="quiet">목록 30개 더 표시</button>
           <p class="small">없는 폰트는 자동 대체하지 않습니다. 아래 설치된 스타일을 본문/제목에 적용해주세요.</p></div>
         </div>
         <button id="btnPrepare" class="primary full">무료 디자인 3안 만들기</button><p class="small" style="margin-top:8px">기사 길이·사진 유무에 맞춰 새 배치를 계산합니다. API 비용 없음.</p>
@@ -42,5 +42,5 @@
       <button id="btnCreateAuto" class="primary full">선택한 디자인으로 새 문서 만들기</button>
       <div class="toolbar" style="margin-top:10px"><button id="btnSaveProject">원고·시안 저장</button><button id="btnSaveIndd">INDD 저장</button><button id="btnCheckAuto">문서 검사</button><button id="btnExportPdf">PDF 내보내기</button></div><div id="hostReport" class="report"></div>
     </div></div>
-  </div><div id="studioStatus" class="studio-status" role="status">준비 중…</div>
+  </div><pre id="studioDiagnostics" class="small" style="white-space:pre-wrap;max-height:120px;overflow-y:auto"></pre><div id="studioStatus" class="studio-status" role="status">준비 중…</div>
 </div><script src="src/layout-engine.js"></script><script src="src/docxZip.js"></script><script src="src/word-text.js"></script><script src="src/article-input.js"></script><script src="src/ai-layout.js"></script><script src="src/production-diagnostics.js"></script><script src="src/studio-ui.js"></script><script src="preview.js"></script></body></html>

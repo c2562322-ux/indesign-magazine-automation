@@ -6,6 +6,8 @@ const L = require('./layout-engine.js');
 const fs = require('fs');
 const D = require('./production-diagnostics.js');
 let latest = null;
+let fontCatalog = null, session = 0;
+function resetSession(){latest=null;fontCatalog=null;session++;}
 // UXP DOM enum values may be distinct wrappers for the same value.
 function sameEnum(value,expected){return value!=null&&typeof value.equals==='function'?value.equals(expected):value===expected;}
 function mm(n) { return n + 'mm'; }
@@ -14,24 +16,23 @@ function installedFont(name) {
     const direct = app.fonts.itemByName(name);
     if (direct && direct.isValid && sameEnum(direct.status,ID.FontStatus.INSTALLED) &&
         [direct.name,direct.fullName,direct.postscriptName].includes(name)) return direct;
-    const families=[];
-    for(let i=0;i<app.fonts.length;i++){
-        const f=app.fonts.item(i);
-        if(!sameEnum(f.status,ID.FontStatus.INSTALLED))continue;
-        if(f.fullName===name || f.name===name || f.postscriptName===name)return f;
-        if(f.fontFamily===name)families.push(f);
-    }
-    if(families.length===1)return families[0];
-    if(families.length>1)throw new Error('여러 스타일이 있는 폰트입니다: '+name+'. 폰트 더보기에서 사용할 스타일을 선택해주세요.');
+    const rows=listFonts(),exact=rows.find(f=>[f.name,f.fullName,f.postscriptName].includes(name));
+    const families=rows.filter(f=>f.family===name);
+    if(!exact&&families.length>1)throw new Error('여러 스타일이 있는 폰트입니다: '+name+'. 폰트 더보기에서 사용할 스타일을 선택해주세요.');
+    const match=exact||(families.length===1?families[0]:null);
+    if(match){const f=app.fonts.itemByName(match.name);if(f&&f.isValid&&sameEnum(f.status,ID.FontStatus.INSTALLED))return f;}
     throw new Error('사용 가능한 폰트/스타일을 찾지 못했습니다: '+name+'. 폰트 더보기에서 설치된 대체 폰트를 선택해주세요. 자동 대체하지 않았습니다.');
 }
-function listFonts(){
+function listFonts(refresh=false){
+    if(fontCatalog&&!refresh)return fontCatalog;
     const out=[];
-    for(let i=0;i<app.fonts.length;i++){
+    const length=app.fonts.length;
+    for(let i=0;i<length;i++){
         const f=app.fonts.item(i);
         if(f.isValid!==false&&sameEnum(f.status,ID.FontStatus.INSTALLED))out.push({name:f.name,family:f.fontFamily,style:f.fontStyleName,fullName:f.fullName,postscriptName:f.postscriptName});
     }
-    return out.sort((a,b)=>a.name.localeCompare(b.name));
+    fontCatalog=out.sort((a,b)=>a.family.localeCompare(b.family)||a.style.localeCompare(b.style));
+    return fontCatalog;
 }
 function validateFonts(s){
     return ['bodyFont','titleFont'].map(role=>{try{const f=installedFont(s[role]);return {role,name:f.name};}catch(e){return {role,error:D.redact(e.message)};}});
@@ -133,6 +134,7 @@ function check(doc,progress){
     return {pageCount:doc.pages.length,errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
 }
 async function create(raw,plan,progress){
+    const generation=session;
     // A failed new attempt must never silently export the previous successful document.
     latest=null;
     const a=D.step('create.validate',()=>{const value=L.article(raw);L.validate(plan,value);return value;},progress),s=L.settings(plan.settings);
@@ -144,6 +146,7 @@ async function create(raw,plan,progress){
     let doc;
     try{
         await D.asyncStep('create.app.doScript',()=>app.doScript(()=>{
+            if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 현재 패널에서 다시 생성해주세요.');
             doc=D.step('create.app.documents.add',()=>app.documents.add(),progress);
             D.step('create.documentPreferences',()=>{
             doc.documentPreferences.facingPages=false;doc.documentPreferences.pagesPerDocument=1;
@@ -178,7 +181,7 @@ async function create(raw,plan,progress){
             }},progress);
         },ID.ScriptLanguage.JAVASCRIPT,[],ID.UndoModes.ENTIRE_SCRIPT,'Create original magazine design'),progress);
         const report=D.step('create.initialCheck',()=>check(doc,progress),progress);
-        latest=doc;
+        if(generation===session)latest=doc;
         return report;
     }catch(e){
         if(doc&&doc.isValid){try{doc.close(ID.SaveOptions.NO);}catch(closeError){throw D.failure('create.cleanup.Document.close',new Error(D.redact(e.message)+' / 새 미완성 문서 정리 실패: '+D.redact(closeError.message)));}}
@@ -209,4 +212,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,listFonts,validateFonts,check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
+module.exports={create,listFonts,validateFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
