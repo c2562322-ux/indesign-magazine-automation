@@ -1,41 +1,65 @@
-2026-09-28 / Node.js 24.19.0
-Host/DOM tests use doubles. No Adobe/UXP or actual browser rendering run. No paid API call.
+2026-09-29 / Node.js v24.19.0
+Command: node --test tests/core.test.js tests/host.test.js tests/ui.test.js
+Existing tests: 30; added: 20; total: 50.
+Host/DOM/UXP file-picker tests use doubles; no actual Adobe run in this change.
+User reported panel/input/free plans/preview font size/scrolling working before this change.
+Create/check/save/export still require actual InDesign verification. No paid API call.
 
-✔ three distinct free plans preserve source and stay within margins (5.023282ms)
-✔ 0/1/2 images, small/default/large sizes, variable lengths (22.778494ms)
-✔ narrow content area adapts column count (0.615629ms)
-✔ body not trimmed/rephrased; newline normalization explicit (0.132681ms)
-✔ reject empty, oversized, invalid color and >2 images (0.429469ms)
-✔ AI geometry rejects overlaps, missing body, photos, out-of-bounds and small text (0.614368ms)
-✔ AI spec contains only placement references; body uses original source (1.817965ms)
-✔ Word preserves tabs, soft breaks, paragraphs and entities (2.003289ms)
-✔ Word refuses unsupported content rather than omitting it (0.472593ms)
-✔ plain/marked Word parsing supports no-photo and rejects duplicate markers (1.316918ms)
-✔ supplied DOCX retains previous fields (3.18595ms)
-✔ all three legacy JSON fixtures pass; whitespace-only fails (0.560305ms)
-✔ relative Windows/macOS paths and absolute paths (0.528007ms)
-✔ ZIP size bounds reject huge declared XML (0.588789ms)
-✔ AI request excludes file paths, images, API keys and limits excerpt (0.411612ms)
-✔ AI output handles refusal and incomplete replies (0.183176ms)
-✔ AI HTTP failures do not retry; valid mock result creates validated plan (1.005728ms)
-✔ project serialization excludes transient preview blobs (0.176847ms)
-✔ new document generation never reads/mutates the active document; body is complete (6.958454ms)
-✔ simulated host overset adds linked continuation pages (3.469437ms)
-✔ missing font and inaccessible image fail before document creation (3.400343ms)
-✔ write failure closes only the new incomplete document (4.208553ms)
-✔ save/export target the generated document, not active document (1.505383ms)
-✔ PDF export is blocked after a font/link error and after closing document (1.465742ms)
-✔ all static controller IDs exist once in both HTML entrypoints (1.581538ms)
-✔ default browser state shows three plans but native actions stay disabled (23.21951ms)
-✔ changing source disables stale plans until regenerated (7.14152ms)
-✔ project save excludes API credentials and transient image data (2.644162ms)
-✔ native creation prevents duplicate clicks and stale export (1.535848ms)
-✔ photo add invalidates previous plan and cannot exceed two (2.635839ms)
-ℹ tests 30
+✔ three distinct free plans preserve source and stay within margins (5.9028ms)
+✔ 0/1/2 images, small/default/large sizes, variable lengths (27.9273ms)
+✔ narrow content area adapts column count (0.6412ms)
+✔ body not trimmed/rephrased; newline normalization explicit (0.125ms)
+✔ reject empty, oversized, invalid color and >2 images (0.4276ms)
+✔ AI geometry rejects overlaps, missing body, photos, out-of-bounds and small text (1.4079ms)
+✔ AI spec contains only placement references; body uses original source (1.1087ms)
+✔ Word preserves tabs, soft breaks, paragraphs and entities (2.9664ms)
+✔ Word refuses unsupported content rather than omitting it (0.4573ms)
+✔ plain/marked Word parsing supports no-photo and rejects duplicate markers (1.0664ms)
+✔ supplied DOCX retains previous fields (6.3888ms)
+✔ all three legacy JSON fixtures pass; whitespace-only fails (3.0844ms)
+✔ relative Windows/macOS paths and absolute paths (0.6533ms)
+✔ ZIP size bounds reject huge declared XML (1.1979ms)
+✔ AI request excludes file paths, images, API keys and limits excerpt (0.7481ms)
+✔ AI output handles refusal and incomplete replies (0.3359ms)
+✔ AI HTTP failures do not retry; valid mock result creates validated plan (1.1672ms)
+✔ project serialization excludes transient preview blobs (0.1428ms)
+✔ new document generation never reads/mutates the active document; body is complete (12.2618ms)
+✔ simulated host overset adds linked continuation pages (2.6033ms)
+✔ missing font and inaccessible image fail before document creation (5.059ms)
+✔ write failure closes only the new incomplete document (3.1037ms)
+✔ save/export target the generated document, not active document (2.9187ms)
+✔ PDF export is blocked after a font/link error and after closing document (1.5326ms)
+✔ UXP enum wrappers accept installed fonts and normal links (2.1295ms)
+✔ failed recreation invalidates latest without closing the previous document (2.2822ms)
+✔ save-as follows the document returned by the host (2.1173ms)
+✔ native PDF completion is not claimed when the options dialog emits no success (1.5164ms)
+✔ link and overset errors really block PDF but allow repair INDD saves (1.477ms)
+✔ confirmed PDF reports success and host failures expose safe API stages (1.9173ms)
+✔ image failure identifies the API, redacts its path and closes only the new document (2.6615ms)
+✔ a completed save followed by inspection failure is reported distinctly (1.5401ms)
+✔ all static controller IDs exist once in both HTML entrypoints (2.2347ms)
+✔ default browser state shows three plans but native actions stay disabled (70.5775ms)
+✔ changing source disables stale plans until regenerated (3.8197ms)
+✔ project save excludes API credentials and transient image data (1.4988ms)
+✔ native creation prevents duplicate clicks and stale export (1.0645ms)
+✔ photo add invalidates previous plan and cannot exceed two (1.2086ms)
+✔ production buttons complete the input-plan-create-check-save-export flow (2.2068ms)
+✔ inspection failure blocks PDF until a successful recheck, while repair save remains available (1.046ms)
+✔ inspection reports with errors disable PDF but keep inspection and repair save enabled (0.9844ms)
+✔ failed recreation never leaves the earlier document exportable and creation can retry (1.3524ms)
+✔ save and export picker cancellation restores usable buttons and reports cancellation (1.153ms)
+✔ changing selected plan blocks all old-document actions until the matching plan is restored (0.766ms)
+✔ production errors redact paths and the actual API key and recover the busy state (0.7013ms)
+✔ PDF native cancellation or unconfirmed completion never displays success (1.0108ms)
+✔ save failure leaves check and retry available, and successful check re-enables PDF (0.7359ms)
+✔ real native adapter passes the selected path and progress to the correct host method (2.5073ms)
+✔ real native adapter does not call host output on either file-picker cancellation (0.6628ms)
+✔ native picker permission failure has a redacted stage and no host write (0.9686ms)
+ℹ tests 50
 ℹ suites 0
-ℹ pass 30
+ℹ pass 50
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 150.597402
+ℹ duration_ms 208.9663

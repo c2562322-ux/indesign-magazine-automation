@@ -1,10 +1,11 @@
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./layout-engine.js'),require('./ai-layout.js'));else root.MagazineStudio=factory(root.MagazineLayout,root.MagazineAI);})(typeof window!=='undefined'?window:this,function(L,AI){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./layout-engine.js'),require('./ai-layout.js'),require('./production-diagnostics.js'));else root.MagazineStudio=factory(root.MagazineLayout,root.MagazineAI,root.MagazineProductionDiagnostics);})(typeof window!=='undefined'?window:this,function(L,AI,D){
  'use strict';
  const SAMPLE={title:'도시를 읽는\n또 하나의 방법',subtitle:'빠르게 지나쳤던 골목에서 발견하는\n우리 동네의 새로운 표정',kicker:'LIFE & CULTURE',author:'편집실',images:[],body:'도시를 이해하는 가장 좋은 방법은 잠시 속도를 늦추는 일이다. 매일 같은 길을 걷더라도 익숙한 풍경을 다르게 바라보면 전에는 보이지 않던 이야기가 드러난다. 오래된 간판의 글씨, 작은 가게의 진열장, 낮은 담장 너머의 나무가 그 시작이 될 수 있다.\n\n골목에는 사람들이 살아온 시간이 겹겹이 쌓여 있다. 새로운 카페 옆에서 수십 년째 문을 여는 수선집은 서로 다른 속도로 동네의 하루를 만든다. 변화를 살펴보는 일은 오래된 것을 지키는 이유와 새로움을 받아들이는 방법을 함께 생각하게 한다.\n\n산책의 목적지를 미리 정하지 않아도 좋다. 평소 버스를 타고 지나던 구간을 걸어보거나 익숙한 교차로에서 반대편으로 방향을 바꾸는 것만으로도 충분하다. 다만 가게와 주택이 이어지는 길에서는 생활하는 사람들의 공간을 존중하며 천천히 머무는 태도가 필요하다.\n\n같은 장소를 다른 시간에 찾는 것도 한 가지 방법이다. 아침에는 문을 여는 사람들의 움직임이, 오후에는 창문에 비치는 빛이, 저녁에는 하루를 마무리하는 소리가 눈에 들어온다. 한 번의 방문으로는 알 수 없었던 표정들이 조금씩 모여 동네에 대한 이해를 넓힌다.\n\n돌아오는 길에는 인상 깊었던 장면 하나를 메모해보자. 사진 한 장이나 짧은 문장이면 된다. 기록은 멋진 장소를 모으기 위한 목록이 아니라 우리가 무엇에 관심을 기울였는지 돌아보는 작은 단서가 된다. 도시의 이야기는 그렇게 각자의 걸음 속에서 새롭게 이어진다.'};
  function mount(adapter){
-    const $=id=>document.getElementById(id),state={images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:''};
+    const $=id=>document.getElementById(id),state={images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false};
     const editable=['autoTitle','autoSubtitle','autoBody','autoKicker','autoAuthor','pageWidth','pageHeight','pageMargin','pageBleed','bodySize','accent','publication','bodyFont','titleFont'];
-    const status=(message,error)=>{$('studioStatus').textContent=message;$('studioStatus').className='studio-status'+(error?' error':'');};
+    const safe=message=>D.redact(message,[$('apiKey').value].concat(state.images.map(im=>im.path)));
+    const status=(message,error)=>{$('studioStatus').textContent=safe(message);$('studioStatus').className='studio-status'+(error?' error':'');};
     function read(){return {article:L.article({title:$('autoTitle').value,subtitle:$('autoSubtitle').value,body:$('autoBody').value,kicker:$('autoKicker').value,author:$('autoAuthor').value,images:state.images}),settings:L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value})};}
     function fingerprint(a,s){return JSON.stringify({article:L.safeArticle(a),settings:s});}
     function fresh(){const v=read();if(!state.plans.length||state.signature!==fingerprint(v.article,v.settings))throw new Error('원고 또는 설정이 바뀌었습니다. 시안을 다시 만들어주세요.');return v;}
@@ -14,6 +15,7 @@
         $('btnSaveProject').disabled=state.busy||!valid;
         const isCurrent=valid&&state.documentKey===state.signature+'|'+JSON.stringify(state.plans[state.selected]);
         ['btnSaveIndd','btnExportPdf','btnCheckAuto'].forEach(id=>$(id).disabled=state.busy||!state.hasDocument||!isCurrent||!adapter.native);
+        $('btnExportPdf').disabled=$('btnExportPdf').disabled||!state.pdfReady;
     }
     async function run(fn){
         if(state.busy)return;state.busy=true;
@@ -107,15 +109,41 @@
         status(cached?'동일한 원고·설정의 AI 시안을 재사용했습니다. API를 호출하지 않았습니다.':'AI 시안을 추가했습니다. 원고 내용은 변경하지 않았습니다.');
     }));
     $('btnSaveProject').addEventListener('click',()=>run(async()=>{const v=fresh();const result=await adapter.saveProject({schemaVersion:1,article:L.safeArticle(v.article),settings:v.settings,plan:state.plans[state.selected]});status(result?'원고와 디자인 설정을 저장했습니다. 사진은 원본 파일을 함께 보관해주세요.':'저장을 취소했습니다.');}));
-    function showReport(report,label){
+    function showReport(report,label,trace){
         state.hasDocument=true;
-        $('hostReport').textContent=label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n'):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.';
-        status(report.errors.length?'문서를 만들었지만 확인할 오류가 있습니다.':'편집 가능한 문서가 준비됐습니다. InDesign에서 결과를 확인해주세요.',!!report.errors.length);
+        state.pdfReady=report.errors.length===0;
+        $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n'):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
+        if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
+        else status(label+(report.errors.length?' 완료 · 검사 오류가 있어 PDF를 차단했습니다. 수정 후 문서 검사를 다시 실행해주세요.':' 성공'),!!report.errors.length);
     }
-    $('btnCreateAuto').addEventListener('click',()=>run(async()=>{const v=fresh();status('새 InDesign 문서를 만드는 중입니다…');const report=await adapter.create(v.article,state.plans[state.selected]);state.documentKey=state.signature+'|'+JSON.stringify(state.plans[state.selected]);showReport(report,'새 문서 생성');}));
-    $('btnCheckAuto').addEventListener('click',()=>run(async()=>showReport(await adapter.check(),'검사 결과')));
-    $('btnSaveIndd').addEventListener('click',()=>run(async()=>{const r=await adapter.saveIndd();if(r)showReport(r,'INDD 저장');else status('저장을 취소했습니다.');}));
-    $('btnExportPdf').addEventListener('click',()=>run(async()=>{const r=await adapter.exportPdf();if(r)showReport(r,'PDF 내보내기');else status('내보내기를 취소했습니다.');}));
+    function documentKey(){return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
+    function requireCurrentDocument(){
+        fresh();
+        if(!state.hasDocument||state.documentKey!==documentKey())throw new Error('현재 원고와 시안으로 새 문서를 먼저 만들어주세요.');
+    }
+    function production(label,action){return run(async()=>{
+        const trace=[label+' 시작'];status(trace[0]);$('hostReport').textContent=trace[0];
+        const progress=stage=>{trace.push(stage);if(trace.length>40)trace.splice(1,1);$('hostReport').textContent=safe(trace.join('\n'));status(label+' 진행 중 · '+stage);};
+        try{
+            const report=await action(progress);
+            if(report)showReport(report,label,trace);
+            else{trace.push(label+' 취소');$('hostReport').textContent=safe(trace.join('\n'));status(label+' 취소');}
+        }catch(e){
+            state.pdfReady=false;
+            const result=e.productionStage==='save.completed.postCheck'?'INDD 저장 완료 후 검사 실패':label+' 실패';
+            const message=result+' · '+safe(e.message||e);
+            $('hostReport').textContent=safe(trace.join('\n')+'\n'+message);status(message,true);
+        }
+    });}
+    $('btnCreateAuto').addEventListener('click',()=>production('문서 생성',async progress=>{
+        state.hasDocument=false;state.documentKey='';state.pdfReady=false;
+        const v=fresh(),key=documentKey();
+        const report=await adapter.create(v.article,state.plans[state.selected],progress);
+        state.documentKey=key;return report;
+    }));
+    $('btnCheckAuto').addEventListener('click',()=>production('문서 검사',progress=>{requireCurrentDocument();return adapter.check(progress);}));
+    $('btnSaveIndd').addEventListener('click',()=>production('INDD 저장',progress=>{requireCurrentDocument();return adapter.saveIndd(progress);}));
+    $('btnExportPdf').addEventListener('click',()=>production('PDF 내보내기',progress=>{requireCurrentDocument();if(!state.pdfReady)throw new Error('문서 검사를 먼저 통과해야 합니다.');return adapter.exportPdf(progress);}));
     ['prevPage','nextPage'].forEach((id,i)=>$(id).addEventListener('click',()=>{try{fresh();state.page=Math.max(0,Math.min(state.plans[state.selected].pages.length-1,state.page+(i?1:-1)));render();}catch(e){status(e.message,true);}}));
     if($('modeLegacy'))$('modeLegacy').addEventListener('click',()=>{if(state.busy)return;$('studioPanel').style.display='none';$('legacyPanel').style.display='block';});
     if($('modeStudio'))$('modeStudio').addEventListener('click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});

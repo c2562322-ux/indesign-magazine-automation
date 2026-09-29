@@ -8,13 +8,13 @@ class Element{
  appendChild(e){this.children.push(e);return e;}setAttribute(){}
  addEventListener(t,f){this.listeners[t]=f;}click(){if(!this.disabled&&this.listeners.click)this.listeners.click();}
 }
-function setup(native=false){
+function setup(native=false,overrides={}){
  const html=fs.readFileSync('index.html','utf8'),elements={};for(const m of html.matchAll(/id="([^"]+)"/g))elements[m[1]]=new Element(m[1]);
  elements.aiModel.value='gpt-4.1-mini';elements.settingsPanel.style.display='none';elements.aiPanel.style.display='none';
  global.document={getElementById:id=>elements[id],querySelectorAll:()=>Object.values(elements),createElement:()=>new Element()};
  const saved=[],calls=[];
  const report={pageCount:1,errors:[],warnings:[]};
- const app=Studio.mount({native,load:async()=>null,image:async()=>({path:'p.jpg',name:'사진',preview:''}),fonts:async()=>[],saveProject:async obj=>{saved.push(obj);return true;},create:async()=>{calls.push('create');return report;},check:()=>report,saveIndd:()=>report,exportPdf:()=>report});
+ const app=Studio.mount({native,load:async()=>null,image:async()=>({path:'p.jpg',name:'사진',preview:''}),fonts:async()=>[],saveProject:async obj=>{saved.push(obj);return true;},create:async()=>{calls.push('create');return report;},check:()=>{calls.push('check');return report;},saveIndd:()=>{calls.push('save');return report;},exportPdf:()=>{calls.push('pdf');return report;},...overrides});
  return {app,e:elements,saved,calls};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
@@ -27,3 +27,86 @@ test('changing source disables stale plans until regenerated',async()=>{const {e
 test('project save excludes API credentials and transient image data',async()=>{const {e,saved}=setup();e.apiKey.value='example-not-a-real-key';e.btnSaveProject.click();await tick();assert.equal(saved.length,1);assert.equal(saved[0].schemaVersion,1);assert.ok(!JSON.stringify(saved[0]).includes('example-not-a-real-key'));});
 test('native creation prevents duplicate clicks and stale export',async()=>{const {e,calls}=setup(true);e.btnCreateAuto.click();e.btnCreateAuto.click();await tick();assert.equal(calls.length,1);assert.equal(e.btnExportPdf.disabled,false);e.autoTitle.value='다른 제목';e.autoTitle.listeners.input();assert.equal(e.btnExportPdf.disabled,true);});
 test('photo add invalidates previous plan and cannot exceed two',async()=>{const {e,app}=setup(true);e.btnAddImage.click();await tick();assert.equal(app.state.images.length,1);assert.equal(e.btnCreateAuto.disabled,true);e.btnAddImage.click();await tick();e.btnAddImage.click();await tick();assert.equal(app.state.images.length,2);assert.match(e.studioStatus.textContent,/최대 2장/);});
+
+test('production buttons complete the input-plan-create-check-save-export flow',async()=>{
+ const {e,calls}=setup(true);e.autoTitle.value='실기 원고';e.autoTitle.listeners.input();
+ e.btnPrepare.click();await tick();e.candidateList.children[1].click();
+ e.btnCreateAuto.click();await tick();assert.equal(e.btnCheckAuto.disabled,false);
+ e.btnCheckAuto.click();await tick();assert.equal(e.btnSaveIndd.disabled,false);assert.equal(e.btnExportPdf.disabled,false);
+ e.btnSaveIndd.click();await tick();assert.match(e.studioStatus.textContent,/INDD 저장 성공/);
+ e.btnExportPdf.click();await tick();assert.match(e.studioStatus.textContent,/PDF 내보내기 성공/);
+ assert.deepEqual(calls,['create','check','save','pdf']);
+});
+test('inspection failure blocks PDF until a successful recheck, while repair save remains available',async()=>{
+ let failed=true;const {e}=setup(true,{check:()=>{if(failed)throw new Error('check failed');return {pageCount:1,errors:[],warnings:[]};}});
+ e.btnCreateAuto.click();await tick();e.btnCheckAuto.click();await tick();
+ assert.equal(e.btnExportPdf.disabled,true);assert.equal(e.btnSaveIndd.disabled,false);assert.equal(e.btnCheckAuto.disabled,false);
+ failed=false;e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);
+});
+test('inspection reports with errors disable PDF but keep inspection and repair save enabled',async()=>{
+ const {e}=setup(true,{check:()=>({pageCount:1,errors:['텍스트 넘침'],warnings:[]})});
+ e.btnCreateAuto.click();await tick();e.btnCheckAuto.click();await tick();
+ assert.equal(e.btnExportPdf.disabled,true);assert.equal(e.btnSaveIndd.disabled,false);assert.equal(e.btnCheckAuto.disabled,false);
+});
+test('failed recreation never leaves the earlier document exportable and creation can retry',async()=>{
+ let fail=false;const {e}=setup(true,{create:()=>{if(fail)throw new Error('host failure');return {pageCount:1,errors:[],warnings:[]};}});
+ e.btnCreateAuto.click();await tick();fail=true;e.btnCreateAuto.click();await tick();
+ assert.equal(e.btnSaveIndd.disabled,true);assert.equal(e.btnCheckAuto.disabled,true);assert.equal(e.btnExportPdf.disabled,true);
+ assert.equal(e.btnCreateAuto.disabled,false);fail=false;e.btnCreateAuto.click();await tick();assert.equal(e.btnCheckAuto.disabled,false);
+});
+test('save and export picker cancellation restores usable buttons and reports cancellation',async()=>{
+ const {e}=setup(true,{saveIndd:()=>null,exportPdf:()=>null});e.btnCreateAuto.click();await tick();
+ e.btnSaveIndd.click();await tick();assert.match(e.studioStatus.textContent,/INDD 저장 취소/);assert.equal(e.btnSaveIndd.disabled,false);
+ e.btnExportPdf.click();await tick();assert.match(e.studioStatus.textContent,/PDF 내보내기 취소/);assert.equal(e.btnCheckAuto.disabled,false);
+});
+test('changing selected plan blocks all old-document actions until the matching plan is restored',async()=>{
+ const {e}=setup(true);e.btnCreateAuto.click();await tick();e.candidateList.children[1].click();
+ for(const id of ['btnCheckAuto','btnSaveIndd','btnExportPdf'])assert.equal(e[id].disabled,true);
+ e.candidateList.children[0].click();assert.equal(e.btnSaveIndd.disabled,false);
+});
+test('production errors redact paths and the actual API key and recover the busy state',async()=>{
+ const {e,app}=setup(true,{create:()=>{throw new Error('bad example-secret-key C:\\Users\\private\\file.indd');}});
+ e.apiKey.value='example-secret-key';e.btnCreateAuto.click();await tick();
+ assert.match(e.studioStatus.textContent,/문서 생성 실패/);assert.equal(app.state.busy,false);assert.equal(e.btnCreateAuto.disabled,false);
+ assert.ok(!e.studioStatus.textContent.includes('example-secret-key'));assert.ok(!e.hostReport.textContent.includes('private'));
+});
+test('PDF native cancellation or unconfirmed completion never displays success',async()=>{
+ const {e}=setup(true,{exportPdf:()=>({pageCount:1,errors:[],warnings:[],outcome:'unconfirmed'})});
+ e.btnCreateAuto.click();await tick();e.btnExportPdf.click();await tick();
+ assert.match(e.studioStatus.textContent,/완료 미확인/);assert.doesNotMatch(e.studioStatus.textContent,/성공/);
+ assert.equal(e.btnExportPdf.disabled,false);
+});
+test('save failure leaves check and retry available, and successful check re-enables PDF',async()=>{
+ const {e}=setup(true,{saveIndd:()=>{throw new Error('write failed');}});
+ e.btnCreateAuto.click();await tick();e.btnSaveIndd.click();await tick();
+ assert.match(e.studioStatus.textContent,/INDD 저장 실패/);assert.equal(e.btnSaveIndd.disabled,false);assert.equal(e.btnExportPdf.disabled,true);
+ e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);
+});
+
+function nativeAdapter(host,picker){
+ const vm=require('node:vm');let adapter;
+ vm.runInNewContext(fs.readFileSync('studio.js','utf8'),{require:n=>{
+  if(n==='uxp')return {storage:{localFileSystem:{getFileForSaving:picker}}};
+  if(n==='./src/auto-indesign.js')return host;
+  if(n==='./src/studio-ui.js')return {mount:a=>{adapter=a;}};
+  return require('../'+n);
+ },document:{getElementById:()=>({})}});
+ assert.ok(adapter);return adapter;
+}
+test('real native adapter passes the selected path and progress to the correct host method',async()=>{
+ const calls=[],steps=[],progress=s=>steps.push(s),report={pageCount:1,errors:[],warnings:[]};
+ const host={save:(p,cb)=>{calls.push(['save',p]);cb('save.Document.save');return report;},exportPdf:(p,cb)=>{calls.push(['pdf',p]);cb('pdf.Document.exportFile');return report;}};
+ const adapter=nativeAdapter(host,async(name,options)=>({nativePath:'C:\\private\\'+name}));
+ assert.equal(await adapter.saveIndd(progress),report);assert.equal(await adapter.exportPdf(progress),report);
+ assert.deepEqual(calls,[['save','C:\\private\\magazine-design.indd'],['pdf','C:\\private\\magazine-design.pdf']]);
+ assert.ok(steps.includes('output.getFileForSaving'));assert.ok(!steps.join(' ').includes('private'));
+});
+test('real native adapter does not call host output on either file-picker cancellation',async()=>{
+ let writes=0;const adapter=nativeAdapter({save:()=>writes++,exportPdf:()=>writes++},async()=>null);
+ assert.equal(await adapter.saveIndd(),null);assert.equal(await adapter.exportPdf(),null);assert.equal(writes,0);
+});
+test('native picker permission failure has a redacted stage and no host write',async()=>{
+ let writes=0;const adapter=nativeAdapter({save:()=>writes++},async()=>{throw new Error('Denied /Users/private/out.indd');});
+ await assert.rejects(()=>adapter.saveIndd(),e=>e.productionStage==='output.getFileForSaving'&&!e.message.includes('private'));
+ assert.equal(writes,0);
+});
