@@ -1,6 +1,6 @@
 # HANDOFF — 1.1.0
 
-갱신: 2026-09-29. 사용자 요청: **새 디자인 미리보기 / InDesign / PDF 외관 정합성 검토와 최소 수정.** 개발 브랜치: `codex/magazine-studio-1.1`.
+갱신: 2026-09-29. 사용자 요청: **새 디자인 전체 UI 감사와 설치 폰트 선택·스타일 오류 진단 보완.** 개발 브랜치: `codex/magazine-studio-1.1`.
 
 ## 현재 상태
 
@@ -8,7 +8,7 @@
 - 새 모드는 새 문서·새 프레임을 생성한다. 기존 문서에는 쓰지 않는다. 이는 사용자가 명시적으로 요청한 새 범위이며 D026에 기록했다.
 - 무료 배치 3안 / 선택형 AI 첫 페이지 설계 / 이어지는 본문 페이지 / 원고 저장 / INDD 저장 / 검사 / PDF 코드 구현.
 - Word의 탭/수동 줄바꿈 처리와 중복 마커 검사를 보강했다.
-- Node 자동 테스트 **56개 통과**(기존 50 + 렌더링 회귀 6). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
+- Node 자동 테스트 **76개 통과**(직전 56 + 폰트/UI 회귀 20). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
 - 사용자 PC 1차 실기 확인: 패널 표시, 원고 입력, 무료 3안, 미리보기 글자 크기, 패널 스크롤 정상. InDesign/UDT 정확한 버전은 아직 미기록.
 - 이후 사용자 PC에서 새 문서 생성·PDF 내보내기 성공 보고. PDF 사각형 선/미리보기 차이 관찰. 이번 외관 수정 이후 실제 InDesign 재검증 필요. AI 실호출 및 별도 브라우저 렌더링은 여전히 미검증.
 - 수정: UXP enum equals 비교, 재생성 실패 시 이전 대상 해제, save 반환 문서 추적, 검사 실패 후 PDF 차단, 단계별 민감정보 제거 진단. PDF 옵션 취소/완료 불명확 시 성공으로 단정하지 않는다.
@@ -16,6 +16,9 @@
 기존 1.0의 실기 성공 기록은 `docs/archive/HANDOFF-before-1.1.md`에 보존했다. 해당 기록은 새 모드 실기 검증의 근거가 아니다.
 
 - 외관 수정: strokeColor=None 명시, typography/furniture 공통화, 설정 폰트·자간·문단 간격·색상 정합성, 신규 문서의 스타일 override 제거. 실제 줄바꿈/폰트 매칭/페이지 분할은 아직 다를 수 있음. 상세 비교와 실기는 docs/RENDER_PARITY.md.
+
+- 최신 실기 오류: create.styles에서 글꼴 스타일 사용 불가. 역할/폰트/속성은 기존 로그에 없어 정확한 PC 원인 미확정. 폰트와 style 일괄 대입을 순차 적용으로 변경하고 단계별 family/style/name 진단을 추가했다.
+- 실제 설치 face 검색/본문·제목 적용, 프로젝트 누락 폰트 경고, UI 전수 감사 완료. Mock 통과와 Adobe 실기는 구분한다. 상세: docs/STUDIO_AUDIT.md. 템플릿 등록/상세 텍스트 편집 UI는 설계만 했다.
 
 ## 다음 3개 작업
 
@@ -35,7 +38,7 @@
 
 ## 개발·전달
 
-- `npm test`: 의존성 설치 없이 56개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js`를 사용한다.
+- `npm test`: 의존성 설치 없이 76개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js`를 사용한다.
 - `preview.html`: 폴더에서 브라우저로 열어 체험.
 - `manifest.json`: UDT로 로드.
 - 최종 ZIP에는 소스/문서/테스트/기존 자료를 포함하며 `.git`과 임시파일은 제외.

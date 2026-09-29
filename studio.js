@@ -22,7 +22,7 @@ async function saveProduction(name,types,write,progress){
  const path=D.step('output.nativePath',()=>{if(!file.nativePath)throw new Error('선택한 저장 위치의 경로를 확인할 수 없습니다.');return file.nativePath;},progress);
  return write(path,progress);
 }
-Studio.mount({native:true,load,image:async()=>{const f=await fs.getFileForOpening({types:['png','jpg','jpeg']});return f?{path:f.nativePath,name:f.name,preview:previewPath(f.nativePath)}:null;},fonts:Host.listFonts,
+Studio.mount({native:true,load,image:async()=>{const f=await fs.getFileForOpening({types:['png','jpg','jpeg']});return f?{path:f.nativePath,name:f.name,preview:previewPath(f.nativePath)}:null;},fonts:Host.listFonts,validateFonts:Host.validateFonts,
  saveProject:obj=>saveAs('magazine-project.json',['json'],async f=>{await f.write(JSON.stringify(obj,null,2));return true;}),
  create:Host.create,check:Host.check,
  saveIndd:progress=>saveProduction('magazine-design.indd',['indd'],Host.save,progress),

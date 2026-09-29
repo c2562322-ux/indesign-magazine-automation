@@ -10,7 +10,12 @@ function host(options={}){
   const pages=[],stories=[];
   const none={isValid:true,name:"None"};
   const events={};
-  const doc={items:[],characterStyles:{item:()=>({name:"[None]"})},isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>p},swatches:{itemByName:()=>options.localizedNone?{isValid:false}:none,item:()=>none},recompose(){if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
+  const doc={items:[],characterStyles:{item:()=>({name:"[None]"})},isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>{
+   if(!options.strictFonts)return p;
+   if('fontStyle' in p)throw new Error('요청한 글꼴 스타일은 사용할 수 없습니다.');
+   let face;Object.defineProperty(p,'appliedFont',{enumerable:true,get:()=>face,set:f=>{face=f;}});
+   let style;Object.defineProperty(p,'fontStyle',{enumerable:true,get:()=>style,set:v=>{if(options.rejectStyle||!face||face.fontStyleName!==v)throw new Error('요청한 글꼴 스타일은 사용할 수 없습니다.');style=v;}});return p;
+  }},swatches:{itemByName:()=>options.localizedNone?{isValid:false}:none,item:()=>none},recompose(){if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
   function frame(page){
     let current;
     const t={pointSize:10.5,leading:16.2,tracking:900,applyParagraphStyle(style,clear){assert.equal(clear,true);this.appliedParagraphStyle=style;Object.assign(this,style);}};
@@ -24,6 +29,7 @@ function host(options={}){
  }
  const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1},Justification:{LEFT_ALIGN:1},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
  const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
+ if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>options.fonts[i],itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
  const module={exports:{}};
  vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
  return {api:module.exports,docs,calls};
@@ -122,4 +128,35 @@ test('Host typography, including meta leading, clears inherited overrides and ma
   assert.equal(t.appliedCharacterStyle.name,'[None]');assert.equal(t.leftIndent,0);assert.equal(t.alignToBaseline,false);
   assert.equal(t.paragraphBorderOn,false);assert.equal(t.paragraphShadingOn,false);
  }
+});
+
+const face=(family,style,status=1)=>({name:family+'\t'+style,fontFamily:family,fontStyleName:style,fullName:family+' '+style,postscriptName:family+'-'+style,status,isValid:true});
+test('font catalog returns actual faces and excludes non-installed fonts',()=>{
+ const h=host({fonts:[face('Example','Book'),face('Example','Heavy'),face('Missing','Regular',99)]});
+ const rows=h.api.listFonts();assert.equal(rows.length,2);assert.equal(rows[0].family,'Example');assert.equal(rows[0].style,'Book');assert.equal(rows[1].name,'Example\tHeavy');
+});
+test('styles apply the resolved face before its real style, without assuming Regular or Bold',async()=>{
+ const h=host({fonts:[face('Example','Book'),face('Example','Heavy')],strictFonts:true}),steps=[];
+ await h.api.create(a,L.candidates(a,{bodyFont:'Example\tBook',titleFont:'Example\tHeavy'})[0],s=>steps.push(s));
+ const body=h.docs[0].items.find(f=>f.label==='AUTO_BODY_1').parentStory.texts.item(0);
+ assert.equal(body.fontStyle,'Book');assert.ok(steps.find(s=>s.includes('body.appliedFont')&&s.includes('style=Book')));
+});
+test('missing style and family reject before creating a document; no invented fallback',async()=>{
+ const h=host({fonts:[face('Example','Book')]});
+ for(const name of ['Example\tBold','Missing'])await assert.rejects(()=>h.api.create(a,L.candidates(a,{bodyFont:name,titleFont:'Example\tBook'})[0]),/自動|자동 대체하지/);
+ assert.equal(h.docs.length,0);
+});
+test('full and PostScript names resolve; an ambiguous family requires explicit style',()=>{
+ const h=host({fonts:[face('Example','Book'),face('Example','Heavy')]});
+ assert.ok(h.api.validateFonts({bodyFont:'Example Book',titleFont:'Example-Heavy'}).every(f=>!f.error));
+ assert.match(h.api.validateFonts({bodyFont:'Example',titleFont:'Missing'})[0].error,/여러 스타일/);
+});
+test('user-selected installed replacement works, and a subsequently unavailable font is rejected',async()=>{
+ const options={fonts:[face('Available','Medium')],strictFonts:true},h=host(options),p=L.candidates(a,{bodyFont:'Available\tMedium',titleFont:'Available\tMedium'})[0];
+ await h.api.create(a,p);options.fonts=[];await assert.rejects(()=>h.api.create(a,p),/사용 가능한 폰트/);assert.equal(h.docs.length,1);
+});
+test('style rejection exposes the role, exact requested face and property stage',async()=>{
+ const h=host({fonts:[face('Example','Book')],strictFonts:true,rejectStyle:true});
+ await assert.rejects(()=>h.api.create(a,L.candidates(a,{bodyFont:'Example\tBook',titleFont:'Example\tBook'})[0]),e=>e.message.includes('body.fontStyle')&&e.message.includes('style=Book'));
+ assert.equal(h.docs[0].isValid,false);
 });

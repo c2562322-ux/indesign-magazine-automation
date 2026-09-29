@@ -83,10 +83,10 @@ test('save failure leaves check and retry available, and successful check re-ena
  e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);
 });
 
-function nativeAdapter(host,picker){
+function nativeAdapter(host,picker,opening){
  const vm=require('node:vm');let adapter;
  vm.runInNewContext(fs.readFileSync('studio.js','utf8'),{require:n=>{
-  if(n==='uxp')return {storage:{localFileSystem:{getFileForSaving:picker}}};
+  if(n==='uxp')return {storage:{formats:{binary:'binary'},localFileSystem:{getFileForSaving:picker,getFileForOpening:opening}}};
   if(n==='./src/auto-indesign.js')return host;
   if(n==='./src/studio-ui.js')return {mount:a=>{adapter=a;}};
   return require('../'+n);
@@ -150,4 +150,100 @@ test('preview photos use centered cover with exact image-plan geometry',async()=
   assert.equal(parseFloat(photo.style.width),b.width*scale);assert.equal(parseFloat(photo.style.height),b.height*scale);
   assert.equal(parseFloat(photo.style.left),b.x*scale);assert.equal(parseFloat(photo.style.top),b.y*scale);
  }
+});
+
+test('every studio button and editable design field has an actual listener',()=>{
+ const {e}=setup(true),html=fs.readFileSync('index.html','utf8').split('<div id="legacyPanel"')[0];
+ for(const m of html.matchAll(/<button[^>]*id="([^"]+)"/g))assert.equal(typeof e[m[1]].listeners.click,'function',m[1]);
+ for(const m of html.matchAll(/<(?:input|textarea)[^>]*id="([^"]+)"/g)){
+  if(['apiKey','aiModel'].includes(m[1]))continue; // read only on explicit AI click
+  assert.equal(typeof e[m[1]].listeners.input,'function',m[1]);
+ }
+});
+const fontRows=Array.from({length:65},(_,i)=>({name:'Family'+i+'\tBook',family:'Family'+i,style:'Book',postscriptName:'Family'+i+'-Book'}));
+test('font browser opens, paginates and searches real styles',async()=>{
+ const {e}=setup(true,{fonts:()=>fontRows});e.btnFonts.click();await tick();
+ assert.equal(e.fontBrowser.style.display,'block');assert.equal(e.fontChoices.children.length,30);
+ e.btnFontMore.click();assert.equal(e.fontChoices.children.length,60);
+ e.fontSearch.value='Family64';e.fontSearch.listeners.input();assert.equal(e.fontChoices.children.length,1);assert.equal(e.btnFontMore.disabled,true);
+});
+test('font query failure shows diagnostics and allows retry and empty results',async()=>{
+ let fail=true;const {e}=setup(true,{fonts:()=>{if(fail)throw new Error('font host failed');return [];}});
+ e.btnFonts.click();await tick();assert.match(e.fontSummary.textContent,/조회 실패/);assert.equal(e.btnFonts.disabled,false);
+ fail=false;e.btnFonts.click();await tick();assert.match(e.studioStatus.textContent,/설치 폰트가 없습니다/);
+});
+test('choosing installed replacements updates preview and creation plan, invalidates old output',async()=>{
+ let received;const {app,e}=setup(true,{fonts:()=>fontRows,create:(a,p)=>{received=p;return {pageCount:1,errors:[],warnings:[]};}});
+ e.btnCreateAuto.click();await tick();e.btnFonts.click();await tick();
+ e.fontChoices.children[0].children[1].click();await tick();e.fontChoices.children[1].children[2].click();await tick();
+ assert.equal(e.bodyFont.value,fontRows[0].name);assert.equal(e.titleFont.value,fontRows[1].name);assert.equal(e.btnExportPdf.disabled,true);
+ const sheet=e.largePreview.children[0];assert.equal(sheet.children.find(n=>n.className==='preview-title').style.fontFamily,'"Family1", sans-serif');
+ e.btnCreateAuto.click();await tick();assert.equal(received.settings.bodyFont,fontRows[0].name);assert.equal(received.settings.titleFont,fontRows[1].name);
+ assert.equal(app.state.plans.length,3);
+});
+test('load warns about fonts missing on this PC without replacing saved settings',async()=>{
+ const {e}=setup(true,{load:()=>({article:Studio.SAMPLE,settings:{bodyFont:'Missing',titleFont:'Missing'}}),validateFonts:()=>[{role:'bodyFont',error:'폰트 없음'}]});
+ e.btnLoadAuto.click();await tick();assert.equal(e.bodyFont.value,'Missing');assert.match(e.studioStatus.textContent,/본문: 폰트 없음/);
+});
+test('sample, clear, settings, AI panel and mode switches change their intended state',async()=>{
+ const {e,app}=setup(true);e.btnSettings.click();assert.equal(e.settingsPanel.style.display,'block');e.btnSettings.click();assert.equal(e.settingsPanel.style.display,'none');
+ e.btnAiSettings.click();assert.equal(e.aiPanel.style.display,'block');e.btnAiSettings.click();assert.equal(e.aiPanel.style.display,'none');
+ e.modeLegacy.click();assert.equal(e.studioPanel.style.display,'none');e.modeStudio.click();assert.equal(e.studioPanel.style.display,'block');
+ e.btnClear.click();await tick();assert.equal(app.state.plans.length,0);assert.equal(e.btnCreateAuto.disabled,true);
+ e.btnSample.click();await tick();assert.equal(app.state.plans.length,3);assert.equal(e.autoTitle.value,Studio.SAMPLE.title);
+});
+test('load cancel, failure, retry and saved-plan restore reach the real adapter',async()=>{
+ let result=null;const {e,app}=setup(true,{load:()=>{if(result instanceof Error)throw result;return result;}});
+ e.btnLoadAuto.click();await tick();assert.match(e.studioStatus.textContent,/취소/);
+ result=new Error('read failure');e.btnLoadAuto.click();await tick();assert.match(e.studioStatus.textContent,/read failure/);
+ result={article:Studio.SAMPLE,settings:app.state.plans[0].settings,plan:app.state.plans[1]};
+ e.btnLoadAuto.click();await tick();assert.equal(app.state.selected,3);assert.equal(e.btnLoadAuto.disabled,false);
+});
+test('photo cancel, failure, retry and dynamic remove preserve expected state',async()=>{
+ let mode=0;const {e,app}=setup(true,{image:()=>{if(mode===1)throw new Error('photo error');return mode===0?null:{path:'a.jpg'};}});
+ e.btnAddImage.click();await tick();assert.match(e.studioStatus.textContent,/취소/);mode=1;e.btnAddImage.click();await tick();assert.match(e.studioStatus.textContent,/photo error/);
+ mode=2;e.btnAddImage.click();await tick();assert.equal(app.state.images.length,1);e.autoImages.children[0].children[1].click();assert.equal(app.state.images.length,0);
+});
+test('project save failure and cancel recover, and a retry succeeds',async()=>{
+ let mode=0;const {e}=setup(true,{saveProject:()=>{if(mode===0)throw new Error('save error');return mode===2;}});
+ e.btnSaveProject.click();await tick();assert.match(e.studioStatus.textContent,/save error/);mode=1;e.btnSaveProject.click();await tick();assert.match(e.studioStatus.textContent,/취소/);
+ mode=2;e.btnSaveProject.click();await tick();assert.match(e.studioStatus.textContent,/저장했습니다/);
+});
+test('page navigation respects boundaries and stale candidate click displays an error',async()=>{
+ const {e,app}=setup(true);e.autoBody.value='긴 본문 '.repeat(2500);e.autoBody.listeners.input();e.btnPrepare.click();await tick();
+ assert.equal(e.prevPage.disabled,true);e.nextPage.click();assert.equal(app.state.page,1);e.prevPage.click();assert.equal(app.state.page,0);
+ e.autoTitle.value+=' 수정';e.autoTitle.listeners.input();e.candidateList.children[1].click();assert.match(e.studioStatus.textContent,/바뀌었습니다/);
+});
+test('AI controls pass input, show failure, retry, select a plan and reuse cache without a real API call',async()=>{
+ const AI=require('../src/ai-layout'),L=require('../src/layout-engine'),original=AI.generate;let calls=0;
+ try{
+  AI.generate=async(a,s,key,model)=>{calls++;assert.equal(key,'fake-test');assert.equal(model,'test-model');if(calls===1)throw new Error('mock AI error');return {...L.candidates(a,s)[0],origin:'ai',id:'ai'};};
+  const {e,app}=setup(true);e.apiKey.value='fake-test';e.aiModel.value='test-model';e.btnAI.click();await tick();assert.match(e.studioStatus.textContent,/mock AI error/);
+  e.btnAI.click();await tick();assert.equal(app.state.plans[app.state.selected].origin,'ai');e.btnAI.click();await tick();assert.equal(calls,2);assert.match(e.studioStatus.textContent,/재사용/);
+ }finally{AI.generate=original;}
+});
+
+test('all editable article and setting values invalidate and reach a regenerated creation plan',async()=>{
+ const changes={autoTitle:'다른 제목',autoSubtitle:'다른 부제',autoBody:'새 본문 '.repeat(100),autoKicker:'NEWS',autoAuthor:'필자',pageWidth:'240',pageHeight:'330',pageMargin:'20',pageBleed:'4',bodySize:'12',accent:'#336699',publication:'TEST',bodyFont:'Other Body',titleFont:'Other Title'};
+ let received;const {e}=setup(true,{create:(article,plan)=>{received={article,plan};return {pageCount:1,errors:[],warnings:[]};}});
+ for(const [id,value] of Object.entries(changes)){e[id].value=value;e[id].listeners.input();assert.equal(e.btnCreateAuto.disabled,true,id);e.btnPrepare.click();await tick();assert.equal(e.btnCreateAuto.disabled,false,id);}
+ e.btnCreateAuto.click();await tick();assert.equal(received.article.title,changes.autoTitle);assert.equal(received.article.author,changes.autoAuthor);
+ assert.equal(received.plan.settings.width,240);assert.equal(received.plan.settings.margin,20);assert.equal(received.plan.settings.accent,'#336699');assert.equal(received.plan.settings.titleFont,'Other Title');
+});
+test('native load and image pickers, project write and font adapter actually connect',async()=>{
+ let entry=null,written,validation;
+ const host={listFonts:()=>fontRows,validateFonts:s=>{validation=s;return [];}};
+ const adapter=nativeAdapter(host,async()=>({write:v=>{written=v;}}),async()=>entry);
+ assert.equal(await adapter.load(),null);assert.equal(await adapter.image(),null);
+ entry={name:'article.txt',nativePath:'C:\\test\\article.txt',read:async()=> '제목\n본문'};
+ assert.equal((await adapter.load()).article.title,'제목');
+ entry={name:'photo.jpg',nativePath:'C:\\test\\photo.jpg'};assert.equal((await adapter.image()).preview,'file:C:/test/photo.jpg');
+ await adapter.saveProject({schemaVersion:1});assert.equal(JSON.parse(written).schemaVersion,1);
+ assert.equal(adapter.fonts(),fontRows);adapter.validateFonts({bodyFont:'chosen'});assert.equal(validation.bodyFont,'chosen');
+});
+test('preview uses catalog Medium style without requesting nonexistent styles from Host',async()=>{
+ const {e}=setup(true,{fonts:()=>[{name:'Actual\tMedium',family:'Actual',style:'Medium'}]});
+ e.btnFonts.click();await tick();e.fontChoices.children[0].children[2].click();await tick();
+ assert.equal(e.largePreview.children[0].children.find(n=>n.className==='preview-title').style.fontWeight,'500');
+ assert.equal(e.titleFont.value,'Actual\tMedium');
 });

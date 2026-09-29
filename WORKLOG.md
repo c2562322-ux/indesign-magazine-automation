@@ -1065,3 +1065,12 @@
 - 새 모드만 공통 typography/furniture와 None stroke 적용, Host 기본값/override 영향 축소. 본문 추정 분할과 실제 연결 조판 차이는 보존하고 제한 명시.
 - 기존 50 + 신규 6 = 전체 56 통과. 수정 전 렌더러를 메모리로 주입해 신규 회귀 실패 확인; 작업 파일 checkout/reset 없음. Mock은 Adobe 실기 검증 아님.
 - docs/RENDER_PARITY.md에 항목별 plan→preview→Host 비교표 및 실기 절차. 기존 시작페이지/Inspector/목차/저장 경로 변경 없음.
+
+
+## 2026-09-29 — 새 디자인 전체 UI/폰트 감사
+
+- create.styles 사용자 실기 오류 접수. 직전 bulk appliedFont/fontStyle 지정의 순서 의존을 제거하고 실제 face→style 순차 지정, 역할/속성/이름 진단 추가. 실제 PC의 정확한 폰트 조합은 미확정. 기존 렌더러를 메모리로 주입한 strict Mock에서 관련 회귀 실패 확인.
+- 설치 face(name/family/style/fullName/PostScript) 조회·검색·30개씩 표시·본문/제목 적용, 누락/모호한 폰트 안내. 자동 임의 대체 없이 실제 설치 face를 사용자가 선택. 프로젝트의 없는 폰트 경고.
+- 전수 정적 35개+동적 컨트롤 추적. 사진 취소/삭제 안내, stale 시안 예외, 페이지 경계, 브라우저의 Host 전용 버튼 상태, 비우기 잔여 표시 보완.
+- 무료 3안=규칙 기반; assets INDD/IDML 미사용. src/template.js는 연결된 엔진이 아닌 빈 placeholder. 등록 템플릿/상세 텍스트 편집은 설계만 docs/STUDIO_AUDIT.md에 기록.
+- 기존56+추가20=76 Node 테스트 통과. 실제 Adobe 폰트/UI/API/AI 실행 성공으로 해석하지 않음. 기존 시작페이지/Inspector/목차/사용자 INDD 파일 미변경.

@@ -2,7 +2,7 @@
  'use strict';
  const SAMPLE={title:'도시를 읽는\n또 하나의 방법',subtitle:'빠르게 지나쳤던 골목에서 발견하는\n우리 동네의 새로운 표정',kicker:'LIFE & CULTURE',author:'편집실',images:[],body:'도시를 이해하는 가장 좋은 방법은 잠시 속도를 늦추는 일이다. 매일 같은 길을 걷더라도 익숙한 풍경을 다르게 바라보면 전에는 보이지 않던 이야기가 드러난다. 오래된 간판의 글씨, 작은 가게의 진열장, 낮은 담장 너머의 나무가 그 시작이 될 수 있다.\n\n골목에는 사람들이 살아온 시간이 겹겹이 쌓여 있다. 새로운 카페 옆에서 수십 년째 문을 여는 수선집은 서로 다른 속도로 동네의 하루를 만든다. 변화를 살펴보는 일은 오래된 것을 지키는 이유와 새로움을 받아들이는 방법을 함께 생각하게 한다.\n\n산책의 목적지를 미리 정하지 않아도 좋다. 평소 버스를 타고 지나던 구간을 걸어보거나 익숙한 교차로에서 반대편으로 방향을 바꾸는 것만으로도 충분하다. 다만 가게와 주택이 이어지는 길에서는 생활하는 사람들의 공간을 존중하며 천천히 머무는 태도가 필요하다.\n\n같은 장소를 다른 시간에 찾는 것도 한 가지 방법이다. 아침에는 문을 여는 사람들의 움직임이, 오후에는 창문에 비치는 빛이, 저녁에는 하루를 마무리하는 소리가 눈에 들어온다. 한 번의 방문으로는 알 수 없었던 표정들이 조금씩 모여 동네에 대한 이해를 넓힌다.\n\n돌아오는 길에는 인상 깊었던 장면 하나를 메모해보자. 사진 한 장이나 짧은 문장이면 된다. 기록은 멋진 장소를 모으기 위한 목록이 아니라 우리가 무엇에 관심을 기울였는지 돌아보는 작은 단서가 된다. 도시의 이야기는 그렇게 각자의 걸음 속에서 새롭게 이어진다.'};
  function mount(adapter){
-    const $=id=>document.getElementById(id),state={images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false};
+    const $=id=>document.getElementById(id),state={images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30};
     const editable=['autoTitle','autoSubtitle','autoBody','autoKicker','autoAuthor','pageWidth','pageHeight','pageMargin','pageBleed','bodySize','accent','publication','bodyFont','titleFont'];
     const safe=message=>D.redact(message,[$('apiKey').value].concat(state.images.map(im=>im.path)));
     const status=(message,error)=>{$('studioStatus').textContent=safe(message);$('studioStatus').className='studio-status'+(error?' error':'');};
@@ -16,6 +16,11 @@
         const isCurrent=valid&&state.documentKey===state.signature+'|'+JSON.stringify(state.plans[state.selected]);
         ['btnSaveIndd','btnExportPdf','btnCheckAuto'].forEach(id=>$(id).disabled=state.busy||!state.hasDocument||!isCurrent||!adapter.native);
         $('btnExportPdf').disabled=$('btnExportPdf').disabled||!state.pdfReady;
+        $('btnAI').disabled=state.busy||!adapter.native;
+        $('btnFonts').disabled=state.busy||!adapter.native;
+        $('prevPage').disabled=state.busy||!valid||state.page===0;
+        $('nextPage').disabled=state.busy||!valid||state.page>=((state.plans[state.selected]||{pages:[]}).pages.length-1);
+        $('btnFontMore').disabled=state.busy||state.fontLimit>=filteredFonts().length;
     }
     async function run(fn){
         if(state.busy)return;state.busy=true;
@@ -25,7 +30,7 @@
     }
     function imageList(){
         const root=$('autoImages');root.textContent='';
-        state.images.forEach((im,i)=>{const row=document.createElement('div');row.className='image-row';const label=document.createElement('span');label.textContent=im.name||im.path||('사진 '+(i+1));row.appendChild(label);const remove=document.createElement('button');remove.textContent='삭제';remove.className='quiet';remove.addEventListener('click',()=>{state.images.splice(i,1);imageList();changed();});row.appendChild(remove);root.appendChild(row);});
+        state.images.forEach((im,i)=>{const row=document.createElement('div');row.className='image-row';const label=document.createElement('span');label.textContent=im.name||im.path||('사진 '+(i+1));row.appendChild(label);const remove=document.createElement('button');remove.textContent='삭제';remove.className='quiet';remove.addEventListener('click',()=>{if(state.busy)return;state.images.splice(i,1);imageList();changed();status('사진을 제거했습니다. 시안을 다시 만들어주세요.');});row.appendChild(remove);root.appendChild(row);});
         $('imageCount').textContent=state.images.length+' / 2';
     }
     function fill(a,s){
@@ -43,9 +48,10 @@
         // L.PT is points per millimetre: convert points to mm, then mm to preview pixels.
         const fontPixels=points=>(points/L.PT*scale)+'px';
         const type=(node,b)=>{
-            const t=L.typography(b,s),parts=t.font.split('\t');
+            const t=L.typography(b,s),face=state.fonts.find(f=>f.name===t.font),parts=face?[face.family,face.style]:t.font.split('\t');
+            const style=parts[1]||'',weight=/black|heavy/i.test(style)?900:/extra.?bold|ultra.?bold/i.test(style)?800:/semi.?bold|demi/i.test(style)?600:/bold/i.test(style)?700:/medium/i.test(style)?500:/extra.?light|ultra.?light/i.test(style)?200:/light/i.test(style)?300:/thin/i.test(style)?100:400;
             Object.assign(node.style,{fontFamily:JSON.stringify(parts[0])+', sans-serif',fontSize:fontPixels(t.size),
-                fontWeight:parts.length>1&&/bold/i.test(parts[1])?'700':'400',fontStyle:parts.length>1&&/italic|oblique/i.test(parts[1])?'italic':'normal',
+                fontWeight:String(weight),fontStyle:/italic|oblique/i.test(style)?'italic':'normal',
                 lineHeight:fontPixels(t.leading),letterSpacing:fontPixels(t.size*t.tracking/1000),textAlign:t.align,color:t.color,
                 whiteSpace:'pre-wrap',padding:'0px',border:'none',boxSizing:'border-box'});
         };
@@ -88,7 +94,7 @@
             const button=element('button','candidate'+(i===state.selected?' selected':''));button.setAttribute('aria-pressed',i===state.selected?'true':'false');
             button.appendChild(element('span','candidate-num',String(i+1).padStart(2,'0')));
             button.appendChild(element('strong','',p.name));button.appendChild(element('span','candidate-desc',p.origin==='ai'?'AI 제안 · '+p.estimatedPages+'p 예상':p.estimatedPages+'p 예상'));
-            button.addEventListener('click',()=>{if(state.busy)return;state.selected=i;state.page=0;render();});grid.appendChild(button);
+            button.addEventListener('click',()=>{if(state.busy)return;try{fresh();state.selected=i;state.page=0;render();}catch(e){status(e.message,true);}});grid.appendChild(button);
         });
         $('designName').textContent=plan.name;$('designDescription').textContent=plan.description;
         $('pageIndicator').textContent=(state.page+1)+' / '+plan.pages.length;
@@ -101,20 +107,50 @@
     editable.forEach(id=>$(id).addEventListener('input',changed));
     $('btnPrepare').addEventListener('click',()=>run(prepare));
     $('btnSample').addEventListener('click',()=>run(()=>{fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status('예시 원고입니다. 직접 입력하거나 원고 파일을 불러와주세요.');}));
-    $('btnClear').addEventListener('click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];$('candidateList').textContent='';$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';status('새 원고를 입력해주세요.');}));
+    $('btnClear').addEventListener('click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];state.hasDocument=false;state.documentKey='';state.pdfReady=false;$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote','hostReport'].forEach(id=>$(id).textContent='');$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';status('새 원고를 입력해주세요.');}));
     $('btnLoadAuto').addEventListener('click',()=>run(async()=>{
         const result=await adapter.load();if(!result){status('불러오기를 취소했습니다.');return;}
         const a=L.article(result.article),s=L.settings(result.settings||readSettingsOnly());
         if(result.plan){L.validate(result.plan,a);if(JSON.stringify(L.settings(result.plan.settings))!==JSON.stringify(s))throw new Error('저장된 시안과 설정이 일치하지 않습니다.');}
         fill(a,s);prepare();
         if(result.plan){state.plans.push(result.plan);state.selected=state.plans.length-1;render();}
-        status('원고를 불러왔습니다. 사진과 추출된 내용을 확인해주세요.');
+        const issues=adapter.validateFonts?await adapter.validateFonts(s):[];
+        const missing=issues.filter(f=>f.error);
+        status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. 사진과 추출된 내용을 확인해주세요.',!!missing.length);
     }));
     function readSettingsOnly(){try{return L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value});}catch(e){return L.DEFAULTS;}}
-    $('btnAddImage').addEventListener('click',()=>run(async()=>{if(state.images.length>=2)throw new Error('사진은 최대 2장입니다.');const im=await adapter.image();if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}}));
+    $('btnAddImage').addEventListener('click',()=>run(async()=>{if(state.images.length>=2)throw new Error('사진은 최대 2장입니다.');const im=await adapter.image();if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));
     $('btnSettings').addEventListener('click',()=>{$('settingsPanel').style.display=$('settingsPanel').style.display==='none'?'block':'none';});
     $('btnAiSettings').addEventListener('click',()=>{$('aiPanel').style.display=$('aiPanel').style.display==='none'?'block':'none';});
-    $('btnFonts').addEventListener('click',()=>run(async()=>{$('fontList').value=(await adapter.fonts()).join('\n');$('fontList').style.display='block';status('설치 폰트 이름을 복사해 입력할 수 있습니다.');}));
+    function filteredFonts(){const q=$('fontSearch').value.trim().toLowerCase();return state.fonts.filter(f=>[f.name,f.family,f.style,f.postscriptName].join(' ').toLowerCase().includes(q));}
+    function fontChoices(){
+        const list=filteredFonts(),root=$('fontChoices');root.textContent='';
+        $('fontSummary').textContent='사용 가능 '+state.fonts.length+'개 스타일 · 검색 '+list.length+'개 · 표시 '+Math.min(list.length,state.fontLimit)+'개';
+        list.slice(0,state.fontLimit).forEach(f=>{
+            const row=element('div','font-row'),label=element('div','small',f.family+' — '+f.style);row.appendChild(label);
+            [['bodyFont','본문에 적용'],['titleFont','제목에 적용']].forEach(([id,title])=>{
+                const button=element('button','quiet',title);button.addEventListener('click',()=>run(()=>{
+                    let current=false;try{fresh();current=true;}catch(e){}
+                    $(id).value=f.name;
+                    if(current){const v=read();state.plans=state.plans.map(p=>({...p,settings:v.settings}));state.signature=fingerprint(v.article,v.settings);render();}
+                    else{changed();try{prepare();}catch(e){status('폰트 선택 완료 · '+e.message,true);return;}}
+                    status(title+' 완료: '+f.family+' — '+f.style+' · 변경한 시안으로 새 문서를 만들어주세요.');
+                }));row.appendChild(button);
+            });root.appendChild(row);
+        });buttons();
+    }
+    $('fontSearch').addEventListener('input',()=>{state.fontLimit=30;fontChoices();});
+    $('btnFontMore').addEventListener('click',()=>{state.fontLimit+=30;fontChoices();});
+    $('btnFonts').addEventListener('click',()=>run(async()=>{
+        $('fontBrowser').style.display='block';state.fonts=[];$('fontChoices').textContent='';$('fontSummary').textContent='InDesign 설치 폰트 조회 중…';
+        try{
+            const fonts=await adapter.fonts();
+            state.fonts=fonts.map(f=>typeof f==='string'?{name:f,family:f.split('\t')[0],style:f.split('\t')[1]||''}:f);
+            state.fontLimit=30;fontChoices();
+            let valid=false;try{fresh();valid=true;}catch(e){}if(valid)render();
+            status(state.fonts.length?'설치된 실제 스타일을 본문/제목에 적용해주세요.':'사용 가능한 설치 폰트가 없습니다. 폰트를 활성화한 뒤 다시 조회해주세요.',!state.fonts.length);
+        }catch(e){$('fontSummary').textContent='폰트 조회 실패 · '+safe(e.message)+' · 다시 누르면 재시도합니다.';throw e;}
+    }));
     $('btnAI').addEventListener('click',()=>run(async()=>{
         if(!adapter.native)throw new Error('AI 호출은 InDesign 플러그인에서 사용할 수 있습니다.');
         const v=read(),model=$('aiModel').value.trim(),sig=fingerprint(v.article,v.settings),cacheKey=sig+'|'+model;

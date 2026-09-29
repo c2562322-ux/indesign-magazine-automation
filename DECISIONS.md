@@ -537,3 +537,8 @@ PDF exportFile의 반환값으로 성공/취소를 추측하지 않는다. after
 ## D031 — 새 디자인 렌더러의 공통 속성과 프레임 선 제거 (2026-09-29)
 
 geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 layout-engine에서 두 렌더러에 제공한다. 편집 프레임은 strokeColor=None 및 fill=None을 명시하고, 의도된 AUTO_RULE은 독립 role과 accent fill로 보존한다. 새 문서의 문단/문자 override만 제거한다. 기존 양식 객체에는 적용하지 않는다. CSS/InDesign 조판 차이로 픽셀 일치나 페이지 수 일치를 보장하지 않는다. 상세 비교: docs/RENDER_PARITY.md.
+
+
+## D032 — 실제 설치 face 선택과 명시적 대체 (2026-09-29)
+
+새 모드는 app.fonts의 INSTALLED face를 name/family/style/fullName/PostScript로 조회한다. 저장 식별자는 Font.name, 적용은 실제 Font 객체 후 실제 fontStyleName 순서다. 없는 스타일명을 합성하지 않으며 모호한 family나 없는 face는 오류로 안내하고 사용자가 실제 목록에서 대체한다. 기본 Freesentation은 예시 설정일 뿐 자동 fallback이 아니다. 파일 이동 시 누락 폰트를 경고한다. UI catalog와 생성 시 검증을 분리하여 마지막 순간 폰트 비활성화도 차단한다. 큰 템플릿 시스템은 구현하지 않고 geometry/template 두 renderer의 공존 설계만 기록했다.

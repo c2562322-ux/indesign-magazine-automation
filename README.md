@@ -2,14 +2,14 @@
 
 기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
-**상태: 개발 검증판. Node 자동 테스트 56개 통과.** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 외관 정합성 수정본은 실제 InDesign 재검증이 필요합니다. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
+**상태: 개발 검증판. Node 자동 테스트 76개 통과.** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 수정본은 실제 InDesign 재검증이 필요합니다. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
 
 ## 바로 시작
 
 1. ZIP을 폴더에 완전히 풀어주세요.
 2. 먼저 `preview.html`을 브라우저에서 열면 원고 입력과 무료 시안 선택을 체험할 수 있습니다. 이 체험판에는 INDD/PDF 생성과 실제 AI 호출이 없습니다. 사진이 연결된 프로젝트를 불러오면 브라우저에서는 사진 파일을 다시 추가해야 합니다.
 3. PC에 InDesign 18.5 이상과 UXP Developer Tool을 준비합니다. 18.5는 Adobe의 플러그인 지원 시작 버전이며, 이 플러그인의 모든 기능이 해당 버전에서 검증됐다는 뜻은 아닙니다.
-4. `assets/fonts/Freesentation-4Regular.ttf`, `Freesentation-7Bold.ttf`를 설치하거나 패널의 폰트 설정에 이미 설치된 폰트를 지정합니다. 폰트 설치 후 InDesign 재시작이 필요할 수 있습니다. 제공된 폰트·템플릿은 원래 전달받은 자료입니다.
+4. `assets/fonts/Freesentation-4Regular.ttf`, `Freesentation-7Bold.ttf`를 설치하거나 패널의 폰트 설정 → 폰트 더보기에서 설치된 실제 스타일을 본문/제목에 적용합니다. 없는 폰트는 자동 대체하지 않습니다. 폰트 설치 후 InDesign 재시작이 필요할 수 있습니다. 제공된 폰트·템플릿은 원래 전달받은 자료입니다.
 5. UXP Developer Tool에서 **Add Plugin → manifest.json → Load**를 선택합니다. 이전 버전을 로드했다면 Unload한 뒤 새 폴더의 manifest로 다시 등록하세요.
 6. 패널에서 기사 제목·본문을 붙여넣거나 **원고 / 작업 불러오기**를 누릅니다. 사진은 0~2장 선택할 수 있습니다.
 7. **무료 디자인 3안 만들기 → 시안 선택 → 선택한 디자인으로 새 문서 만들기**를 실행합니다.

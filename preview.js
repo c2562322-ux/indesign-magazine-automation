@@ -12,5 +12,5 @@ window.magazineApp=MagazineStudio.mount({native:false,load:async()=>{
  const file=await pick('image/png,image/jpeg');if(!file)return null;
  const preview=URL.createObjectURL(file),img=new Image();img.src=preview;await img.decode();
  return {path:file.name,name:file.name,preview,width:img.naturalWidth,height:img.naturalHeight};
-},fonts:async()=>['Freesentation 4 Regular','Freesentation 7 Bold','브라우저에서는 설치 폰트 전체를 조회할 수 없습니다.'],saveProject:async obj=>{const url=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='magazine-project.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}});
+},fonts:async()=>{throw new Error('설치 폰트 조회는 InDesign 플러그인에서 사용해주세요.');},saveProject:async obj=>{const url=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='magazine-project.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}});
 })();

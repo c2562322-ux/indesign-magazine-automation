@@ -12,29 +12,47 @@ function mm(n) { return n + 'mm'; }
 function bounds(b) { return [b.y,b.x,b.y+b.height,b.x+b.width].map(mm); }
 function installedFont(name) {
     const direct = app.fonts.itemByName(name);
-    if (direct && direct.isValid && sameEnum(direct.status,ID.FontStatus.INSTALLED)) return direct;
+    if (direct && direct.isValid && sameEnum(direct.status,ID.FontStatus.INSTALLED) &&
+        [direct.name,direct.fullName,direct.postscriptName].includes(name)) return direct;
+    const families=[];
     for(let i=0;i<app.fonts.length;i++){
         const f=app.fonts.item(i);
-        if(sameEnum(f.status,ID.FontStatus.INSTALLED) && (f.fontFamily===name || f.fullName===name || f.name===name)) return f;
+        if(!sameEnum(f.status,ID.FontStatus.INSTALLED))continue;
+        if(f.fullName===name || f.name===name || f.postscriptName===name)return f;
+        if(f.fontFamily===name)families.push(f);
     }
-    throw new Error('설치된 폰트를 찾지 못했습니다: '+name+'. 폰트를 설치하거나 설치 폰트 목록에서 이름을 복사해주세요.');
+    if(families.length===1)return families[0];
+    if(families.length>1)throw new Error('여러 스타일이 있는 폰트입니다: '+name+'. 폰트 더보기에서 사용할 스타일을 선택해주세요.');
+    throw new Error('사용 가능한 폰트/스타일을 찾지 못했습니다: '+name+'. 폰트 더보기에서 설치된 대체 폰트를 선택해주세요. 자동 대체하지 않았습니다.');
 }
 function listFonts(){
     const out=[];
-    for(let i=0;i<app.fonts.length;i++){const f=app.fonts.item(i);if(sameEnum(f.status,ID.FontStatus.INSTALLED))out.push(f.name);}
-    return out.sort();
+    for(let i=0;i<app.fonts.length;i++){
+        const f=app.fonts.item(i);
+        if(f.isValid!==false&&sameEnum(f.status,ID.FontStatus.INSTALLED))out.push({name:f.name,family:f.fontFamily,style:f.fontStyleName,fullName:f.fullName,postscriptName:f.postscriptName});
+    }
+    return out.sort((a,b)=>a.name.localeCompare(b.name));
+}
+function validateFonts(s){
+    return ['bodyFont','titleFont'].map(role=>{try{const f=installedFont(s[role]);return {role,name:f.name};}catch(e){return {role,error:D.redact(e.message)};}});
 }
 function rgb(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));}
-function createStyles(doc,s,bodyFont,titleFont){
+function createStyles(doc,s,bodyFont,titleFont,progress){
     const ink=doc.colors.add({name:'AUTO Ink',model:ID.ColorModel.PROCESS,space:ID.ColorSpace.RGB,colorValue:rgb(L.RENDER.ink)});
     const accent=doc.colors.add({name:'AUTO Accent',model:ID.ColorModel.PROCESS,space:ID.ColorSpace.RGB,colorValue:rgb(s.accent)});
     const muted=doc.colors.add({name:'AUTO Muted',model:ID.ColorModel.PROCESS,space:ID.ColorSpace.RGB,colorValue:rgb(L.RENDER.muted)});
     const style=(role,size,font,color)=>{
         const t=L.typography({role,fontSize:size},s);
-        return doc.paragraphStyles.add({name:'AUTO '+role[0].toUpperCase()+role.slice(1),appliedFont:font,fontStyle:font.fontStyleName,
+        const identity=D.redact('family='+font.fontFamily+'; style='+font.fontStyleName+'; name='+font.name);
+        const p=D.step('create.styles.'+role+'.add',()=>doc.paragraphStyles.add({name:'AUTO '+role[0].toUpperCase()+role.slice(1),
             pointSize:t.size,leading:t.leading,fillColor:color,hyphenation:false,justification:ID.Justification.LEFT_ALIGN,
             tracking:t.tracking,spaceBefore:0,spaceAfter:mm(t.spaceAfter),leftIndent:0,rightIndent:0,firstLineIndent:0,
-            alignToBaseline:false,ruleAbove:false,ruleBelow:false,paragraphBorderOn:false,paragraphShadingOn:false});
+            alignToBaseline:false,ruleAbove:false,ruleBelow:false,paragraphBorderOn:false,paragraphShadingOn:false}),progress);
+        // Apply the resolved face first; never ask the inherited family for this style
+        // through an unordered bulk property assignment.
+        D.step('create.styles.'+role+'.appliedFont ('+identity+')',()=>{p.appliedFont=font;},progress);
+        D.step('create.styles.'+role+'.fontStyle ('+identity+')',()=>{p.fontStyle=font.fontStyleName;},progress);
+        return p;
     };
     const body=style('body',s.bodySize,bodyFont,ink);
     body.keepFirstLines=2;body.keepLastLines=2;
@@ -137,7 +155,7 @@ async function create(raw,plan,progress){
             // Smart reflow must not silently introduce host-created pages outside this plan.
             doc.textPreferences.smartTextReflow=false;
             },progress);
-            const styles=D.step('create.styles',()=>createStyles(doc,s,fonts.body,fonts.title),progress);
+            const styles=D.step('create.styles',()=>createStyles(doc,s,fonts.body,fonts.title,progress),progress);
             const bodyFrames=[];
             plan.pages.forEach((design,i)=>bodyFrames.push(D.step('create.page.'+(i+1),()=>addPage(doc,design,s,a,styles,i),progress)));
             D.step('create.body.threadAndContents',()=>{
@@ -191,4 +209,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,listFonts,check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
+module.exports={create,listFonts,validateFonts,check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
