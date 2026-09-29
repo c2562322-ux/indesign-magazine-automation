@@ -1,0 +1,13 @@
+매거진 스튜디오 1.1 개발 검증판
+
+1. ZIP을 완전히 풀어주세요.
+2. preview.html을 더블클릭하면 기사 입력과 무료 디자인 3안을 체험할 수 있습니다.
+3. 실제 InDesign 제작은 UXP Developer Tool에서 manifest.json을 등록해 실행합니다.
+4. 폰트 설정의 기본값은 Freesentation입니다. assets/fonts의 4Regular와 7Bold를 설치하거나 이미 설치된 폰트로 바꿔주세요.
+5. 원고 입력 → 무료 시안 생성 → 선택 → 새 문서 만들기 → 결과 확인 → INDD/PDF 저장 순서입니다.
+
+무료 모드는 API가 필요 없습니다. AI 디자인은 선택 기능으로 별도 OpenAI API 키와 요금이 필요합니다.
+
+이번 개발에서 Node 자동 테스트 30개를 통과했습니다. 실제 InDesign 실행, AI 실호출, 실제 브라우저 렌더링은 아직 검증하지 못했습니다. 실무 사용 전 docs/ACCEPTANCE_TESTS.md 순서로 확인해주세요.
+자세한 사용법과 범위: README.md
+개발 인수인계: HANDOFF.md

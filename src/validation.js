@@ -263,7 +263,7 @@ function formatValidationReport(results) {
 // ---------------------------------------------------------------------------
 
 function hasNonEmptyString(value) {
-    return typeof value === "string" && value.length > 0;
+    return typeof value === "string" && value.trim().length > 0;
 }
 
 // data: JSON.parse로 이미 파싱된 객체. { ok, templateType, variant, checks } 를 반환한다.

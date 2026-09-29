@@ -89,3 +89,9 @@
 - [docs/WORD_INPUT_SPEC.md](WORD_INPUT_SPEC.md) — Word(.docx) 마커 형식으로 이 Article Data 구조를 만드는 방법
 - [HANDOFF.md](../HANDOFF.md) — 현재 프로젝트 상태
 - [DECISIONS.md](../DECISIONS.md) D010 — 이번 단순화 결정과 근거, D019 — Word 입력 MVP 결정과 근거
+
+## 1.1 새 디자인 입력 (기존 OPENING_PAGE 계약과 별개)
+
+`{title: string, body: string, subtitle?: string, kicker?: string, author?: string, images?: [{path, name, width?, height?}]}`.
+
+title/body 필수. 사진 0~2장. 기존 pointText/heroImage도 새 입력에서 매핑한다. 본문은 최대 50,000자이며 디자인 과정에서 요약/삭제하지 않는다. 프로젝트 저장 형식은 `{schemaVersion:1, article, settings, plan}`. 사진 원본 바이너리와 API 키는 포함하지 않는다. `preview` URL은 저장 시 제거한다.

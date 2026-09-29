@@ -1,0 +1,10 @@
+{
+  "version": "1.1.0",
+  "commit": "185bd919e6c6e54d6c45ac2e844e256969b7f4fa",
+  "date": "2026-09-28",
+  "tests": 30,
+  "indesignRuntimeTested": false,
+  "liveApiTested": false,
+  "actualBrowserRenderingTested": false,
+  "remotePush": false
+}

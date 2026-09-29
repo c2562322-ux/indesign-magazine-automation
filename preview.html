@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./studio.css"></head><body><div id="studioPanel">
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>매거진 스튜디오 · 체험</title><link rel="stylesheet" href="studio.css"><style>@font-face{font-family:"Freesentation 4 Regular";src:url("assets/fonts/Freesentation-4Regular.ttf")}@font-face{font-family:"Freesentation 7 Bold";src:url("assets/fonts/Freesentation-7Bold.ttf")}body{font-family:"Freesentation 4 Regular",sans-serif}#modeLegacy{display:none}</style></head><body class="browser"><div id="studioPanel">
   <div class="studio-header"><div><div class="eyebrow">MAGAZINE STUDIO / 1.1</div><h1>기사에서 시작하는 디자인</h1><p class="small">원고를 담고, 시안을 고르고, 새로운 지면을 만드세요.</p></div><button id="modeLegacy" class="quiet">기존 양식 모드</button></div>
   <div class="workspace">
     <div class="editor-column">
@@ -40,39 +40,4 @@
       <div class="toolbar" style="margin-top:10px"><button id="btnSaveProject">원고·시안 저장</button><button id="btnSaveIndd">INDD 저장</button><button id="btnCheckAuto">문서 검사</button><button id="btnExportPdf">PDF 내보내기</button></div><div id="hostReport" class="report"></div>
     </div></div>
   </div><div id="studioStatus" class="studio-status" role="status">준비 중…</div>
-</div><div id="legacyPanel" class="legacy-wrap" style="display:none"><button id="modeStudio">← 새 디자인 모드</button><div class="panel">
-        <sp-heading size="M">Magazine Automation</sp-heading>
-
-        <div class="section">
-            <sp-label>Article</sp-label>
-            <sp-button id="btnLoadArticle" variant="secondary">Load Article</sp-button>
-            <sp-body id="articleFileName" size="S">(선택된 파일 없음)</sp-body>
-        </div>
-
-        <div class="section">
-            <sp-label>Article Log</sp-label>
-            <pre id="articleLog" class="log-area">(Load Article을 아직 실행하지 않음)</pre>
-        </div>
-
-        <div class="section">
-            <sp-button id="btnGenerate" variant="cta">Generate</sp-button>
-        </div>
-
-        <div class="section">
-            <sp-button id="btnInspect" variant="secondary">Inspect Template</sp-button>
-            <sp-button id="btnInspectCurrentPage" variant="secondary">Inspect Current Page</sp-button>
-        </div>
-
-        <div class="section">
-            <sp-label>Inspection Log</sp-label>
-            <sp-button id="btnCopyInspectLog" variant="secondary">Copy Log</sp-button>
-            <textarea id="inspectLog" class="log-area" readonly style="height: 240px; resize: none;">(Inspect Template을 아직 실행하지 않음)</textarea>
-        </div>
-
-        <div class="section">
-            <sp-label>Status</sp-label>
-            <sp-body id="statusText" size="S">Ready</sp-body>
-        </div>
-    </div>
-
-    </div><script src="./index.js"></script><script src="./studio.js"></script></body></html>
+</div><script src="src/layout-engine.js"></script><script src="src/docxZip.js"></script><script src="src/word-text.js"></script><script src="src/article-input.js"></script><script src="src/ai-layout.js"></script><script src="src/studio-ui.js"></script><script src="preview.js"></script></body></html>

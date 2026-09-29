@@ -1,3 +1,4 @@
+(function(root,factory){ if(typeof module==="object"&&module.exports)module.exports=factory();else root.MagazineZip=factory(); })(typeof window!=="undefined"?window:this,function(){
 // .docx(ZIP 컨테이너) 안에서 특정 항목(예: word/document.xml)을 꺼내는 최소 ZIP 리더와
 // RFC 1951(DEFLATE) 압축 해제(raw inflate)를 순수 JavaScript로 직접 구현한 모듈이다.
 //
@@ -177,6 +178,7 @@ const CODE_LENGTH_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2
 // Directory에 기록된 압축 해제 후 크기(정확하다고 가정하고 출력 버퍼를 미리 할당한다).
 function inflateRaw(compressedBytes, expectedLength) {
     const reader = makeBitReader(compressedBytes, 0);
+    if (!Number.isInteger(expectedLength) || expectedLength < 0 || expectedLength > 8000000) throw new Error("Word XML 압축 해제 크기가 허용 범위를 넘습니다.");
     const out = new Uint8Array(expectedLength);
     let outPos = 0;
 
@@ -190,7 +192,9 @@ function inflateRaw(compressedBytes, expectedLength) {
         if (blockType === 0) {
             reader.alignToByte();
             const len = compressedBytes[reader.getBytePos()] | (compressedBytes[reader.getBytePos() + 1] << 8);
-            reader.setBytePos(reader.getBytePos() + 4); // LEN(2)+NLEN(2), NLEN 검증은 생략
+            const nlen = readUint16LE(compressedBytes, reader.getBytePos() + 2);
+            if ((len ^ nlen) !== 65535 || reader.getBytePos() + 4 + len > compressedBytes.length || outPos + len > out.length) throw new Error("손상된 DEFLATE 저장 블록입니다.");
+            reader.setBytePos(reader.getBytePos() + 4);
             for (let i = 0; i < len; i++) {
                 out[outPos++] = compressedBytes[reader.getBytePos() + i];
             }
@@ -238,6 +242,7 @@ function inflateRaw(compressedBytes, expectedLength) {
             while (true) {
                 const symbol = decodeSymbol(reader, litLenHuffman);
                 if (symbol < 256) {
+                    if(outPos >= out.length) throw new Error("DEFLATE 출력 한도 초과");
                     out[outPos++] = symbol;
                 } else if (symbol === 256) {
                     break;
@@ -246,6 +251,7 @@ function inflateRaw(compressedBytes, expectedLength) {
                     const length = LENGTH_BASE[lengthIndex] + reader.getBits(LENGTH_EXTRA_BITS[lengthIndex]);
                     const distSymbol = decodeSymbol(reader, distHuffman);
                     const distance = DIST_BASE[distSymbol] + reader.getBits(DIST_EXTRA_BITS[distSymbol]);
+                    if (!Number.isFinite(length) || !Number.isFinite(distance) || distance > outPos || distance < 1 || outPos + length > out.length) throw new Error("손상된 DEFLATE 참조입니다.");
                     let copyFrom = outPos - distance;
                     for (let i = 0; i < length; i++) {
                         out[outPos++] = out[copyFrom++];
@@ -261,6 +267,7 @@ function inflateRaw(compressedBytes, expectedLength) {
         }
     }
 
+    if (outPos !== expectedLength) throw new Error("ZIP 압축 해제 길이가 일치하지 않습니다.");
     return out;
 }
 
@@ -289,9 +296,11 @@ function extractEntryData(bytes, localHeaderOffset, compressionMethod, compresse
     const localFileNameLength = readUint16LE(bytes, localHeaderOffset + 26);
     const localExtraFieldLength = readUint16LE(bytes, localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength;
+    if(dataStart < 0 || dataStart + compressedSize > bytes.length || uncompressedSize > 8000000) throw new Error("ZIP 항목 크기가 잘못되었거나 너무 큽니다.");
     const compressedData = bytes.subarray(dataStart, dataStart + compressedSize);
 
     if (compressionMethod === 0) {
+        if(compressedSize !== uncompressedSize) throw new Error("ZIP 저장 항목 길이가 일치하지 않습니다.");
         return compressedData.slice();
     }
     if (compressionMethod === 8) {
@@ -307,6 +316,7 @@ function extractEntryData(bytes, localHeaderOffset, compressionMethod, compresse
 // Error를 던진다 — InDesign 문서는 전혀 건드리지 않는다.
 function readZipEntry(docxArrayBuffer, entryName) {
     const bytes = new Uint8Array(docxArrayBuffer);
+    if(bytes.length > 32 * 1024 * 1024) throw new Error("Word 파일은 최대 32MB입니다.");
     const eocdOffset = findEndOfCentralDirectory(bytes);
 
     const centralDirOffset = readUint32LE(bytes, eocdOffset + 16);
@@ -338,7 +348,5 @@ function readZipEntry(docxArrayBuffer, entryName) {
     throw new Error(`ZIP 안에서 "${entryName}" 항목을 찾지 못했습니다 — 올바른 .docx 파일이 아닐 수 있습니다.`);
 }
 
-module.exports = {
-    readZipEntry,
-    utf8BytesToString,
-};
+return { readZipEntry, utf8BytesToString };
+});

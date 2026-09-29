@@ -48,9 +48,9 @@ document.getElementById("btnLoadArticle").addEventListener("click", async () => 
         if (loadResult.status === "parse-error") {
             currentArticleData = null;
             currentArticleFileNativePath = null;
-            articleFileName.textContent = `${loadResult.fileName} (JSON 문법 오류)`;
-            articleLog.textContent = `JSON 문법 오류: ${loadResult.message}`;
-            setStatus(`Load Article 오류 (JSON 문법 오류): ${loadResult.fileName}`);
+            articleFileName.textContent = `${loadResult.fileName} (원고 형식 오류)`;
+            articleLog.textContent = `원고 형식 오류: ${loadResult.message}`;
+            setStatus(`Load Article 오류 (원고 형식 오류): ${loadResult.fileName}`);
             return;
         }
 

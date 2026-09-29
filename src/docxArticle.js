@@ -35,21 +35,7 @@ function unescapeXmlEntities(text) {
 // 문단으로 나뉘어 보이는지(문단 구분 vs 줄 안 개행)는 이 프로젝트에서 아직 실기로 확인된
 // 적이 없다 — 실제 InDesign 테스트에서 육안으로 확인이 필요하다.
 function extractTextFromDocumentXml(xmlText) {
-    // 빈 문단은 자체 닫힘 형태(<w:p/>)나 여닫힘 형태(<w:p></w:p>) 둘 다로 나타날 수 있어
-    // 두 형태 모두 매칭한다(실제 Word는 보통 후자를 쓰지만, 방어적으로 둘 다 처리한다).
-    const paragraphMatches = xmlText.match(/<w:p(?:\s[^>]*)?\/>|<w:p[ >][\s\S]*?<\/w:p>/g) || [];
-
-    const paragraphs = paragraphMatches.map((paragraphXml) => {
-        const textTagMatches = paragraphXml.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g) || [];
-        return textTagMatches
-            .map((tagMatch) => {
-                const innerMatch = tagMatch.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/);
-                return innerMatch ? unescapeXmlEntities(innerMatch[1]) : "";
-            })
-            .join("");
-    });
-
-    return paragraphs.join("\n");
+    return require("./word-text.js").extract(xmlText);
 }
 
 // 마커로 구획된 일반 텍스트를 파싱해 OPENING_PAGE/WITH_PHOTO Article Data로 만든다.
@@ -76,6 +62,7 @@ function parseArticleFromMarkedText(plainText) {
         if (markerMatch) {
             flushCurrent();
             currentField = MARKER_FIELD_MAP[markerMatch[1]];
+            if (Object.prototype.hasOwnProperty.call(sections, currentField)) throw new Error(`중복 원고 마커: ${markerMatch[1]}`);
             currentLines = [];
         } else if (currentField) {
             currentLines.push(rawLine);

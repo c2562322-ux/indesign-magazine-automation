@@ -1,12 +1,12 @@
 {
     "id": "com.magazineautomation.panel",
     "name": "Magazine Automation",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "main": "index.html",
     "manifestVersion": 5,
     "host": {
         "app": "ID",
-        "minVersion": "17.0"
+        "minVersion": "18.5.0"
     },
     "entrypoints": [
         {
@@ -16,25 +16,30 @@
                 "default": "Magazine Automation"
             },
             "minimumSize": {
-                "width": 230,
-                "height": 200
+                "width": 430,
+                "height": 500
             },
             "maximumSize": {
                 "width": 2000,
                 "height": 2000
             },
             "preferredDockedSize": {
-                "width": 230,
-                "height": 300
+                "width": 450,
+                "height": 850
             },
             "preferredFloatingSize": {
-                "width": 300,
-                "height": 400
+                "width": 520,
+                "height": 900
             }
         }
     ],
     "requiredPermissions": {
         "localFileSystem": "fullAccess",
-        "clipboard": "readAndWrite"
+        "clipboard": "readAndWrite",
+        "network": {
+            "domains": [
+                "https://api.openai.com"
+            ]
+        }
     }
 }

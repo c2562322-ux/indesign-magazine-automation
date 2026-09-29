@@ -1,0 +1,41 @@
+2026-09-28 / Node.js 24.19.0
+Host/DOM tests use doubles. No Adobe/UXP or actual browser rendering run. No paid API call.
+
+✔ three distinct free plans preserve source and stay within margins (5.023282ms)
+✔ 0/1/2 images, small/default/large sizes, variable lengths (22.778494ms)
+✔ narrow content area adapts column count (0.615629ms)
+✔ body not trimmed/rephrased; newline normalization explicit (0.132681ms)
+✔ reject empty, oversized, invalid color and >2 images (0.429469ms)
+✔ AI geometry rejects overlaps, missing body, photos, out-of-bounds and small text (0.614368ms)
+✔ AI spec contains only placement references; body uses original source (1.817965ms)
+✔ Word preserves tabs, soft breaks, paragraphs and entities (2.003289ms)
+✔ Word refuses unsupported content rather than omitting it (0.472593ms)
+✔ plain/marked Word parsing supports no-photo and rejects duplicate markers (1.316918ms)
+✔ supplied DOCX retains previous fields (3.18595ms)
+✔ all three legacy JSON fixtures pass; whitespace-only fails (0.560305ms)
+✔ relative Windows/macOS paths and absolute paths (0.528007ms)
+✔ ZIP size bounds reject huge declared XML (0.588789ms)
+✔ AI request excludes file paths, images, API keys and limits excerpt (0.411612ms)
+✔ AI output handles refusal and incomplete replies (0.183176ms)
+✔ AI HTTP failures do not retry; valid mock result creates validated plan (1.005728ms)
+✔ project serialization excludes transient preview blobs (0.176847ms)
+✔ new document generation never reads/mutates the active document; body is complete (6.958454ms)
+✔ simulated host overset adds linked continuation pages (3.469437ms)
+✔ missing font and inaccessible image fail before document creation (3.400343ms)
+✔ write failure closes only the new incomplete document (4.208553ms)
+✔ save/export target the generated document, not active document (1.505383ms)
+✔ PDF export is blocked after a font/link error and after closing document (1.465742ms)
+✔ all static controller IDs exist once in both HTML entrypoints (1.581538ms)
+✔ default browser state shows three plans but native actions stay disabled (23.21951ms)
+✔ changing source disables stale plans until regenerated (7.14152ms)
+✔ project save excludes API credentials and transient image data (2.644162ms)
+✔ native creation prevents duplicate clicks and stale export (1.535848ms)
+✔ photo add invalidates previous plan and cannot exceed two (2.635839ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 150.597402

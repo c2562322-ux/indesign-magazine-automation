@@ -84,3 +84,7 @@ UXP에는 zip 해제나 압축 해제(inflate) 내장 API가 없다([DECISIONS.m
 - [docs/ARTICLE_DATA_SPEC.md](ARTICLE_DATA_SPEC.md) — Article Data 구조 자체(JSON 기준)
 - [HANDOFF.md](../HANDOFF.md) — 현재 프로젝트 상태, 실기 검증 여부
 - [DECISIONS.md](../DECISIONS.md) D019 — 이번 결정과 근거
+
+## 1.1 갱신 (2026-09-28)
+
+위의 1.0 개발 당시 미검증 설명은 과거 기록이다. 최신 상태는 HANDOFF.md가 기준이다. 새 디자인 모드의 일반 원고/마커 입력은 README.md를 참고한다. `word-text.js`로 탭/수동 줄바꿈을 보존하도록 수정했고 Node 테스트로 확인했다. 중복 마커·표·각주·텍스트상자·변경 추적·필드·수식은 오류로 처리한다. 새 코드의 InDesign 실제 실행은 아직 검증하지 않았다.

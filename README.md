@@ -1,107 +1,96 @@
-# indesign-magazine-automation
+# 매거진 스튜디오 1.1 — InDesign 자동 디자인
 
-Adobe InDesign용 UXP Plugin. 디자이너가 만든 InDesign 매거진 템플릿에 기사 데이터와 이미지를 자동으로 배치하는 것을 목표로 한다.
+기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
-Vanilla JavaScript 기반이며 React 등 프레임워크는 사용하지 않는다.
+**상태: 개발 검증판. Node 자동 테스트 30개 통과. 실제 InDesign/UDT에서 새 기능을 실행한 검증은 아직 없습니다.** 기존 1.0의 실기 기록과 1.1 검증 범위는 HANDOFF.md를 보세요.
 
-## 현재 단계
+## 바로 시작
 
-`Load Article` 버튼을 클릭하면 로컬 파일(JSON 또는 Word `.docx`)을 선택할 수 있는 파일 선택 대화상자가 뜬다. 파일 확장자로 자동 분기한다: JSON이면 `JSON.parse`, `.docx`면 [src/docxZip.js](src/docxZip.js)/[src/docxArticle.js](src/docxArticle.js)가 `[TITLE]`/`[POINT_TEXT]`/`[BODY]`/`[HERO_IMAGE]` 마커를 파싱한다(자세한 형식은 [docs/WORD_INPUT_SPEC.md](docs/WORD_INPUT_SPEC.md)). 어느 쪽이든 같은 Article Data 구조가 되어 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)의 `OPENING_PAGE` 계약(templateType/variant/title/pointText/body, WITH_PHOTO일 때 heroImage)으로 검사되고 `Article Log`/콘솔에 결과가 출력된다. 검증을 통과한 데이터만 메모리에 보관한다. 이 단계에서 InDesign 문서는 전혀 건드리지 않는다 — 로컬 파일을 읽고 검증만 한다.
+1. ZIP을 폴더에 완전히 풀어주세요.
+2. 먼저 `preview.html`을 브라우저에서 열면 원고 입력과 무료 시안 선택을 체험할 수 있습니다. 이 체험판에는 INDD/PDF 생성과 실제 AI 호출이 없습니다. 사진이 연결된 프로젝트를 불러오면 브라우저에서는 사진 파일을 다시 추가해야 합니다.
+3. PC에 InDesign 18.5 이상과 UXP Developer Tool을 준비합니다. 18.5는 Adobe의 플러그인 지원 시작 버전이며, 이 플러그인의 모든 기능이 해당 버전에서 검증됐다는 뜻은 아닙니다.
+4. `assets/fonts/Freesentation-4Regular.ttf`, `Freesentation-7Bold.ttf`를 설치하거나 패널의 폰트 설정에 이미 설치된 폰트를 지정합니다. 폰트 설치 후 InDesign 재시작이 필요할 수 있습니다. 제공된 폰트·템플릿은 원래 전달받은 자료입니다.
+5. UXP Developer Tool에서 **Add Plugin → manifest.json → Load**를 선택합니다. 이전 버전을 로드했다면 Unload한 뒤 새 폴더의 manifest로 다시 등록하세요.
+6. 패널에서 기사 제목·본문을 붙여넣거나 **원고 / 작업 불러오기**를 누릅니다. 사진은 0~2장 선택할 수 있습니다.
+7. **무료 디자인 3안 만들기 → 시안 선택 → 선택한 디자인으로 새 문서 만들기**를 실행합니다.
+8. InDesign에서 줄바꿈, 사진 크롭, 페이지를 확인하고 **INDD 저장** 또는 **PDF 내보내기**를 누릅니다. PDF는 InDesign의 출력 옵션 창에서 인쇄소 요구에 맞게 설정합니다.
 
-`Generate` 버튼을 클릭하면 검증을 통과한 기사 데이터를 InDesign "시작 페이지"에 채워 넣는다([src/text.js](src/text.js)의 `applyOpeningPageContent`): TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1, WITHOUT_PHOTO는 텍스트 스레드로 BODY_COLUMN_2까지 자동 흐름) Text Frame에 텍스트를 채우고, WITH_PHOTO는 `heroImage`를 기존 HERO_IMAGE Rectangle에 place한 뒤 "대표이미지" 템플릿 안내 문구(HERO_IMAGE_GUIDE)를 비운다. `variant`에 맞는 대상 페이지는 `page.name` 하드코딩 없이 [src/validation.js](src/validation.js)의 Script Label 프로필(`OPENING_PROFILES_BY_VARIANT`)로 찾는다. 필요한 모든 프레임 탐색(및 WITH_PHOTO의 이미지 파일 접근 확인)이 전부 성공했을 때만 실제 쓰기를 시작하며, 하나라도 실패하면 문서를 전혀 수정하지 않고 중단한다. (이전 단계의 "Hello Magazine" 텍스트 생성 테스트 코드는 [src/indesign.js](src/indesign.js)에 `addHelloText`로 남아 있지만 더 이상 `Generate` 버튼과 연결되어 있지 않다.)
+## 제공 기능
 
-`Inspect Template` 버튼을 클릭하면 현재 열린 InDesign 문서를 읽기 전용으로 분석해 페이지 수, 페이지별 Text Frame/Rectangle(이미지 프레임) 목록(name, label, 텍스트 미리보기, geometricBounds), 사용 가능한 Paragraph/Object Style 목록을 패널 로그 영역과 콘솔에 출력한다. 같은 버튼 클릭 한 번으로 "시작 페이지"에 필요한 Script Label(TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 또는 TITLE/POINT_TEXT/BODY_COLUMN_1/BODY_COLUMN_2)이 정확히 1개씩 존재하는지, 타입이 예상과 맞는지도 함께 검증해 같은 로그에 이어서 출력한다 ([src/validation.js](src/validation.js)). 문서를 수정하지 않는다.
+- 기존 `.indd` 양식 없이 새 텍스트·사진 프레임을 만들어 배치.
+- 무료: 기사 길이, 제목 길이, 사진 유무에 따라 3가지 배치 전략 계산. AI 호출 없는 로컬 방식입니다.
+- 선택형 AI: 사용자가 API 키를 입력하고 버튼을 누르면 기사 내용을 바탕으로 새로운 첫 페이지 좌표를 제안. 고정 3안 중 선택하는 방식이 아닙니다.
+- 제목·부제·본문 원문 유지. AI는 문구를 다시 쓰지 않고 프레임 역할/좌표만 반환합니다.
+- 본문 프레임 연결과 실제 `Story.overflows` 기반 이어지는 페이지 추가. 최대 40페이지.
+- 원고·설정·선택 시안 JSON 저장/재개. 사진 자체는 저장 파일에 포함되지 않습니다.
+- 새 문서만 생성. 기존 문서 참조를 입력 대상으로 사용하지 않습니다.
+- 기본 출력 검사: 글 넘침, 폰트 설치 상태, 이미지 링크 상태. 낮은 유효 해상도 경고.
+- 기존 모드의 Word 탭/줄바꿈 파서 보강, 중복 마커 거부, 공백 필수값 거부.
 
-실기 검증 상태(어디까지 실제 InDesign에서 확인됐는지)는 [HANDOFF.md](HANDOFF.md)를 참고한다 — 이 README는 기능 설명이고, 실기 검증 여부의 기준 문서는 HANDOFF.md다.
+## 입력 형식
 
-## 폴더 구조
+일반 DOCX는 첫 번째 내용 있는 문단을 제목, 나머지를 본문으로 읽습니다. TXT는 첫 번째 내용 있는 줄을 제목으로 읽습니다. 입력 후 패널에서 수정할 수 있습니다. Word에 포함된 사진은 자동 추출하지 않으므로 사진 추가 버튼으로 선택해주세요. 표·각주·텍스트상자·변경 추적·필드·수식이 포함된 DOCX는 원고 누락을 피하기 위해 오류로 안내합니다. 일반 문단으로 정리하거나 텍스트를 직접 붙여넣어주세요.
+
+마커 원고도 지원합니다. 새 디자인 모드에서는 TITLE/BODY 필수, 나머지는 선택입니다.
 
 ```text
-indesign-magazine-automation/
-├─ manifest.json      UXP Plugin 설정 및 InDesign 연결 정보
-├─ index.html         UXP 패널 화면 (Load Article / Generate / Inspect Template 버튼)
-├─ styles.css         UXP 패널 스타일
-├─ index.js           버튼 이벤트 바인딩, 프로그램 시작점
-│
-├─ src/
-│  ├─ inspector.js    Template Inspector: 문서 구조 읽기 전용 분석 (구현됨, 미검증)
-│  ├─ data.js         JSON/DOCX 파일 선택/읽기(require("uxp").storage), 파일 nativePath 반환 (JSON은 실기 검증 완료, DOCX 분기는 D019·미검증)
-│  ├─ docxZip.js      .docx(ZIP) 안의 항목을 꺼내는 최소 ZIP 리더 + 직접 구현한 RFC 1951(DEFLATE) 압축 해제 (D019, 미검증)
-│  ├─ docxArticle.js  word/document.xml에서 문단/텍스트 추출 + 마커 파싱 → Article Data 변환 (D019, 미검증)
-│  ├─ text.js         TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE 입력을 applyOpeningPageContent() 하나로 통합 구현. TITLE/POINT_TEXT/BODY/HERO_IMAGE/HERO_IMAGE_GUIDE(WITH_PHOTO 정상 케이스)는 실기 검증 완료
-│  ├─ image.js         heroImage 경로 해석/파일 접근 확인(fs.lstat)/place 구현 및 실기 검증 완료. fit/리사이즈 없음
-│  ├─ validation.js   Script Label 기준 프레임 검증 + OPENING_PAGE 기사 데이터 검증 (읽기 전용, 구현됨, 데이터 검증 부분은 미검증). 이미지 누락/Overset 검사는 예정
-│  ├─ indesign.js     [사용되지 않음] 초기 "Hello Magazine" 테스트 코드(addHelloText)만 남아 있고 D012 이후 어디서도 require되지 않는다. 삭제 여부는 별도 판단 대상(cleanup 범위 밖) — 최종 배포 패키지에는 포함하지 않는다
-│  └─ template.js     [사용되지 않음] templateType별 템플릿 처리용으로 만든 빈 스텁, 미구현. 최종 배포 패키지에는 포함하지 않는다
-│
-├─ sample/                                   회귀 테스트용 샘플(개발 저장소에만 유지, 최종 배포 패키지에는 포함하지 않음)
-│  ├─ opening-page-with-photo.json           "시작 페이지"(사진 있음) 샘플 데이터
-│  ├─ opening-page-without-photo.json        "시작 페이지"(사진 없음) 샘플 데이터
-│  ├─ opening-page-without-photo-long-test.json  Text Thread 실기 테스트용(본문을 길게 늘림)
-│  ├─ eye-clinic-hero.png                    실기 테스트용 이미지(article-eye-clinic-with-photo.docx의 heroImage가 참조하는 파일)
-│  └─ article-eye-clinic-with-photo.docx     Word 입력 MVP 실기 테스트용 샘플(D019, 안과 병원 매거진 예시)
-│
-├─ assets/
-│  ├─ templates/
-│  │  ├─ original/    디자이너 전달 원본 .indd/.idml (수정 금지)
-│  │  └─ working/     자동화 개발/테스트용 InDesign 작업 복사본
-│  └─ fonts/          디자이너 전달 폰트 파일
-│
-└─ README.md
+[TITLE]
+기사 제목
+[POINT_TEXT]
+부제 또는 리드문
+[BODY]
+기사 본문
+[HERO_IMAGE]
+photo.jpg
 ```
 
-UI 로직(`index.js`, `index.html`)과 InDesign 제어 로직(`src/text.js`, `src/inspector.js`, `src/image.js` 등)을 분리해서, InDesign API 사용 방식이 바뀌어도 UI 코드를 건드리지 않도록 구성했다. `src/indesign.js`는 초기 "Hello Magazine" 테스트 코드가 남아 있는 미사용 파일이다(위 폴더 구조 참고).
+기존 양식 모드의 Word 데이터 계약은 기존과 같이 WITH_PHOTO입니다. 새 디자인 입력과 혼동하지 마세요.
 
-## assets 폴더
+## 디자인 설정
 
-디자이너에게 전달받은 디자인 리소스를 보관하는 폴더다.
+기본 A4(210×297mm), 여백 18mm, 본문 10.5pt, 재단 여백 3mm. 너비 148~300mm, 높이 210~420mm인 세로 판형을 지원합니다. 여백 12~35mm, 본문 9~14pt 범위입니다. 제목/부제가 과도하게 길어 첫 지면을 구성할 수 없으면 오류를 표시합니다.
 
-- `assets/templates/original/` — 원본 `.indd`/`.idml` 파일. 이 폴더의 파일은 수정하지 않는다.
-- `assets/templates/working/` — 실제 자동화 개발/테스트에 사용하는 InDesign 작업용 복사본.
-- `assets/fonts/` — 디자이너에게 전달받은 폰트 파일.
+화면의 미리보기는 배치 확인용입니다. 브라우저의 글꼴·조판 방식과 InDesign은 다르므로 줄바꿈·페이지 수는 실제 생성 문서에서 확정합니다. 실제 제목/부제 넘침은 자동으로 글자를 축소하지 않고 검수 오류로 표시하며 PDF 내보내기를 막습니다.
 
-용량이 큰 바이너리 리소스이므로 `assets/templates/`, `assets/fonts/` 하위 실제 파일은 [.gitignore](.gitignore)에 의해 Git에 커밋되지 않는다. 폴더 구조만 `.gitkeep`으로 유지되며, 새로 clone한 환경에서는 디자이너에게 파일을 별도로 전달받아 해당 폴더에 넣어야 한다.
+## AI 기능과 비용
 
-## 기사 데이터 규격
+AI는 선택 기능입니다. 무료 시안은 키가 필요하지 않습니다.
 
-자동조판 MVP에서 쓸 기사 JSON 데이터의 필드 구조(현재 "시작 페이지" 2개 variant만)는 [docs/ARTICLE_DATA_SPEC.md](docs/ARTICLE_DATA_SPEC.md)에 정의되어 있다. Script Label과의 매핑, Required/Optional 여부, 샘플 파일(`sample/opening-page-with-photo.json`, `sample/opening-page-without-photo.json`) 위치도 이 문서에 정리했다. `Load Article` 버튼으로 이 JSON을 선택/읽기/검증하는 기능은 구현됐고, `Generate` 버튼으로 `title`/`pointText`/`body`/(WITH_PHOTO는)`heroImage`를 TITLE/POINT_TEXT/BODY(또는 BODY_COLUMN_1)/HERO_IMAGE 프레임에 채워 넣는 것까지 구현됐다(`src/text.js`의 `applyOpeningPageContent`, 하나의 `app.doScript` 안에서 모든 프레임 탐색·WITHOUT_PHOTO의 텍스트 스레드 연결 확인을 마친 뒤에만 쓰기를 시작함 — [DECISIONS.md](DECISIONS.md) D014/D015/D017). `heroImage`는 `Load Article`로 불러온 JSON 파일이 있는 폴더 기준 상대 경로로 해석하며, 기존 `HERO_IMAGE` Rectangle의 위치/크기는 건드리지 않고 이미지만 place한다([src/image.js](src/image.js)). TITLE+POINT_TEXT+BODY 범위는 실기 검증 완료, HERO_IMAGE가 포함된 현재 구조는 아직 실기 테스트 전이다.
+- 기본 모델 입력값: `gpt-4.1-mini`. 계정에서 접근 가능한 Responses/Structured Outputs 지원 모델로 바꿀 수 있습니다.
+- 명시적으로 AI 버튼을 누를 때만 `https://api.openai.com/v1/responses`에 1회 요청합니다. 자동 재시도하지 않습니다.
+- 전송 내용: 제목, 부제, 분류, 본문 앞 12,000자, 본문 전체 글자 수, 사진 개수/알려진 크기, 지면 설정. 사진 파일·로컬 경로는 전송하지 않습니다.
+- API 키는 비밀번호 입력칸과 실행 메모리에서만 사용합니다. 원고 저장 파일·로그·소스·브라우저 저장소에 기록하지 않습니다. 플러그인 재로드 시 초기화합니다.
+- `store:false`, 출력 토큰 상한 2,400, 60초 요청 제한. 같은 원고·설정·모델의 결과는 패널 실행 중 재사용합니다.
+- AI 제안의 요소 겹침, 영역 초과, 작은 글씨, 본문/사진 누락은 로컬에서 거부합니다. 무효 응답을 무료 시안으로 몰래 대체하거나 비용을 발생시키며 자동 재요청하지 않습니다.
+- 실제 API 요청은 이번 개발에서 실행하지 않았습니다. 요금·계정 접근·UXP 네트워크 동작은 사용 환경에서 확인해야 합니다.
 
-## 최종 사용자 배포 패키지
+## 파일 구성
 
-개발 저장소에는 회귀 테스트용 `sample/` 샘플과 프로젝트 관리 문서를 그대로 유지한다. 최종 사용자에게 전달하는 배포 패키지를 만들 때는 아래 기준으로 포함/제외한다.
+- `manifest.json`, `index.html`, `studio.js`, `studio.css`: InDesign 플러그인 진입점/화면
+- `src/layout-engine.js`: 배치 계산·좌표 검증·페이지 추정
+- `src/auto-indesign.js`: 새 문서 생성·연결 조판·검수·저장/PDF
+- `src/ai-layout.js`: 선택형 OpenAI 요청·응답 검증
+- `src/studio-ui.js`: 패널 상태·시안·프로젝트 저장
+- `src/article-input.js`, `src/word-text.js`, `src/docxZip.js`: 원고 입력
+- `preview.html`, `preview.js`: 브라우저 체험판
+- `index.js`, `src/text.js` 등: 기존 양식 모드
+- `tests/`: 순수 로직·모의 Host·모의 DOM 테스트
+- `docs/ACCEPTANCE_TESTS.md`: 실제 InDesign에서 확인할 순서
 
-**배포 패키지에 포함(런타임에 실제로 필요한 파일)**
+소스 그대로 실행하며 React·서버·빌드 도구가 필요하지 않습니다. 테스트는 Node.js 20 이상에서 `npm test`로 실행합니다. 의존성 설치가 필요하지 않습니다.
 
-```
-manifest.json
-index.html
-styles.css
-index.js
-src/inspector.js
-src/validation.js
-src/data.js
-src/docxArticle.js
-src/docxZip.js
-src/text.js
-src/image.js
-```
+## 현재 범위
 
-**배포 패키지에서 제외**
+기사 1건씩 디자인하는 버전입니다. 여러 기사 일괄 조판·목차 자동 생성·인터뷰 내용 분석·표·각주·이미지 생성은 포함하지 않습니다. 기존 목차샘플1은 라벨 설정/분석까지이며 Generate는 여전히 미구현입니다. 무료 모드는 규칙 기반, AI 모드는 선택형 실제 API 연결입니다.
 
-- `sample/` — 회귀 테스트용 샘플. `Load Article`은 사용자가 직접 선택한 파일만 읽으므로 최종 사용자에게는 불필요하다.
-- `docs/`, `assets/` — 개발 문서 및 디자이너 원본 리소스.
-- `CLAUDE.md`, `README.md`, `HANDOFF.md`, `WORKLOG.md`, `DECISIONS.md` — 프로젝트 관리/개발 이력 문서.
-- `src/indesign.js`, `src/template.js` — 어디서도 `require`되지 않는 미사용 코드(위 폴더 구조 참고). 저장소에는 남아 있지만 배포 패키지에는 포함하지 않는다.
+RGB 강조색은 배치 시안의 출발점입니다. 색상 프로파일·오버프린트·재단·이미지 크롭·최종 인쇄소 PDF 규격을 자동으로 보증하지 않습니다. INDD는 기본 오류가 있어도 수정용으로 저장할 수 있고, 패널의 PDF 출력은 기본 오류가 남으면 차단합니다.
 
-## UXP Developer Tool에서 실행하는 방법
+## 공식 참고
 
-1. Adobe InDesign(2022, v17 이상)과 UXP Developer Tool(UDT)을 설치한다.
-2. UDT를 실행하고 `Add Plugin` → `Add existing plugin`을 선택한다.
-3. 이 프로젝트 폴더 안의 `manifest.json` 파일을 선택한다.
-4. 플러그인 목록에 `Magazine Automation`이 추가되면 InDesign을 실행한 상태에서 `Load`(또는 로드 아이콘)를 눌러 플러그인을 로드한다.
-5. InDesign에서 문서를 하나 새로 만들거나 연다.
-6. InDesign 메뉴 `Plugins`(또는 UDT에서 지정한 위치)에서 `Magazine Automation` 패널을 연다.
-7. 먼저 `sample/opening-page-with-photo.json`과 같은 폴더에 JSON의 `heroImage` 값(예: `hero.jpg`)과 정확히 이름이 같은 이미지 파일을 준비한다. `Load Article` 버튼으로 그 JSON을 불러와 검증을 통과시킨 뒤, `Generate` 버튼을 클릭하면 "시작 페이지(사진 있음)"의 TITLE·POINT_TEXT·BODY·HERO_IMAGE가 JSON 값/이미지로 바뀌는지(HERO_IMAGE Rectangle의 위치/크기는 그대로인지) 확인한다. `sample/opening-page-without-photo.json`을 불러와 `Generate`하면 "시작 페이지(사진 없음)"의 TITLE·POINT_TEXT·BODY_COLUMN_1이 바뀌고 `body`가 텍스트 스레드를 통해 BODY_COLUMN_2까지 흐르는지, 반대쪽 variant 페이지는 바뀌지 않는지 확인한다. Article을 불러오지 않은 상태에서 `Generate`를 누르면 문서 변경 없이 Status에 중단 사유가 표시되는지도 확인한다. (Script Label을 일시적으로 지우거나 이미지 파일을 잠시 지웠을 때 아무 필드도 반영되지 않는지 등 D014/D015/D017 검증을 위한 추가 테스트는 HANDOFF.md "다음 추천 작업"에 정리되어 있다.)
-8. 패널에서 `Inspect Template` 버튼을 클릭하면 현재 문서의 페이지/프레임/스타일 정보와 함께, Script Label 기준 "시작 페이지" 필수 프레임 검증 결과(`=== Script Label 기반 프레임 검증 ===`로 시작하는 부분)가 `Inspection Log` 영역과 콘솔에 이어서 출력되는지 확인한다. 문서 내용은 변경되지 않아야 한다.
-9. 패널에서 `Load Article` 버튼을 클릭하면 파일 선택 대화상자가 뜨는지, `sample/opening-page-with-photo.json`이나 `sample/opening-page-without-photo.json`을 선택했을 때 `Article Log` 영역에 `=== Load Article 데이터 검증 ===`로 시작하는 결과가 출력되고 "결과: 검증 통과"로 끝나는지 확인한다. 문서 내용은 변경되지 않아야 한다.
-10. 코드를 수정한 뒤에는 UDT에서 `Reload`를 눌러 변경 사항을 다시 로드한다. 콘솔 로그는 UDT의 `Inspect` 기능으로 확인할 수 있다.
+- [InDesign UXP 플러그인 시작](https://developer.adobe.com/indesign/uxp/plugins/getting-started/)
+- [Document API](https://developer.adobe.com/indesign/uxp/dom/api/d/document/)
+- [TextFrame API](https://developer.adobe.com/indesign/uxp/dom/api/t/text-frame/)
+- [FitOptions API](https://developer.adobe.com/indesign/uxp/dom/api/f/fit-options/)
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+
+확인일: 2026-09-28.

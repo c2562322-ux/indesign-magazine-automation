@@ -1,0 +1,8 @@
+{
+  "name": "indesign-magazine-automation",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Original magazine layouts with an optional AI planner for InDesign UXP",
+  "scripts": {"test": "node --test tests/core.test.js tests/host.test.js tests/ui.test.js"},
+  "engines": {"node": ">=20"}
+}
