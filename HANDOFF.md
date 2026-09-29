@@ -1,6 +1,6 @@
 # HANDOFF — 1.1.0
 
-갱신: 2026-09-29. 사용자 요청: **새 디자인 제작·검사·저장·PDF 경로의 실기 진단과 회귀 수정.** 개발 브랜치: `codex/magazine-studio-1.1`.
+갱신: 2026-09-29. 사용자 요청: **새 디자인 미리보기 / InDesign / PDF 외관 정합성 검토와 최소 수정.** 개발 브랜치: `codex/magazine-studio-1.1`.
 
 ## 현재 상태
 
@@ -8,16 +8,18 @@
 - 새 모드는 새 문서·새 프레임을 생성한다. 기존 문서에는 쓰지 않는다. 이는 사용자가 명시적으로 요청한 새 범위이며 D026에 기록했다.
 - 무료 배치 3안 / 선택형 AI 첫 페이지 설계 / 이어지는 본문 페이지 / 원고 저장 / INDD 저장 / 검사 / PDF 코드 구현.
 - Word의 탭/수동 줄바꿈 처리와 중복 마커 검사를 보강했다.
-- Node 자동 테스트 **50개 통과**(기존 30 + 제작 경로 회귀 20). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
+- Node 자동 테스트 **56개 통과**(기존 50 + 렌더링 회귀 6). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
 - 사용자 PC 1차 실기 확인: 패널 표시, 원고 입력, 무료 3안, 미리보기 글자 크기, 패널 스크롤 정상. InDesign/UDT 정확한 버전은 아직 미기록.
-- 제작·검사·INDD 저장·PDF 실기에서 일부 문제 보고. 이번 수정 이후 실제 InDesign 재검증 필요. AI 실호출 및 별도 브라우저 렌더링은 여전히 미검증.
+- 이후 사용자 PC에서 새 문서 생성·PDF 내보내기 성공 보고. PDF 사각형 선/미리보기 차이 관찰. 이번 외관 수정 이후 실제 InDesign 재검증 필요. AI 실호출 및 별도 브라우저 렌더링은 여전히 미검증.
 - 수정: UXP enum equals 비교, 재생성 실패 시 이전 대상 해제, save 반환 문서 추적, 검사 실패 후 PDF 차단, 단계별 민감정보 제거 진단. PDF 옵션 취소/완료 불명확 시 성공으로 단정하지 않는다.
 
 기존 1.0의 실기 성공 기록은 `docs/archive/HANDOFF-before-1.1.md`에 보존했다. 해당 기록은 새 모드 실기 검증의 근거가 아니다.
 
+- 외관 수정: strokeColor=None 명시, typography/furniture 공통화, 설정 폰트·자간·문단 간격·색상 정합성, 신규 문서의 스타일 override 제거. 실제 줄바꿈/폰트 매칭/페이지 분할은 아직 다를 수 있음. 상세 비교와 실기는 docs/RENDER_PARITY.md.
+
 ## 다음 3개 작업
 
-1. `docs/PRODUCTION_TESTS.md`의 버튼 순서로 실제 InDesign에서 실행하고 앱·UDT 버전, 코드 SHA, 단계별 결과를 남긴다. 먼저 설치 폰트와 사진 없는 짧은 원고로 문서 생성부터 확인한다.
+1. `docs/PRODUCTION_TESTS.md`의 버튼 순서로 실제 InDesign에서 실행하고 앱·UDT 버전, 코드 SHA, 단계별 결과를 남긴다. docs/RENDER_PARITY.md 순서로 동일 원고/무료 시안의 미리보기·새 문서·PDF 외관을 비교한다.
 2. Host API 호환성 문제가 있으면 `src/auto-indesign.js`에 한정해 보정한다. 원고/배치 계산 로직과 기존 템플릿 생성 경로를 함께 바꾸지 않는다.
 3. 실제 원고 3건으로 제목 넘침, 본문 페이지 추가, 사진 크롭, 원문 보존, PDF 출력을 확인한 뒤 실무 배포 여부를 결정한다.
 
@@ -33,7 +35,7 @@
 
 ## 개발·전달
 
-- `npm test`: 의존성 설치 없이 50개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js`를 사용한다.
+- `npm test`: 의존성 설치 없이 56개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js`를 사용한다.
 - `preview.html`: 폴더에서 브라우저로 열어 체험.
 - `manifest.json`: UDT로 로드.
 - 최종 ZIP에는 소스/문서/테스트/기존 자료를 포함하며 `.git`과 임시파일은 제외.

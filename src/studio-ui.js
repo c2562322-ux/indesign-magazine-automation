@@ -42,26 +42,42 @@
         parent.textContent='';const s=plan.settings,scale=width/s.width;
         // L.PT is points per millimetre: convert points to mm, then mm to preview pixels.
         const fontPixels=points=>(points/L.PT*scale)+'px';
+        const type=(node,b)=>{
+            const t=L.typography(b,s),parts=t.font.split('\t');
+            Object.assign(node.style,{fontFamily:JSON.stringify(parts[0])+', sans-serif',fontSize:fontPixels(t.size),
+                fontWeight:parts.length>1&&/bold/i.test(parts[1])?'700':'400',fontStyle:parts.length>1&&/italic|oblique/i.test(parts[1])?'italic':'normal',
+                lineHeight:fontPixels(t.leading),letterSpacing:fontPixels(t.size*t.tracking/1000),textAlign:t.align,color:t.color,
+                whiteSpace:'pre-wrap',padding:'0px',border:'none',boxSizing:'border-box'});
+        };
         const sheet=element('div','design-sheet');sheet.style.width=width+'px';sheet.style.height=(s.height*scale)+'px';
         const pos=(node,x,y,w,h)=>{Object.assign(node.style,{position:'absolute',left:(x*scale)+'px',top:(y*scale)+'px',width:(w*scale)+'px',height:(h*scale)+'px'});sheet.appendChild(node);};
-        const header=element('div','preview-meta',s.publication+'  /  '+a.kicker);header.style.fontSize=fontPixels(8);pos(header,s.margin,s.margin,s.width-2*s.margin,7);
-        const rule=element('div');rule.style.backgroundColor=s.accent;pos(rule,s.margin,s.margin+9,s.width-2*s.margin,0.45);
-        const footer=element('div','preview-meta',(a.author?a.author+' · ':'')+String(pageIndex+1).padStart(2,'0'));footer.style.fontSize=fontPixels(8);pos(footer,s.margin,s.height-s.margin-6,s.width-2*s.margin,6);
+        L.furniture(s,a,pageIndex+1).forEach(b=>{
+            const node=element('div',b.role==='rule'?'preview-rule':'preview-meta',b.text);
+            if(b.role==='rule')node.style.backgroundColor=b.fill;else type(node,b);
+            pos(node,b.x,b.y,b.width,b.height);
+        });
         let offset=0;
         for(let i=0;i<pageIndex;i++)offset+=Math.floor(L.capacity(plan.pages[i].elements.find(b=>b.role==='body'),s)*a.body.length/Math.max(1,L.demand(a.body)));
         plan.pages[pageIndex].elements.forEach(b=>{
             if(b.role==='image'){
                 const im=a.images[b.imageIndex],wrap=element('div','preview-photo');wrap.style.backgroundColor=s.accent;
-                if(im.preview){const img=element('img');img.src=im.preview;img.alt=im.name;wrap.appendChild(img);}else{wrap.textContent=im.name||'PHOTO';}
+                if(im.preview){wrap.style.backgroundColor='transparent';const img=element('img');img.src=im.preview;img.alt=im.name;img.style.objectFit=L.RENDER.imageFit;img.style.objectPosition=L.RENDER.imagePosition;wrap.appendChild(img);}else{wrap.textContent=im.name||'PHOTO';}
                 pos(wrap,b.x,b.y,b.width,b.height);return;
             }
             if(b.role==='body'){
                 const cap=Math.floor(L.capacity(b,s)*a.body.length/Math.max(1,L.demand(a.body))),text=a.body.slice(offset,offset+cap);
-                const cw=(b.width-(b.columns-1)*5)/b.columns,chunk=Math.ceil(text.length/b.columns);
-                for(let c=0;c<b.columns;c++){const node=element('div','preview-body',text.slice(c*chunk,(c+1)*chunk));node.style.fontSize=fontPixels(b.fontSize);node.style.lineHeight='1.55';pos(node,b.x+c*(cw+5),b.y,cw,b.height);}
+                const cw=(b.width-(b.columns-1)*L.RENDER.gutter)/b.columns,chunk=Math.ceil(text.length/b.columns);
+                for(let c=0;c<b.columns;c++){
+                    const node=element('div','preview-body');type(node,b);
+                    text.slice(c*chunk,(c+1)*chunk).split('\n').forEach(line=>{
+                        const p=element('div','preview-paragraph',line||'\u00a0');
+                        p.style.marginBottom=(L.typography(b,s).spaceAfter*scale)+'px';node.appendChild(p);
+                    });
+                    pos(node,b.x+c*(cw+L.RENDER.gutter),b.y,cw,b.height);
+                }
                 return;
             }
-            const node=element('div','preview-'+b.role,a[b.role]);node.style.fontSize=fontPixels(b.fontSize);node.style.lineHeight=b.role==='title'?'1.3':'1.5';pos(node,b.x,b.y,b.width,b.height);
+            const node=element('div','preview-'+b.role,a[b.role]);type(node,b);pos(node,b.x,b.y,b.width,b.height);
         });
         parent.appendChild(sheet);
     }

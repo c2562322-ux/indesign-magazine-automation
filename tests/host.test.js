@@ -8,21 +8,22 @@ function host(options={}){
  const coll=arr=>({get length(){return arr.length;},item:i=>arr[i]});
  function document(){
   const pages=[],stories=[];
+  const none={isValid:true,name:"None"};
   const events={};
-  const doc={isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>p},swatches:{itemByName:()=>({isValid:true}),item:()=>({})},recompose(){if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
+  const doc={items:[],characterStyles:{item:()=>({name:"[None]"})},isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>p},swatches:{itemByName:()=>options.localizedNone?{isValid:false}:none,item:()=>none},recompose(){if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
   function frame(page){
     let current;
-    const t={pointSize:10.5,leading:16.2};
+    const t={pointSize:10.5,leading:16.2,tracking:900,applyParagraphStyle(style,clear){assert.equal(clear,true);this.appliedParagraphStyle=style;Object.assign(this,style);}};
     const st={id:++counter,data:'',frames:[],texts:{item:()=>t},get contents(){return this.data;},set contents(v){this.data=v;},get overflows(){return this.data.length>this.frames.length*(options.capacity||10000);}};
     current=st;stories.push(st);
-    const f={isValid:true,label:'',parentPage:page,textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
-    st.frames=[f];return f;
+    const f={strokeColor:'inherited black',fillColor:'inherited fill',isValid:true,label:'',parentPage:page,textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
+    st.frames=[f];doc.items.push(f);return f;
   }
-  function page(){const p={textFrames:{add:()=>frame(p)},rectangles:{add:()=>({place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(){}})},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
+  function page(){const p={marginPreferences:{},textFrames:{add:()=>frame(p)},rectangles:{add:()=>{const r={strokeColor:'inherited black',fillColor:'inherited fill',fits:[],place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(option){this.fits.push(option);}};doc.items.push(r);return r;}},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
   pages.push(page());doc.pages={...coll(pages),get length(){return pages.length;},add(){const p=page();pages.push(p);return p;}};doc.stories=coll(stories);docs.push(doc);return doc;
  }
- const enums={FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1},Justification:{LEFT_ALIGN:1},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
- const app={documents:{add:document},fonts:{length:1,itemByName:()=>({isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
+ const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1},Justification:{LEFT_ALIGN:1},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
+ const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
  const module={exports:{}};
  vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
  return {api:module.exports,docs,calls};
@@ -83,4 +84,42 @@ test('a completed save followed by inspection failure is reported distinctly',as
  assert.throws(()=>h.api.save('/out/a.indd'),e=>e.productionStage==='save.completed.postCheck');
  assert.equal(h.calls.filter(c=>c[0]==='save').length,1);
  options.failCheck=false;assert.equal(h.api.check().errors.length,0);
+});
+
+test('all generated frames remove inherited stroke; the intentional accent rule keeps its fill',async()=>{
+ for(const localizedNone of [false,true]){
+  const h=host({localizedNone}),raw={...a,subtitle:'부제',images:[{path:'photo.jpg'}]};
+  await h.api.create(raw,L.candidates(raw)[0]);
+  for(const item of h.docs[0].items){
+   assert.equal(item.strokeColor.name,'None',item.label);assert.equal(item.strokeWeight,0);
+   assert.equal(item.fillColor.name,item.label.startsWith('AUTO_RULE')?'AUTO Accent':'None');
+  }
+ }
+});
+test('all three plans send exact mm bounds, dimensions, margins, columns and centered cover fitting to Host',async()=>{
+ const raw={...a,subtitle:'부제',images:[{path:'one.jpg'},{path:'two.jpg'}]};
+ for(const p of L.candidates(raw,{width:240,height:330,margin:22,bodySize:12})){
+  const h=host();await h.api.create(raw,p);const d=h.docs[0],s=p.settings;
+  assert.equal(d.documentPreferences.pageWidth,s.width+'mm');assert.equal(d.documentPreferences.pageHeight,s.height+'mm');
+  assert.equal(d.pages.item(0).marginPreferences.left,s.margin+'mm');
+  for(const b of p.pages[0].elements){
+   const label=b.role==='image'?'AUTO_IMAGE_'+b.imageIndex:b.role==='body'?'AUTO_BODY_1':'AUTO_'+b.role.toUpperCase();
+   const f=d.items.find(f=>f.label===label);
+   assert.deepEqual(Array.from(f.geometricBounds),[b.y,b.x,b.y+b.height,b.x+b.width].map(n=>n+'mm'));
+   if(b.role==='image')assert.deepEqual(f.fits,[1,2]);
+   else{assert.equal(f.textFramePreferences.textColumnCount,b.columns);assert.equal(f.textFramePreferences.textColumnGutter,'5mm');}
+  }
+ }
+});
+test('Host typography, including meta leading, clears inherited overrides and matches shared specification',async()=>{
+ const raw={...a,subtitle:'부제'},p=L.candidates(raw,{bodySize:13,bodyFont:'Custom Regular',titleFont:'Custom Bold'})[2],h=host();
+ await h.api.create(raw,p);const d=h.docs[0];
+ const blocks=p.pages[0].elements.concat(L.furniture(p.settings,L.article(raw),1)).filter(b=>b.role!=='rule');
+ for(const b of blocks){
+  const f=d.items.find(f=>f.label===(b.label||(b.role==='body'?'AUTO_BODY_1':'AUTO_'+b.role.toUpperCase()))),t=f.parentStory.texts.item(0),spec=L.typography(b,p.settings);
+  assert.equal(t.pointSize,spec.size);assert.equal(t.leading,spec.leading);assert.equal(t.appliedFont.name,spec.font);
+  assert.equal(t.fontStyle,b.role==='title'?'Bold':'Regular');assert.equal(t.tracking,0);assert.equal(t.spaceAfter,spec.spaceAfter+'mm');
+  assert.equal(t.appliedCharacterStyle.name,'[None]');assert.equal(t.leftIndent,0);assert.equal(t.alignToBaseline,false);
+  assert.equal(t.paragraphBorderOn,false);assert.equal(t.paragraphShadingOn,false);
+ }
 });

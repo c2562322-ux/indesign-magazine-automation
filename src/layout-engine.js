@@ -6,6 +6,23 @@
     'use strict';
     const PT = 72 / 25.4;
     const MAX_PAGES = 40;
+    // Renderer contract: mm geometry, pt type, InDesign tracking in 1/1000 em.
+    const RENDER = Object.freeze({ gutter: 5, ink: '#1D2126', muted: '#5F6367', imageFit: 'cover', imagePosition: 'center' });
+    function typography(b, s) {
+        const role=b.role, size=b.fontSize || 8;
+        return { font: role==='title'?s.titleFont:s.bodyFont, size,
+            leading:size*(role==='title'?1.3:role==='subtitle'?1.5:role==='body'?1.55:1.4),
+            tracking:0, spaceAfter:role==='body'?2:0, align:'left',
+            color:role==='subtitle'||role==='meta'?RENDER.muted:RENDER.ink };
+    }
+    function furniture(s,a,pageNumber) {
+        const width=s.width-2*s.margin;
+        return [
+            {role:'meta',label:'AUTO_HEADER_'+pageNumber,x:s.margin,y:s.margin,width,height:7,fontSize:8,text:s.publication+'  /  '+a.kicker},
+            {role:'rule',label:'AUTO_RULE_'+pageNumber,x:s.margin,y:s.margin+9,width,height:0.45,fill:s.accent},
+            {role:'meta',label:'AUTO_FOOTER_'+pageNumber,x:s.margin,y:s.height-s.margin-6,width,height:6,fontSize:8,text:(a.author?a.author+'   ·   ':'')+String(pageNumber).padStart(2,'0')}
+        ];
+    }
     const DEFAULTS = { width: 210, height: 297, margin: 18, bleed: 3, bodySize: 10.5,
         accent: '#B45732', publication: 'MAGAZINE', bodyFont: 'Freesentation 4 Regular', titleFont: 'Freesentation 7 Bold' };
     function number(value, fallback, min, max, name) {
@@ -55,7 +72,7 @@
             imageIndex: imageIndex == null ? -1 : imageIndex };
     }
     function capacity(b, s) {
-        const columnWidth = (b.width - (b.columns - 1) * 5) / b.columns;
+        const columnWidth = (b.width - (b.columns - 1) * RENDER.gutter) / b.columns;
         const glyphs = Math.max(1, Math.floor(columnWidth * PT / s.bodySize));
         const lines = Math.max(1, Math.floor(b.height * PT / (s.bodySize * 1.55)));
         return glyphs * lines * b.columns * 0.82;
@@ -156,7 +173,7 @@
                 if (b.role === 'body') {
                     bodyCount++;
                     if (!Number.isInteger(b.columns) || b.columns < 1 || b.columns > 3 ||
-                        (b.width - (b.columns - 1) * 5) / b.columns < 38 || b.height < 25 || b.fontSize !== s.bodySize) throw new Error('본문 폭·단 수·글자 크기를 확인해주세요.');
+                        (b.width - (b.columns - 1) * RENDER.gutter) / b.columns < 38 || b.height < 25 || b.fontSize !== s.bodySize) throw new Error('본문 폭·단 수·글자 크기를 확인해주세요.');
                 }
                 if (b.role === 'image') {
                     if (pi > 0 || !Number.isInteger(b.imageIndex) || b.imageIndex < 0 || b.imageIndex >= a.images.length) throw new Error('사진 참조를 확인해주세요.');
@@ -189,5 +206,5 @@
         c.images = c.images.map(im => ({path:im.path,name:im.name,width:im.width,height:im.height}));
         return c;
     }
-    return { DEFAULTS, PT, MAX_PAGES, settings, article, units, demand, capacity, textHeight, candidates, validate, continuation, fromAI, safeArticle };
+    return { DEFAULTS, PT, MAX_PAGES, RENDER, typography, furniture, settings, article, units, demand, capacity, textHeight, candidates, validate, continuation, fromAI, safeArticle };
 });

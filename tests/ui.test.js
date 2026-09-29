@@ -110,3 +110,44 @@ test('native picker permission failure has a redacted stage and no host write',a
  await assert.rejects(()=>adapter.saveIndd(),e=>e.productionStage==='output.getFileForSaving'&&!e.message.includes('private'));
  assert.equal(writes,0);
 });
+
+test('all free plan preview bounds and typography consume the same settings passed to creation',async()=>{
+ const L=require('../src/layout-engine');let received;const {app,e}=setup(true,{create:(a,p)=>{received=p;return {pageCount:1,errors:[],warnings:[]};}});
+ e.bodyFont.value='Custom Body';e.titleFont.value='Custom Title';e.bodySize.value='12';e.pageWidth.value='240';e.pageHeight.value='330';
+ e.btnPrepare.click();await tick();
+ for(let i=0;i<3;i++){
+  e.candidateList.children[i].click();const p=app.state.plans[i],sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width;
+  const near=(actual,expected)=>assert.ok(Math.abs(parseFloat(actual)-expected)<1e-8,actual+' vs '+expected);
+  near(sheet.style.height,p.settings.height*scale);
+  for(const b of p.pages[0].elements){
+   const nodes=sheet.children.filter(n=>n.className==='preview-'+b.role),spec=L.typography(b,p.settings);
+   for(let c=0;c<nodes.length;c++){
+    const node=nodes[c],cw=b.role==='body'?(b.width-(b.columns-1)*5)/b.columns:b.width;
+    near(node.style.left,(b.x+c*(cw+5))*scale);near(node.style.top,b.y*scale);near(node.style.width,cw*scale);near(node.style.height,b.height*scale);
+    near(node.style.fontSize,spec.size/L.PT*scale);near(node.style.lineHeight,spec.leading/L.PT*scale);
+    assert.equal(node.style.fontFamily,JSON.stringify(spec.font)+', sans-serif');assert.equal(node.style.letterSpacing,'0px');assert.equal(node.style.textAlign,'left');
+   }
+  }
+  e.btnCreateAuto.click();await tick();assert.equal(received,p);
+ }
+});
+test('preview metadata and paragraph spacing match shared furniture and body spec',()=>{
+ const L=require('../src/layout-engine'),{app,e}=setup(),p=app.state.plans[0],sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width;
+ const a=L.article({title:e.autoTitle.value,body:e.autoBody.value,kicker:e.autoKicker.value,author:e.autoAuthor.value});
+ const spec=L.furniture(p.settings,a,1),metas=sheet.children.filter(n=>n.className==='preview-meta');
+ assert.equal(metas[0].textContent,spec[0].text);assert.equal(metas[1].textContent,spec[2].text);
+ assert.equal(parseFloat(metas[0].style.lineHeight),8*1.4/L.PT*scale);
+ const rule=sheet.children.find(n=>n.className==='preview-rule');assert.equal(parseFloat(rule.style.height),0.45*scale);
+ const body=sheet.children.find(n=>n.className==='preview-body');assert.ok(body.children.length>0);
+ assert.equal(parseFloat(body.children[0].style.marginBottom),2*scale);
+});
+test('preview photos use centered cover with exact image-plan geometry',async()=>{
+ const {app,e}=setup(true,{image:async()=>({path:'photo.jpg',preview:'data:image/png;base64,AA==',name:'photo'})});
+ e.btnAddImage.click();await tick();e.btnPrepare.click();await tick();
+ for(let i=0;i<3;i++){
+  e.candidateList.children[i].click();const p=app.state.plans[i],b=p.pages[0].elements.find(b=>b.role==='image'),sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width;
+  const photo=sheet.children.find(n=>n.className==='preview-photo');assert.equal(photo.children[0].style.objectFit,'cover');assert.equal(photo.children[0].style.objectPosition,'center');
+  assert.equal(parseFloat(photo.style.width),b.width*scale);assert.equal(parseFloat(photo.style.height),b.height*scale);
+  assert.equal(parseFloat(photo.style.left),b.x*scale);assert.equal(parseFloat(photo.style.top),b.y*scale);
+ }
+});

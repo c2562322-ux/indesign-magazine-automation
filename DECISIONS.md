@@ -532,3 +532,8 @@ TOC_ITEM_01 (Group, childCount=3)
 새 모드의 FontStatus/LinkStatus는 Adobe UXP 지침에 따라 equals()로 비교하고, 숫자형 모의 값도 허용한다. 새 생성 시 이전 latest/UI 연결을 먼저 해제하며 기존 문서 자체는 닫지 않는다. 생성과 첫 검사가 반환된 뒤에만 새 문서를 추적한다. Document.save가 유효한 Document를 반환하면 그 문서로 latest를 갱신한다. 검사 오류/예외는 PDF 버튼을 차단하며 검사 및 수정용 INDD 저장으로 복구할 수 있다. 출력 직전 Host 검사도 유지한다.
 
 PDF exportFile의 반환값으로 성공/취소를 추측하지 않는다. afterExport를 수신하면 성공, 받지 못하면 완료 미확인, 예외는 단계별 실패로 표시한다. UXP 파일 선택창 취소는 명확히 취소로 표시한다. 이벤트 지원과 PDF 옵션 취소의 실제 형태는 PC에서 확인할 항목이다. 기존 경로 전달 방식과 doScript 언어/콜백은 임의 변경하지 않았다. 로그는 상태/제작 결과 영역에 표시하며 원본 Error/스택·키·개인 경로를 출력하지 않는다. 기존 시작 페이지·Inspector·목차 코드는 변경하지 않는다. 공식 근거와 호출 흐름은 docs/PRODUCTION_TESTS.md 참고.
+
+
+## D031 — 새 디자인 렌더러의 공통 속성과 프레임 선 제거 (2026-09-29)
+
+geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 layout-engine에서 두 렌더러에 제공한다. 편집 프레임은 strokeColor=None 및 fill=None을 명시하고, 의도된 AUTO_RULE은 독립 role과 accent fill로 보존한다. 새 문서의 문단/문자 override만 제거한다. 기존 양식 객체에는 적용하지 않는다. CSS/InDesign 조판 차이로 픽셀 일치나 페이지 수 일치를 보장하지 않는다. 상세 비교: docs/RENDER_PARITY.md.

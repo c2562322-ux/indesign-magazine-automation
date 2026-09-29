@@ -1056,3 +1056,12 @@
 - 테스트: 기존 30개 + 신규 20개 = 50개 통과. Word/배치/기존 JSON 검증도 통과. 모의 Host·DOM·UXP 파일 선택 테스트이며 실제 InDesign 실행 아님.
 - 신규 docs/PRODUCTION_TESTS.md에 버튼 조건/호출 흐름/공식 근거/PC 테스트 순서/실패 보고 항목을 기록했다. HANDOFF/README/ACCEPTANCE_TESTS와 검증 결과 갱신.
 - 기존 모드·레이아웃 계산·manifest/index.html·원본 템플릿·RELEASE.json은 수정하지 않았다. 개발 브랜치에서만 commit/push하도록 사용자 승인받음.
+
+
+## 2026-09-29 — 미리보기 / InDesign / PDF 정합성 검토
+
+- 사용자 문서 생성/PDF 출력 성공 보고 및 영역 사각형 선/외관 차이 접수. 실제 첨부 스크린샷은 접근 불가; sample/magazine-design.indd 읽기도 접근 거부되어 내부 미검사, 파일 미변경/미스테이징.
+- 코드 확인: strokeColor 미설정, preview 고정 폰트/800 굵기/-0.5px 자간, 본문 문단 간격 누락, meta 행간/색상 차이. geometry/pt-mm/fitting의 기존 일치도 구분.
+- 새 모드만 공통 typography/furniture와 None stroke 적용, Host 기본값/override 영향 축소. 본문 추정 분할과 실제 연결 조판 차이는 보존하고 제한 명시.
+- 기존 50 + 신규 6 = 전체 56 통과. 수정 전 렌더러를 메모리로 주입해 신규 회귀 실패 확인; 작업 파일 checkout/reset 없음. Mock은 Adobe 실기 검증 아님.
+- docs/RENDER_PARITY.md에 항목별 plan→preview→Host 비교표 및 실기 절차. 기존 시작페이지/Inspector/목차/저장 경로 변경 없음.
