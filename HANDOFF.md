@@ -1,6 +1,6 @@
 # HANDOFF — 1.1.0
 
-갱신: 2026-09-29. 사용자 요청: **새 디자인 lifecycle/세션/폰트 조회 및 제작 경로 안정화.** 개발 브랜치: `codex/magazine-studio-1.1`.
+갱신: 2026-09-29. 사용자 요청: **안정화 유지 + 제공 JSON 디자인 3종 연결.** 개발 브랜치: `codex/magazine-studio-1.1`.
 
 ## 현재 상태
 
@@ -8,7 +8,7 @@
 - 새 모드는 새 문서·새 프레임을 생성한다. 기존 문서에는 쓰지 않는다. 이는 사용자가 명시적으로 요청한 새 범위이며 D026에 기록했다.
 - 무료 배치 3안 / 선택형 AI 첫 페이지 설계 / 이어지는 본문 페이지 / 원고 저장 / INDD 저장 / 검사 / PDF 코드 구현.
 - Word의 탭/수동 줄바꿈 처리와 중복 마커 검사를 보강했다.
-- Node 자동 테스트 **90개 통과**(직전 76 + lifecycle/session/cache 회귀 14). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
+- Node 자동 테스트 **115개 통과**(기존 안정화 90 + JSON 회귀 25). Host/DOM/파일 선택은 모의 객체이며 실제 Adobe 실행 검증이 아니다.
 - 사용자 PC 1차 실기 확인: 패널 표시, 원고 입력, 무료 3안, 미리보기 글자 크기, 패널 스크롤 정상. InDesign/UDT 정확한 버전은 아직 미기록.
 - 이후 사용자 PC에서 새 문서 생성·PDF 내보내기 성공 보고. PDF 사각형 선/미리보기 차이 관찰. 이번 외관 수정 이후 실제 InDesign 재검증 필요. AI 실호출 및 별도 브라우저 렌더링은 여전히 미검증.
 - 수정: UXP enum equals 비교, 재생성 실패 시 이전 대상 해제, save 반환 문서 추적, 검사 실패 후 PDF 차단, 단계별 민감정보 제거 진단. PDF 옵션 취소/완료 불명확 시 성공으로 단정하지 않는다.
@@ -23,9 +23,12 @@
 - 안정화: 동일 DOM mount 재사용, destroy/새 DOM 재초기화, 선택 UI 실패 격리, Host 실패 시 입력/시안 유지, session/latest/picker 보호. 폰트 Family→Style 선택과 cache/명시 새로고침 분리. 시간 진단 표식: Studio ready [stability-01].
 - 최신 절차/전체 UI 추적은 docs/STABILITY.md. 실제 UDT Reload와 최신 폰트 적용은 아직 사용자 PC 실기 필요.
 
+- JSON: designs/manifest.json → validator/normalizer → origin=json plan → Preview/Host. 무료3안 유지. 폰트/무사진/후속 페이지/누락값/추가 파일 방법은 docs/JSON_DESIGNS.md. 표시 [json-design-01] 추가.
+- 원본 헤더 크기/페이지번호 행간은 null이므로 명시 기본값과 경고 적용. 원본 제목/부제 프레임이 작아 예시 원고 넘침 가능; 자동 축소/이동 없음. 실제 InDesign/PDF 미검증.
+
 ## 다음 3개 작업
 
-1. 먼저 `docs/STABILITY.md`의 5~10분 Smoke Test를 통과한 뒤 `docs/PRODUCTION_TESTS.md`의 버튼 순서로 실제 InDesign에서 실행하고 앱·UDT 버전, 코드 SHA, 단계별 결과를 남긴다. docs/RENDER_PARITY.md 순서로 동일 원고/무료 시안의 미리보기·새 문서·PDF 외관을 비교한다.
+1. JSON 디자인은 먼저 `docs/JSON_DESIGNS.md`의 Smoke 순서로 실기 비교한다. 기본 흐름은 `docs/STABILITY.md`의 5~10분 Smoke Test를 통과한 뒤 `docs/PRODUCTION_TESTS.md`의 버튼 순서로 실제 InDesign에서 실행하고 앱·UDT 버전, 코드 SHA, 단계별 결과를 남긴다. docs/RENDER_PARITY.md 순서로 동일 원고/무료 시안의 미리보기·새 문서·PDF 외관을 비교한다.
 2. Host API 호환성 문제가 있으면 `src/auto-indesign.js`에 한정해 보정한다. 원고/배치 계산 로직과 기존 템플릿 생성 경로를 함께 바꾸지 않는다.
 3. 실제 원고 3건으로 제목 넘침, 본문 페이지 추가, 사진 크롭, 원문 보존, PDF 출력을 확인한 뒤 실무 배포 여부를 결정한다.
 
@@ -41,7 +44,7 @@
 
 ## 개발·전달
 
-- `npm test`: 의존성 설치 없이 90개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js`를 사용한다.
+- `npm test`: 의존성 설치 없이 115개 테스트. 현재 PC 셸에 npm이 없으면 package.json과 동일한 `node --test tests/core.test.js tests/host.test.js tests/ui.test.js tests/json-design.test.js`를 사용한다.
 - `preview.html`: 폴더에서 브라우저로 열어 체험.
 - `manifest.json`: UDT로 로드.
 - 최종 ZIP에는 소스/문서/테스트/기존 자료를 포함하며 `.git`과 임시파일은 제외.

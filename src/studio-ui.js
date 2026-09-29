@@ -8,11 +8,11 @@
     if(mounted&&mounted.root===root&&!mounted.disposed)return mounted;
     if(mounted)mounted.destroy();
     const nodes=new Map(Array.from(doc.querySelectorAll('[id]')).map(e=>[e.id,e]));
-    const optional=['btnFonts','fontBrowser','fontSearch','fontSummary','fontChoices','btnFontMore','btnFontRefresh','fontSelection','fontCurrent','btnFontBody','btnFontTitle','btnAI','btnAiSettings','aiPanel','apiKey','aiModel','studioDiagnostics'];
+    const optional=['btnLoadDesigns','designLibraryStatus','jsonDesignList','jsonDesignInfo','btnFonts','fontBrowser','fontSearch','fontSummary','fontChoices','btnFontMore','btnFontRefresh','fontSelection','fontCurrent','btnFontBody','btnFontTitle','btnAI','btnAiSettings','aiPanel','apiKey','aiModel','studioDiagnostics'];
     const missing=optional.filter(id=>!nodes.has(id));
     missing.forEach(id=>{const node=doc.createElement('div');node.value='';nodes.set(id,node);});
     const $=id=>nodes.get(id),listeners=[];
-    const state={images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30,fontsLoaded:false,fontMatches:[],fontByName:new Map(),selectedFont:null};
+    const state={library:[],libraryLoading:false,libraryPromise:null,designIssues:[],designFontsChecked:false,images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30,fontsLoaded:false,fontMatches:[],fontByName:new Map(),selectedFont:null};
     let status;
     const api={root,disposed:false,destroy(){if(api.disposed)return;api.disposed=true;listeners.splice(0).forEach(([node,event,handler])=>{try{node.removeEventListener(event,handler);}catch(e){/* A disposed wrapper is inert even if its old DOM has gone away. */}});try{if(adapter.dispose)adapter.dispose();}catch(e){/* Disposal must not prevent a fresh mount. */}}};
     const diagnostics=[],initStart=Date.now();
@@ -57,6 +57,8 @@
         $('prevPage').disabled=state.busy||!valid||state.page===0;
         $('nextPage').disabled=state.busy||!valid||state.page>=((state.plans[state.selected]||{pages:[]}).pages.length-1);
         $('btnFontMore').disabled=state.busy||state.fontLimit>=state.fontMatches.length;
+        $('btnLoadDesigns').disabled=state.busy||state.libraryLoading;
+        for(const child of $('jsonDesignList').children)child.disabled=state.busy||child.designError===true;
     }
     async function run(fn){
         if(state.busy||api.disposed)return;state.busy=true;
@@ -87,7 +89,7 @@
     function renderPage(parent,plan,a,pageIndex,width){
         parent.textContent='';const s=plan.settings,scale=width/s.width;
         // L.PT is points per millimetre: convert points to mm, then mm to preview pixels.
-        const fontPixels=points=>(points/L.PT*scale)+'px';
+        const fontPixels=points=>(L.ptToMm(points)*scale)+'px';
         const type=(node,b)=>{
             const t=L.typography(b,s),face=state.fontByName.get(t.font),parts=face?[face.family,face.style]:t.font.split('\t');
             const style=parts[1]||'',weight=/black|heavy/i.test(style)?900:/extra.?bold|ultra.?bold/i.test(style)?800:/semi.?bold|demi/i.test(style)?600:/bold/i.test(style)?700:/medium/i.test(style)?500:/extra.?light|ultra.?light/i.test(style)?200:/light/i.test(style)?300:/thin/i.test(style)?100:400;
@@ -98,34 +100,37 @@
         };
         const sheet=element('div','design-sheet');sheet.style.width=width+'px';sheet.style.height=(s.height*scale)+'px';
         const pos=(node,x,y,w,h)=>{Object.assign(node.style,{position:'absolute',left:(x*scale)+'px',top:(y*scale)+'px',width:(w*scale)+'px',height:(h*scale)+'px'});sheet.appendChild(node);};
-        L.furniture(s,a,pageIndex+1).forEach(b=>{
+        (plan.origin==='json'?[]:L.furniture(s,a,pageIndex+1)).forEach(b=>{
             const node=element('div',b.role==='rule'?'preview-rule':'preview-meta',b.text);
             if(b.role==='rule')node.style.backgroundColor=b.fill;else type(node,b);
             pos(node,b.x,b.y,b.width,b.height);
         });
         const bodyDemand=Math.max(1,L.demand(a.body));
         let offset=0;
-        for(let i=0;i<pageIndex;i++)offset+=Math.floor(L.capacity(plan.pages[i].elements.find(b=>b.role==='body'),s)*a.body.length/bodyDemand);
+        for(let i=0;i<pageIndex;i++)offset+=plan.pages[i].elements.filter(b=>b.role==='body').reduce((sum,b)=>sum+Math.floor(L.capacity(b,s)*a.body.length/bodyDemand),0);
+        const starts=new Map();plan.pages[pageIndex].elements.filter(b=>b.role==='body').slice().sort((a,b)=>(a.flowOrder||0)-(b.flowOrder||0)).forEach(b=>{starts.set(b,offset);offset+=Math.floor(L.capacity(b,s)*a.body.length/bodyDemand);});
         plan.pages[pageIndex].elements.forEach(b=>{
+            if(b.role==='line'){const node=element('div','preview-rule'),h=L.ptToMm(b.stroke.weight);node.style.backgroundColor=b.stroke.color.css;const cap=b.stroke.cap==='ButtEndCap'?0:h/2;node.style.borderRadius=b.stroke.cap==='RoundEndCap'?fontPixels(b.stroke.weight/2):'0px';pos(node,b.x-cap,b.y-h/2,b.width+cap*2,h);return;}
             if(b.role==='image'){
-                const im=a.images[b.imageIndex],wrap=element('div','preview-photo');wrap.style.backgroundColor=s.accent;
-                if(im.preview){wrap.style.backgroundColor='transparent';const img=element('img');img.src=im.preview;img.alt=im.name;img.style.objectFit=L.RENDER.imageFit;img.style.objectPosition=L.RENDER.imagePosition;wrap.appendChild(img);}else{wrap.textContent=im.name||'PHOTO';}
+                const im=a.images[b.imageIndex]||{},wrap=element('div','preview-photo');wrap.style.backgroundColor=b.fill?b.fill.css:s.accent;wrap.style.borderRadius=((b.cornerRadius||0)*scale)+'px';
+                if(im.preview){if(plan.origin!=='json')wrap.style.backgroundColor='transparent';const img=element('img');img.src=im.preview;img.alt=im.name;img.style.objectFit=b.fit||L.RENDER.imageFit;img.style.objectPosition=L.RENDER.imagePosition;wrap.appendChild(img);}else{wrap.textContent=plan.origin==='json'&&!im.path?'':im.name||'PHOTO';}
                 pos(wrap,b.x,b.y,b.width,b.height);return;
             }
             if(b.role==='body'){
-                const cap=Math.floor(L.capacity(b,s)*a.body.length/bodyDemand),text=a.body.slice(offset,offset+cap);
-                const cw=(b.width-(b.columns-1)*L.RENDER.gutter)/b.columns,chunk=Math.ceil(text.length/b.columns);
+                const cap=Math.floor(L.capacity(b,s)*a.body.length/bodyDemand),text=a.body.slice(starts.get(b),starts.get(b)+cap);
+                const inset=b.inset||[0,0,0,0],gutter=b.columnGap===undefined?L.RENDER.gutter:b.columnGap;
+                const cw=(b.width-inset[1]-inset[3]-(b.columns-1)*gutter)/b.columns,chunk=Math.ceil(text.length/b.columns);
                 for(let c=0;c<b.columns;c++){
                     const node=element('div','preview-body');type(node,b);
                     text.slice(c*chunk,(c+1)*chunk).split('\n').forEach(line=>{
                         const p=element('div','preview-paragraph',line||'\u00a0');
-                        p.style.marginBottom=(L.typography(b,s).spaceAfter*scale)+'px';node.appendChild(p);
+                        p.style.marginTop=((L.typography(b,s).spaceBefore||0)*scale)+'px';p.style.marginBottom=(L.typography(b,s).spaceAfter*scale)+'px';node.appendChild(p);
                     });
-                    pos(node,b.x+c*(cw+L.RENDER.gutter),b.y,cw,b.height);
+                    pos(node,b.x+inset[1]+c*(cw+gutter),b.y+inset[0],cw,b.height-inset[0]-inset[2]);
                 }
                 return;
             }
-            const node=element('div','preview-'+b.role,a[b.role]);type(node,b);pos(node,b.x,b.y,b.width,b.height);
+            const node=element('div','preview-'+b.role,L.content(b,a,pageIndex+1));type(node,b);const inset=b.inset||[0,0,0,0];node.style.overflow='hidden';node.style.padding=[inset[0],inset[3],inset[2],inset[1]].map(v=>(v*scale)+'px').join(' ');pos(node,b.x,b.y,b.width,b.height);
         });
         parent.appendChild(sheet);
     }
@@ -133,12 +138,13 @@
         const v=fresh(),plan=state.plans[state.selected];state.page=Math.min(state.page,plan.pages.length-1);
         const grid=$('candidateList');grid.textContent='';
         state.plans.forEach((p,i)=>{
+            if(p.origin==='json')return;
             const button=element('button','candidate'+(i===state.selected?' selected':''));button.setAttribute('aria-pressed',i===state.selected?'true':'false');
             button.appendChild(element('span','candidate-num',String(i+1).padStart(2,'0')));
             button.appendChild(element('strong','',p.name));button.appendChild(element('span','candidate-desc',p.origin==='ai'?'AI 제안 · '+p.estimatedPages+'p 예상':p.estimatedPages+'p 예상'));
             button.addEventListener('click',()=>{if(state.busy||api.disposed)return;try{fresh();state.selected=i;state.page=0;render();}catch(e){status(e.message,true);}});grid.appendChild(button);
         });
-        $('designName').textContent=plan.name;$('designDescription').textContent=plan.description;
+        renderLibrary();designInfo(plan);fontCurrent();$('designName').textContent=plan.name;$('designDescription').textContent=plan.description;
         $('pageIndicator').textContent=(state.page+1)+' / '+plan.pages.length;
         const available=$('largePreview').clientWidth||360;
         renderPage($('largePreview'),plan,v.article,state.page,Math.max(220,Math.min(430,available-20)));
@@ -146,20 +152,54 @@
         buttons();
     }
     function prepare(){const v=read();state.plans=L.candidates(v.article,v.settings);state.signature=fingerprint(v.article,v.settings);state.selected=0;state.page=0;render();status('무료 시안 3개를 만들었습니다. 원하는 안을 선택해주세요.');}
+
+    function designInfo(plan){
+        if(!plan||plan.origin!=='json'){$('jsonDesignInfo').textContent='';return;}
+        const fonts=[...new Set(plan.pages[0].elements.filter(b=>b.typography).map(b=>b.typography.font.replace(/\t/g,' — ')))];
+        $('jsonDesignInfo').textContent='사용 폰트: '+fonts.join(' / ')+'\n'+(state.designIssues.length?'이 디자인에 필요한 폰트가 없습니다: '+state.designIssues.map(f=>f.name.replace(/\t/g,' — ')).join(' / '):state.designFontsChecked?'현재 InDesign에서 필요한 폰트 확인됨 (생성 직전 재검사)':'설치 상태는 선택/생성 때 확인합니다.')+'\n'+plan.warnings.join(' · ')+'\n사진 없으면 빈 프레임 유지. 본문 폰트 대체는 부제·헤더·페이지 번호에도 적용됩니다.';
+    }
+    function renderLibrary(){
+        const grid=$('jsonDesignList');grid.textContent='';
+        state.library.forEach(row=>{
+            const selected=state.plans[state.selected],button=element('button','candidate'+(selected&&selected.origin==='json'&&selected.id===row.id?' selected':''));
+            button.setAttribute('aria-pressed',selected&&selected.origin==='json'&&selected.id===row.id?'true':'false');button.appendChild(element('strong','',row.design?row.design.name:row.id));
+            if(row.error){button.designError=true;button.disabled=true;button.appendChild(element('span','candidate-desc','JSON 오류: '+safe(row.error)));}
+            else{const bodies=row.design.elements.filter(e=>e.role==='body');button.appendChild(element('span','candidate-desc','사진 '+row.design.contentSlots.images.min+'장 · 본문 '+bodies.reduce((n,e)=>n+(e.columns||1),0)+'열 · 폰트 선택 시 확인'));button.disabled=state.busy;
+                button.addEventListener('click',()=>{if(api.disposed||state.busy)return;state.action='JSON 디자인 선택';return run(async()=>{
+                    const v=read(),p=L.fromDesign(row.design,v.article);invalidateDocument();state.designIssues=[];state.designFontsChecked=false;
+                    if(state.signature!==fingerprint(v.article,v.settings)){try{state.plans=L.candidates(v.article,v.settings);}catch(e){state.plans=[];}}
+                    state.plans=state.plans.filter(x=>x.origin!=='json');state.plans.push(p);state.selected=state.plans.length-1;state.page=0;state.signature=fingerprint(v.article,v.settings);render();
+                    if(adapter.validateDesignFonts){if(adapter.yieldUI)await adapter.yieldUI();if(api.disposed)return;const issues=await adapter.validateDesignFonts(p);if(api.disposed)return;state.designIssues=issues.filter(f=>f.error);state.designFontsChecked=true;designInfo(p);}
+                    status(state.designIssues.length?'이 디자인에 필요한 폰트가 없습니다. 설정 → 폰트 더보기에서 제목/본문 대체 폰트를 선택해주세요.':'JSON 디자인을 선택했습니다. 사진이 없으면 이미지 프레임을 비워 둡니다.',!!state.designIssues.length);
+                });});}
+            grid.appendChild(button);
+        });
+    }
+    async function loadLibrary(){
+        if(state.libraryLoading)return state.libraryPromise;
+        state.libraryLoading=true;$('designLibraryStatus').textContent='디자인 JSON 읽는 중…';
+        state.libraryPromise=(async()=>{try{
+            if(!adapter.designs)throw new Error('이 환경에 JSON 로더가 없습니다.');
+            const rows=await adapter.designs();if(api.disposed)return;state.library=rows;renderLibrary();
+            $('designLibraryStatus').textContent=rows.filter(r=>r.design).length+'개 사용 가능 · '+rows.filter(r=>r.error).length+'개 오류';
+        }catch(e){if(!api.disposed)$('designLibraryStatus').textContent='디자인 읽기 실패: '+safe(e.message)+' · 다시 읽기로 재시도 (브라우저는 로컬 HTTP 서버 필요)';}
+        finally{state.libraryLoading=false;if(!api.disposed)buttons();}})();return state.libraryPromise;
+    }
     diagnostic('Events binding start');
+    on('btnLoadDesigns','click',()=>run(loadLibrary));
     editable.forEach(id=>on(id,'input',changed));
     on('btnPrepare','click',()=>run(prepare));
     on('btnSample','click',()=>run(()=>{fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status('예시 원고입니다. 직접 입력하거나 원고 파일을 불러와주세요.');}));
-    on('btnClear','click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];state.hasDocument=false;state.documentKey='';state.pdfReady=false;$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote','hostReport'].forEach(id=>$(id).textContent='');$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';status('새 원고를 입력해주세요.');}));
+    on('btnClear','click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];state.hasDocument=false;state.documentKey='';state.pdfReady=false;$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote','hostReport','jsonDesignInfo'].forEach(id=>$(id).textContent='');$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';renderLibrary();fontCurrent();status('새 원고를 입력해주세요.');}));
     on('btnLoadAuto','click',()=>run(async()=>{
         const result=await adapter.load();if(api.disposed)return;if(!result){status('불러오기를 취소했습니다.');return;}
         const a=L.article(result.article),s=L.settings(result.settings||readSettingsOnly());
-        if(result.plan){L.validate(result.plan,a);if(JSON.stringify(L.settings(result.plan.settings))!==JSON.stringify(s))throw new Error('저장된 시안과 설정이 일치하지 않습니다.');}
+        if(result.plan){L.validate(result.plan,a);if(result.plan.origin!=='json'&&JSON.stringify(L.settings(result.plan.settings))!==JSON.stringify(s))throw new Error('저장된 시안과 설정이 일치하지 않습니다.');}
         fill(a,s);prepare();
         if(result.plan){state.plans.push(result.plan);state.selected=state.plans.length-1;render();}
-        const issues=adapter.validateFonts?await adapter.validateFonts(s):[];
-        const missing=issues.filter(f=>f.error);
-        status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. 사진과 추출된 내용을 확인해주세요.',!!missing.length);
+        const issues=result.plan&&result.plan.origin==='json'&&adapter.validateDesignFonts?await adapter.validateDesignFonts(result.plan):adapter.validateFonts?await adapter.validateFonts(s):[];if(api.disposed)return;
+        const missing=issues.filter(f=>f.error);if(result.plan&&result.plan.origin==='json'){state.designIssues=missing;state.designFontsChecked=!!adapter.validateDesignFonts;designInfo(result.plan);}
+        status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.name?f.name.replace(/\t/g,' — ')+': ':f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. 사진과 추출된 내용을 확인해주세요.',!!missing.length);
     }));
     function readSettingsOnly(){try{return L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value});}catch(e){return L.DEFAULTS;}}
     on('btnAddImage','click',()=>run(async()=>{if(state.images.length>=2)throw new Error('사진은 최대 2장입니다.');const im=await adapter.image();if(api.disposed)return;if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));
@@ -170,7 +210,8 @@
         state.fontMatches=state.fonts.filter(f=>f.searchText.includes(q));
     }
     function fontCurrent(){
-        $('fontCurrent').textContent='본문: '+$('bodyFont').value.replace(/\t/g,' — ')+' | 제목: '+$('titleFont').value.replace(/\t/g,' — ');
+        const p=state.plans[state.selected],s=p&&p.origin==='json'?p.settings:{bodyFont:$('bodyFont').value,titleFont:$('titleFont').value};
+        $('fontCurrent').textContent='본문: '+s.bodyFont.replace(/\t/g,' — ')+' | 제목: '+s.titleFont.replace(/\t/g,' — ');
         $('fontSelection').textContent=state.selectedFont?'선택: '+state.selectedFont.family+' — '+state.selectedFont.style:'실제 설치된 스타일을 선택해주세요.';
     }
     function fontChoices(){
@@ -185,12 +226,13 @@
             group.appendChild(button);
         });fontCurrent();buttons();
     }
-    function applyFont(id){return run(()=>{
+    function applyFont(id){return run(async()=>{
         const f=state.selectedFont;if(!f)throw new Error('먼저 설치된 스타일을 선택해주세요.');
         let current=false;try{fresh();current=true;}catch(e){}
         $(id).value=f.name;invalidateDocument();
-        if(current){const v=read();state.plans=state.plans.map(p=>({...p,settings:v.settings}));state.signature=fingerprint(v.article,v.settings);render();}
+        if(current){const v=read();state.plans=state.plans.map((p,i)=>p.origin==='json'?(i===state.selected?L.fromDesign(p.design,v.article,{...p.fontOverrides,[id]:f.name}):p):({...p,settings:v.settings}));state.designIssues=[];state.designFontsChecked=false;state.signature=fingerprint(v.article,v.settings);render();}
         else{changed();try{prepare();}catch(e){status('폰트 선택 완료 · '+e.message,true);return;}}
+        const plan=state.plans[state.selected];if(plan&&plan.origin==='json'&&adapter.validateDesignFonts){const issues=await adapter.validateDesignFonts(plan);if(api.disposed)return;state.designIssues=issues.filter(f=>f.error);state.designFontsChecked=true;designInfo(plan);}
         fontCurrent();status((id==='bodyFont'?'본문':'제목')+' 폰트 적용: '+f.family+' — '+f.style+' · 새 문서를 만들어주세요.');
     });}
     async function loadFonts(refresh){
@@ -268,7 +310,7 @@
     if($('modeStudio'))on('modeStudio','click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});
     diagnostic('Events binding complete · '+listeners.length+' listeners');
     fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
-    Object.assign(api,{read,state,prepare,diagnostics});mounted=api;diagnostic('Studio ready [stability-01] '+(Date.now()-initStart)+'ms');return api;
+    Object.assign(api,{read,state,prepare,diagnostics});mounted=api;diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
     }catch(e){diagnostic('Studio init 실패: '+e.message);api.destroy();const el=$('studioStatus');if(el)el.textContent='Studio init 실패: '+D.redact(e.message);throw e;}
  }
  return {mount,SAMPLE};

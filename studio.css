@@ -17,3 +17,5 @@ body{margin:0;padding:0;background:#f3f1eb;color:#202724;font-family:Arial,sans-
 .font-row{padding:6px 0;border-bottom:1px solid #ddd;}
 
 .font-family{margin:8px 0;} .font-family strong{display:block;} .font-style{display:block;margin:3px 0 3px 12px;padding:5px 10px;} .font-style.selected{border:2px solid #2c493b;background:#eef3eb;}
+
+#jsonDesignInfo{white-space:pre-wrap;margin:8px 0;}

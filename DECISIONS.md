@@ -547,3 +547,8 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 ## D033 — Studio lifecycle와 폰트 캐시 안정화 (2026-09-29)
 
 동일 root의 mount는 재사용하고 새로운 root/해제 후에는 listener와 state/Host 세션을 새로 만든다. 이전 비동기 결과는 새 패널·문서에 쓰지 않는다. 선택 UI/Host 초기화 실패는 핵심 원고·시안 binding과 분리한다. 폰트 catalog는 세션 단위 캐시, 명시 새로고침만 전체 열거한다. 생성 시에는 선택 face의 현재 상태를 검증한다. 원고/설정 편집은 이전 출력 대상을 무효화하며 실제 문서 창은 유지한다. 자동 테스트와 실제 UDT Reload 성공은 구분하고 stability-01 시간 진단과 Smoke Test로 실기를 받는다.
+
+
+## D034 — 외부 IDML 추출 JSON은 단일 정규화 plan으로 재현 (2026-09-29)
+
+제공 ZIP의 designs/manifest와 JSON을 파일로 보관하고 UXP pluginFolder/브라우저 fetch로 읽는다. draft $schema 기준 검증, 손상 파일 격리, 원본 first-page geometry/개별 typography 보존. 기존 무료/AI plan 경로를 유지하며 origin=json 경로가 독립 본문 flowOrder, 실제 선/이미지 모서리/색상을 지원한다. 헤더 null 크기 8pt, null 행간 120%, 글자색 검정/문단 간격·inset 0/bleed 0은 누락값 정책이며 원본값이 아니다. fontOverrides는 사용자 명시 선택만 허용. 사진 0장은 빈 원본 프레임, 초과 사진은 거부. 긴 본문은 원본 첫 페이지 이후 공통 continuation geometry+원본 body typography를 사용하며 JSON 후속 페이지에는 본문만 넣는다. 원본 프레임 넘침을 자동 축소로 감추지 않는다. 상세 계약/한계: docs/JSON_DESIGNS.md.

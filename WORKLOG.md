@@ -1084,3 +1084,13 @@
 - 작업/Host 단계 ms, 초기화 단계와 stability-01 표식. 기존 stroke/typography/좌표 및 기존 양식/Inspector/목차 코드 보존.
 - index.html 트리/복수 listener/해제/범위 query fixture 보강. 기존76+14=90 통과. 수정 전 HEAD의 핵심 3회귀 테스트 실패, 수정 후 통과(메모리 비교). 실제 PC 성능/Reload/Host 렌더 성공은 미확정.
 - docs/STABILITY.md에 비교/전수표/5~10분 Smoke Test.
+
+
+## 2026-09-29 — json-design-01 제공 외부 JSON 디자인 연결
+
+- 시작 HEAD 2179753, tracked clean. 사용자 sample/magazine-design.indd는 계속 미변경·미stage.
+- ZIP 실제 스키마 분석: 216×303mm, 글자는 pt, 8/8/9요소, 독립 body 2/2/3개, 헤더 fontSize null/페이지번호 leading null 확인. 파일 내용은 designs/에 보존.
+- validator/library loader + 단일 normalized plan. 기존 무료3안 유지, 별도 IDML 기반 목록, 파일별 오류 격리/다시 읽기, 이전 비동기 결과 차단.
+- Preview/Host에 원본 좌표·실제 style·leading/tracking·정렬·색상·라운드 이미지·1.5pt 장식선 전달. 사진 없음 빈 프레임, 본문 스레드/후속 페이지, 명시 폰트 대체와 프로젝트 복원.
+- 기존90+추가25=115 Node 테스트 통과. UXP 로더는 Mock, 실제 Adobe 생성/검사/출력은 미검증. 브라우저 키보드 선택으로3안 렌더 확인; 도구의 마우스 클릭은 반응을 확인하지 못해 실제 UXP 클릭도 사용자 Smoke 대상. 고정 제목/부제에서 예시 원고 잘림 확인.
+- docs/JSON_DESIGNS.md에 schema/단위/누락값/추가 절차/Smoke/시각적 한계 기록. 기존 시작페이지/Inspector/목차/Script Label 코드는 변경하지 않음.

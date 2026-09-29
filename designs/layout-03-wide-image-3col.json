@@ -1,0 +1,230 @@
+{
+  "$schema": "magazine-studio-layout-template/v1-draft",
+  "id": "layout-03-wide-image-3col",
+  "name": "레이아웃 3 · 가로 이미지 + 본문 3열",
+  "source": {
+    "file": "매거진자동화템플릿2.idml",
+    "spread": "Spread_u8e5c.xml",
+    "pageSelf": "u8dbf",
+    "sourcePageName": "6",
+    "extraction": "IDML geometry and text formatting"
+  },
+  "page": {
+    "widthMm": 216.0,
+    "heightMm": 303.0,
+    "units": "mm"
+  },
+  "contentSlots": {
+    "required": [
+      "title",
+      "subtitle",
+      "body"
+    ],
+    "images": {
+      "min": 1,
+      "max": 1
+    }
+  },
+  "elements": [
+    {
+      "type": "image",
+      "role": "image1",
+      "frame": {
+        "x": 18.25,
+        "y": 91.75,
+        "width": 176.5,
+        "height": 79.0
+      },
+      "fit": "cover",
+      "fillColorRef": "Color/C=10 M=0 Y=0 K=0",
+      "cornerRadiusMm": 5.0,
+      "source": {
+        "itemId": "u8dc0"
+      }
+    },
+    {
+      "type": "text",
+      "role": "body",
+      "frame": {
+        "x": 31.0,
+        "y": 180.5,
+        "width": 51.262,
+        "height": 86.447
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "4 Regular",
+        "fontSizePt": 13.0,
+        "leadingPt": 19.0,
+        "tracking": 20,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8dc1",
+        "storyId": "u8dc4"
+      },
+      "flowGroup": "body",
+      "flowOrder": 1
+    },
+    {
+      "type": "text",
+      "role": "body",
+      "frame": {
+        "x": 87.244,
+        "y": 180.5,
+        "width": 51.262,
+        "height": 86.447
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "4 Regular",
+        "fontSizePt": 13.0,
+        "leadingPt": 19.0,
+        "tracking": 20,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8dd8",
+        "storyId": "u8ddb"
+      },
+      "flowGroup": "body",
+      "flowOrder": 2
+    },
+    {
+      "type": "text",
+      "role": "body",
+      "frame": {
+        "x": 143.488,
+        "y": 180.5,
+        "width": 51.262,
+        "height": 86.447
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "4 Regular",
+        "fontSizePt": 13.0,
+        "leadingPt": 19.0,
+        "tracking": 20,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8e9d",
+        "storyId": "u8ea0"
+      },
+      "flowGroup": "body",
+      "flowOrder": 3
+    },
+    {
+      "type": "text",
+      "role": "title",
+      "frame": {
+        "x": 16.625,
+        "y": 32.778,
+        "width": 179.75,
+        "height": 34.031
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "6 SemiBold",
+        "fontSizePt": 51.0,
+        "leadingPt": 60.0,
+        "tracking": 0,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8def",
+        "storyId": "u8df2"
+      }
+    },
+    {
+      "type": "text",
+      "role": "subtitle",
+      "frame": {
+        "x": 16.875,
+        "y": 75.5,
+        "width": 133.569,
+        "height": 4.013
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "5 Medium",
+        "fontSizePt": 16.0,
+        "leadingPt": 16.0,
+        "tracking": 0,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8e06",
+        "storyId": "u8e09"
+      }
+    },
+    {
+      "type": "text",
+      "role": "header",
+      "frame": {
+        "x": 16.875,
+        "y": 16.783,
+        "width": 36.05,
+        "height": 3.01
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "5 Medium",
+        "fontSizePt": null,
+        "leadingPt": 16.0,
+        "tracking": 40,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "itemId": "u8e1d",
+        "storyId": "u8e20"
+      }
+    },
+    {
+      "type": "line",
+      "role": "headerRule",
+      "frame": {
+        "x": 17.702,
+        "y": 24.786,
+        "width": 177.596,
+        "height": 0.0
+      },
+      "stroke": {
+        "weightPt": 1.5,
+        "colorRef": "Color/r48g53b88",
+        "cap": "RoundEndCap"
+      },
+      "source": {
+        "itemId": "u8e34"
+      }
+    },
+    {
+      "type": "pageNumber",
+      "role": "pageNumber",
+      "frame": {
+        "x": 12.861,
+        "y": 286.722,
+        "width": 7.056,
+        "height": 2.498
+      },
+      "typography": {
+        "fontFamily": "프리젠테이션",
+        "fontStyle": "4 Regular",
+        "fontSizePt": 10.0,
+        "leadingPt": null,
+        "tracking": 0,
+        "alignment": "LeftJustified"
+      },
+      "source": {
+        "master": "MasterSpread_udb.xml",
+        "itemId": "u166",
+        "storyId": "u154"
+      }
+    }
+  ],
+  "notes": [
+    "IDML 원본의 프레임/선/타이포그래피 수치를 추출한 초안입니다.",
+    "Magazine Studio의 현재 외부 JSON 스키마가 아직 확정되지 않았으므로 Codex 연결 시 어댑터 또는 스키마 조정이 필요합니다.",
+    "본문은 원본처럼 독립 프레임 여러 개로 구성되며 flowGroup/body와 flowOrder로 순서를 기록했습니다."
+  ]
+}

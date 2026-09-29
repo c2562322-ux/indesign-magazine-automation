@@ -96,10 +96,10 @@ test('save failure leaves check and retry available, and successful check re-ena
  e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);
 });
 
-function nativeAdapter(host,picker,opening){
+function nativeAdapter(host,picker,opening,pluginFolder){
  const vm=require('node:vm');let adapter;
  vm.runInNewContext(fs.readFileSync('studio.js','utf8'),{require:n=>{
-  if(n==='uxp')return {storage:{formats:{binary:'binary'},localFileSystem:{getFileForSaving:picker,getFileForOpening:opening}}};
+  if(n==='uxp')return {storage:{formats:{binary:'binary'},localFileSystem:{getFileForSaving:picker,getFileForOpening:opening,getPluginFolder:pluginFolder}}};
   if(n==='./src/auto-indesign.js')return host;
   if(n==='./src/studio-ui.js')return {mount:a=>{adapter=a;}};
   return require('../'+n);
@@ -338,4 +338,42 @@ test('a control-query exception cannot leave the controller permanently busy',as
  document.querySelectorAll=s=>{if(fail&&s!=='[id]')throw new Error('controls unavailable');return query(s);};
  e.btnSample.click();await tick();assert.equal(app.state.busy,false);assert.match(e.studioStatus.textContent,/controls unavailable/);
  fail=false;e.btnSample.click();await tick();assert.equal(app.state.plans.length,3);assert.equal(e.btnCreateAuto.disabled,false);
+});
+
+const jsonManifest=JSON.parse(fs.readFileSync('designs/manifest.json')),jsonLibrary=()=>require('../src/json-design').load(name=>fs.readFileSync('designs/'+name,'utf8'));
+for(let i=0;i<3;i++)test('JSON Layout '+(i+1)+' selection renders normalized positions/type and sends the same plan to Host',async()=>{
+ let received;const {e,app}=setup(true,{designs:jsonLibrary,validateDesignFonts:()=>[],create:async(a,p)=>{received=p;return {pageCount:1,errors:[],warnings:[]};}});await tick();
+ assert.equal(e.candidateList.children.length,3);assert.equal(e.jsonDesignList.children.length,3);e.jsonDesignList.children[i].click();await tick();
+ const p=app.state.plans[app.state.selected],sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width;
+ assert.equal(p.id,jsonManifest.templates[i].id);assert.equal(sheet.children.length,p.pages[0].elements.length);
+ p.pages[0].elements.forEach((b,j)=>{const node=sheet.children[j];if(b.role==='line'){assert.equal(node.style.height,(require('../src/layout-engine').ptToMm(b.stroke.weight)*scale)+'px');assert.equal(node.style.backgroundColor,b.stroke.color.css);return;}
+ assert.equal(node.style.left,(b.x*scale)+'px');assert.equal(node.style.top,(b.y*scale)+'px');assert.equal(node.style.width,(b.width*scale)+'px');assert.equal(node.style.height,(b.height*scale)+'px');
+ if(b.typography){assert.equal(node.style.fontSize,(require('../src/layout-engine').ptToMm(b.typography.size)*scale)+'px');assert.equal(node.style.lineHeight,(require('../src/layout-engine').ptToMm(b.typography.leading)*scale)+'px');assert.equal(node.style.textAlign,b.typography.align);}else{assert.equal(node.style.borderRadius,(5*scale)+'px');assert.equal(node.textContent,'');}});
+ e.btnCreateAuto.click();await tick();assert.equal(received,p);assert.equal(e.btnCheckAuto.disabled,false);assert.equal(e.candidateList.children.length,3);
+});
+test('broken library entry and unavailable fonts cannot kill free UI; explicit font choice changes only typography',async()=>{
+ const catalog=[{name:'Available\tBook',family:'Available',style:'Book'}];const {e,app}=setup(true,{designs:async()=>{const rows=await jsonLibrary();rows[1]={id:rows[1].id,error:'bad JSON'};return rows;},validateDesignFonts:()=>[{name:'프리젠테이션\t6 SemiBold',error:'없음'}],fonts:()=>catalog});await tick();
+ assert.equal(e.jsonDesignList.children[1].disabled,true);e.jsonDesignList.children[0].click();await tick();assert.match(e.jsonDesignInfo.textContent,/필요한 폰트가 없습니다/);assert.equal(app.state.busy,false);assert.equal(e.btnPrepare.disabled,false);
+ const before=app.state.plans.at(-1);e.btnFonts.click();await tick();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();const after=app.state.plans[app.state.selected];assert.equal(after.origin,'json');assert.equal(after.fontOverrides.titleFont,'Available\tBook');assert.deepEqual(after.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]),before.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]));
+ e.btnPrepare.click();await tick();assert.equal(e.candidateList.children.length,3);assert.ok(app.state.plans.every(p=>p.origin==='local'));
+});
+test('JSON loading failure can retry, and reinitialization does not duplicate listeners or accept stale results',async()=>{
+ let fail=true;const first=setup(true,{designs:async()=>{if(fail)throw new Error('read failed');return jsonLibrary();}});await tick();assert.match(first.e.designLibraryStatus.textContent,/읽기 실패/);first.e.btnSample.click();await tick();assert.equal(first.e.candidateList.children.length,3);
+ fail=false;first.e.btnLoadDesigns.click();await tick();assert.equal(first.e.jsonDesignList.children.length,3);assert.equal(Studio.mount(first.adapter),first.app);assert.equal(first.e.btnLoadDesigns.handlers.click.length,1);
+ let resolve;const old=setup(true,{designs:()=>new Promise(r=>resolve=r)}),next=setup(true,{designs:jsonLibrary});await tick();resolve([{id:'old',error:'stale'}]);await tick();assert.equal(old.app.disposed,true);assert.equal(next.e.jsonDesignList.children.length,3);assert.doesNotMatch(next.e.designLibraryStatus.textContent,/stale/);
+});
+test('JSON project roundtrip preserves source plan and document freshness without replacing free designs',async()=>{
+ const first=setup(true,{designs:jsonLibrary});await tick();first.e.jsonDesignList.children[2].click();await tick();first.e.btnSaveProject.click();await tick();const saved=JSON.parse(JSON.stringify(first.saved[0]));assert.equal(saved.plan.origin,'json');
+ const next=setup(true,{designs:jsonLibrary,load:async()=>saved,validateDesignFonts:()=>[]});await tick();next.e.btnLoadAuto.click();await tick();assert.equal(next.app.state.plans[next.app.state.selected].id,saved.plan.id);assert.equal(next.e.candidateList.children.length,3);next.e.btnCreateAuto.click();await tick();assert.equal(next.e.btnSaveIndd.disabled,false);next.e.autoBody.value+='수정';next.e.autoBody.listeners.input();assert.equal(next.e.btnSaveIndd.disabled,true);assert.equal(next.e.btnCreateAuto.disabled,true);
+});
+
+test('actual UXP adapter reads the plugin designs folder through manifest, never the user document folder',async()=>{
+ const paths=[],adapter=nativeAdapter({},null,null,async()=>({getEntry:async path=>{paths.push(path);return {read:async()=>fs.readFileSync(path,'utf8')};}}));
+ const rows=await adapter.designs();assert.equal(rows.filter(r=>r.design).length,3);assert.deepEqual(paths,['designs/manifest.json',...jsonManifest.templates.map(r=>'designs/'+r.file)]);
+});
+
+test('JSON preview maps asymmetric InDesign inset order and preserves contain image background',async()=>{
+ const rows=await jsonLibrary(),raw=rows[0].design;for(const e of raw.elements.filter(e=>e.role==='body')){e.inset=[1,2,3,4];e.columns=2;e.columnGap=3;e.typography.spaceBeforeMm=1;e.typography.spaceAfterMm=2;}raw.elements[0].fit='contain';
+ const {e,app}=setup(true,{designs:async()=>rows,image:async()=>({path:'p.jpg',preview:'file:/p.jpg'})});await tick();e.btnAddImage.click();await tick();e.jsonDesignList.children[0].click();await tick();
+ const p=app.state.plans[app.state.selected],b=p.pages[0].elements.find(b=>b.role==='body'),sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width,node=sheet.children[1];assert.equal(node.style.left,((b.x+2)*scale)+'px');assert.equal(node.style.top,((b.y+1)*scale)+'px');assert.equal(node.style.width,((b.width-2-4-3)/2*scale)+'px');assert.equal(node.children[0].style.marginTop,scale+'px');assert.equal(node.children[0].style.marginBottom,(2*scale)+'px');assert.equal(sheet.children[0].style.backgroundColor,p.pages[0].elements[0].fill.css);assert.equal(sheet.children[0].children[0].style.objectFit,'contain');
 });

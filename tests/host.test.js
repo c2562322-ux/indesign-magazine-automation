@@ -10,7 +10,7 @@ function host(options={}){
   const pages=[],stories=[];
   const none={isValid:true,name:"None"};
   const events={};
-  const doc={items:[],characterStyles:{item:()=>({name:"[None]"})},isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>{
+  const doc={items:[],strokeStyles:{item:()=>({name:'Solid'})},characterStyles:{item:()=>({name:"[None]"})},isValid:true,id:++counter,documentPreferences:{},viewPreferences:{},textPreferences:{},allGraphics:[],links:coll([]),fonts:coll([{name:'regular',status:status()}]),colors:{add:p=>p},paragraphStyles:{add:p=>{
    if(!options.strictFonts)return p;
    if('fontStyle' in p)throw new Error('요청한 글꼴 스타일은 사용할 수 없습니다.');
    let face;Object.defineProperty(p,'appliedFont',{enumerable:true,get:()=>face,set:f=>{face=f;}});
@@ -24,10 +24,10 @@ function host(options={}){
     const f={strokeColor:'inherited black',fillColor:'inherited fill',isValid:true,label:'',parentPage:page,textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
     st.frames=[f];doc.items.push(f);return f;
   }
-  function page(){const p={marginPreferences:{},textFrames:{add:()=>frame(p)},rectangles:{add:()=>{const r={strokeColor:'inherited black',fillColor:'inherited fill',fits:[],place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(option){this.fits.push(option);}};doc.items.push(r);return r;}},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
+  function page(){const p={marginPreferences:{},graphicLines:{add:()=>{const path={},line={paths:{item:()=>path}};doc.items.push(line);return line;}},textFrames:{add:()=>frame(p)},rectangles:{add:()=>{const r={strokeColor:'inherited black',fillColor:'inherited fill',fits:[],place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(option){this.fits.push(option);}};doc.items.push(r);return r;}},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
   pages.push(page());doc.pages={...coll(pages),get length(){return pages.length;},add(){const p=page();pages.push(p);return p;}};doc.stories=coll(stories);docs.push(doc);return doc;
  }
- const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1},Justification:{LEFT_ALIGN:1},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
+ const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1,CMYK:2},Justification:{LEFT_ALIGN:1,LEFT_JUSTIFIED:2,RIGHT_ALIGN:3,CENTER_ALIGN:4},EndCap:{ROUND_END_CAP:1,BUTT_END_CAP:2,PROJECTING_END_CAP:3},ArrowHead:{NONE:0},CornerOptions:{ROUNDED_CORNER:1,NONE:0},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2,PROPORTIONALLY:3},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
  const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
  if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>{metrics.fontItems++;return options.fonts[i];},itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
  const module={exports:{}};
@@ -177,4 +177,31 @@ test('an in-flight old-session creation cannot publish a document after reinitia
  let release;const h=host({imageGate:new Promise(r=>release=r)}),raw={...a,images:[{path:'photo.jpg'}]};
  const pending=h.api.create(raw,L.candidates(raw)[0]);h.api.resetSession();release();
  await assert.rejects(()=>pending,/다시 초기화/);assert.equal(h.docs.length,0);assert.throws(()=>h.api.check());
+});
+
+const jsonTemplates=JSON.parse(fs.readFileSync('designs/manifest.json')).templates.map(r=>JSON.parse(fs.readFileSync('designs/'+r.file)));
+for(const [i,raw] of jsonTemplates.entries())test('JSON Layout '+(i+1)+' Host consumes normalized frame, style, color, line and image properties',async()=>{
+ const input={title:'제목',subtitle:'부제',body:'본문',images:[{path:'image.jpg'}]},p=L.fromDesign(raw,input),h=host({fonts:[face('프리젠테이션','4 Regular'),face('프리젠테이션','5 Medium'),face('프리젠테이션','6 SemiBold')],strictFonts:true});
+ await h.api.create(input,p);const doc=h.docs[0];assert.equal(doc.documentPreferences.pageWidth,'216mm');assert.equal(doc.documentPreferences.pageHeight,'303mm');
+ for(const b of p.pages[0].elements){const f=doc.items.find(f=>f.label===b.label);assert.ok(f,b.label);if(b.role==='line'){assert.equal(f.strokeWeight,'1.5pt');assert.equal(f.endCap,1);assert.deepEqual(Array.from(f.paths.item(0).entirePath,p=>Array.from(p)),[[b.x,b.y],[b.x+b.width,b.y]]);assert.deepEqual(Array.from(f.strokeColor.colorValue),[48,53,88]);continue;}
+ assert.deepEqual(Array.from(f.geometricBounds),[b.y,b.x,b.y+b.height,b.x+b.width].map(v=>v+'mm'));assert.equal(f.strokeWeight,0);assert.equal(f.strokeColor.name,'None');
+ if(b.role==='image'){assert.deepEqual(f.fits,[1,2]);assert.equal(f.topLeftCornerRadius,'5mm');assert.equal(f.topLeftCornerOption,1);assert.equal(f.fillColor.space,2);assert.deepEqual(Array.from(f.fillColor.colorValue),[10,0,0,0]);}
+ else{const t=f.parentStory.texts.item(0);assert.equal(t.pointSize,b.typography.size);assert.equal(t.leading,b.typography.leading);assert.equal(t.tracking,b.typography.tracking);assert.equal(t.justification,b.typography.align==='right'?3:2);assert.equal(t.appliedFont.name,b.typography.font);assert.equal(f.textFramePreferences.textColumnGutter,b.columnGap+'mm');}}
+ assert.equal(doc.items.filter(f=>f.label&&f.label.startsWith('AUTO_')).length,0);
+});
+test('JSON no-image generation leaves the frame empty and long-body threading never deletes first-page columns',async()=>{
+ const input={title:'제목',subtitle:'부제',body:'가'.repeat(1800),images:[]},p=L.fromDesign(jsonTemplates[2],input),h=host({capacity:500});const r=await h.api.create(input,p);const doc=h.docs[0];
+ assert.ok(r.warnings.some(w=>w.includes('사진 없음')));const frames=doc.items.filter(f=>f.label&&f.label.startsWith('JSON_body_'));assert.equal(frames.length,3);assert.equal(frames[0].parentStory,frames[2].parentStory);assert.equal(frames[0].parentStory.contents,input.body);assert.ok(r.pageCount>1);assert.equal(doc.items.find(f=>f.label==='JSON_image1_0').fits.length,0);
+ const short={...input,body:'짧은 본문'},next=L.fromDesign(jsonTemplates[2],short);await h.api.create(short,next);assert.equal(h.docs[1].pages.length,1);assert.equal(h.docs[1].items.filter(f=>f.label&&f.label.startsWith('JSON_body_')).length,3);
+});
+test('JSON font diagnostics isolate unavailable exact styles; explicit replacements create and export',async()=>{
+ const input={title:'제목',subtitle:'부제',body:'본문',images:[]},h=host({fonts:[face('Installed','Book')],strictFonts:true}),p=L.fromDesign(jsonTemplates[0],input);
+ assert.equal(h.api.validateDesignFonts(p).filter(f=>f.error).length,3);await assert.rejects(()=>h.api.create(input,p),/create.fonts/);assert.equal(h.docs.length,0);
+ const fixed=L.fromDesign(jsonTemplates[0],input,{bodyFont:'Installed\tBook',titleFont:'Installed\tBook'});await h.api.create(input,fixed);h.api.save('/out/json.indd');h.api.exportPdf('/out/json.pdf');assert.deepEqual(h.calls.map(c=>c[0]),['save','pdf']);
+});
+
+test('JSON optional body inset/gutter/paragraph spacing and contain fitting reach Host unchanged',async()=>{
+ const raw=structuredClone(jsonTemplates[0]);for(const e of raw.elements.filter(e=>e.role==='body')){e.inset=[1,2,3,4];e.columns=2;e.columnGap=3;e.typography.spaceBeforeMm=1;e.typography.spaceAfterMm=2;}raw.elements[0].fit='contain';
+ const input={title:'제목',subtitle:'부제',body:'본문',images:[{path:'p.jpg'}]},p=L.fromDesign(raw,input),h=host();await h.api.create(input,p);
+ const f=h.docs[0].items.find(f=>f.label==='JSON_body_1'),t=f.parentStory.texts.item(0);assert.deepEqual(Array.from(f.textFramePreferences.insetSpacing),['1mm','2mm','3mm','4mm']);assert.equal(f.textFramePreferences.textColumnGutter,'3mm');assert.equal(f.textFramePreferences.textColumnCount,2);assert.equal(t.spaceBefore,'1mm');assert.equal(t.spaceAfter,'2mm');assert.deepEqual(h.docs[0].items.find(f=>f.label==='JSON_image1_0').fits,[3,2]);
 });

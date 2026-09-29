@@ -16,7 +16,7 @@ function installedFont(name) {
     const direct = app.fonts.itemByName(name);
     if (direct && direct.isValid && sameEnum(direct.status,ID.FontStatus.INSTALLED) &&
         [direct.name,direct.fullName,direct.postscriptName].includes(name)) return direct;
-    const rows=listFonts(),exact=rows.find(f=>[f.name,f.fullName,f.postscriptName].includes(name));
+    const rows=listFonts(),exact=rows.find(f=>[f.name,f.fullName,f.postscriptName,f.family+'\t'+f.style].includes(name));
     const families=rows.filter(f=>f.family===name);
     if(!exact&&families.length>1)throw new Error('여러 스타일이 있는 폰트입니다: '+name+'. 폰트 더보기에서 사용할 스타일을 선택해주세요.');
     const match=exact||(families.length===1?families[0]:null);
@@ -36,6 +36,55 @@ function listFonts(refresh=false){
 }
 function validateFonts(s){
     return ['bodyFont','titleFont'].map(role=>{try{const f=installedFont(s[role]);return {role,name:f.name};}catch(e){return {role,error:D.redact(e.message)};}});
+}
+function designFonts(plan){
+    return [...new Set(plan.pages[0].elements.filter(b=>b.typography).map(b=>b.typography.font))];
+}
+function validateDesignFonts(plan){return designFonts(plan).map(name=>{try{const f=installedFont(name);return {name,installed:f.name};}catch(e){return {name,error:D.redact(e.message)};}});}
+function createJSONPages(doc,a,plan,fonts,progress){
+    const paints=new Map(),styles=new Map(),pages=[],allBodies=[];
+    function paint(c){const key=JSON.stringify(c);if(!paints.has(key))paints.set(key,doc.colors.add({name:'JSON Color '+paints.size,model:ID.ColorModel.PROCESS,space:ID.ColorSpace[c.space],colorValue:c.values}));return paints.get(key);}
+    function style(b){
+        const t=L.typography(b,plan.settings),key=JSON.stringify(t);if(styles.has(key))return styles.get(key);
+        const font=fonts[t.font],identity='family='+font.fontFamily+'; style='+font.fontStyleName;
+        const p=D.step('create.styles.'+b.role+'.add',()=>doc.paragraphStyles.add({name:'JSON '+b.role+' '+styles.size,pointSize:t.size,leading:t.leading,tracking:t.tracking,
+            fillColor:paint(t.paint),hyphenation:false,justification:ID.Justification[{left:'LEFT_ALIGN',right:'RIGHT_ALIGN',center:'CENTER_ALIGN',justify:'LEFT_JUSTIFIED'}[t.align]],
+            spaceBefore:mm(t.spaceBefore),spaceAfter:mm(t.spaceAfter),leftIndent:0,rightIndent:0,firstLineIndent:0,alignToBaseline:false,
+            ruleAbove:false,ruleBelow:false,paragraphBorderOn:false,paragraphShadingOn:false,keepFirstLines:1,keepLastLines:1}),progress);
+        D.step('create.styles.'+b.role+'.appliedFont ('+identity+')',()=>{p.appliedFont=font;},progress);
+        D.step('create.styles.'+b.role+'.fontStyle ('+identity+')',()=>{p.fontStyle=font.fontStyleName;},progress);
+        styles.set(key,p);return p;
+    }
+    function add(design,index){
+        const page=index===0?doc.pages.item(0):doc.pages.add(ID.LocationOptions.AT_END),bodies=[];
+        Object.assign(page.marginPreferences,{top:mm(plan.settings.margin),bottom:mm(plan.settings.margin),left:mm(plan.settings.margin),right:mm(plan.settings.margin)});
+        design.elements.forEach(b=>D.step('create.json.'+(index+1)+'.'+b.label,()=>{
+            if(b.role==='line'){
+                const line=page.graphicLines.add();line.label=b.label;line.paths.item(0).entirePath=[[b.x,b.y],[b.x+b.width,b.y]];
+                framePaint(line,doc);line.strokeWeight=b.stroke.weight+'pt';line.strokeColor=paint(b.stroke.color);line.strokeTint=100;
+                line.endCap=ID.EndCap[{RoundEndCap:'ROUND_END_CAP',ButtEndCap:'BUTT_END_CAP',ProjectingEndCap:'PROJECTING_END_CAP'}[b.stroke.cap]];
+                line.leftLineEnd=ID.ArrowHead.NONE;line.rightLineEnd=ID.ArrowHead.NONE;line.strokeType=doc.strokeStyles.item(0);
+            }else if(b.role==='image'){
+                const rect=page.rectangles.add();rect.label=b.label;rect.geometricBounds=bounds(b);framePaint(rect,doc,paint(b.fill));rect.fillTint=100;
+                for(const corner of ['topLeft','topRight','bottomLeft','bottomRight']){rect[corner+'CornerOption']=b.cornerRadius?ID.CornerOptions.ROUNDED_CORNER:ID.CornerOptions.NONE;rect[corner+'CornerRadius']=mm(b.cornerRadius);}
+                const im=a.images[b.imageIndex];if(im){rect.place(im.path);rect.fit(b.fit==='cover'?ID.FitOptions.FILL_PROPORTIONALLY:ID.FitOptions.PROPORTIONALLY);rect.fit(ID.FitOptions.CENTER_CONTENT);}
+            }else{
+                const f=textFrame(page,doc,b,b.label,style(b),b.role==='body'?undefined:L.content(b,a,index+1));
+                f.textFramePreferences.insetSpacing=b.inset.map(mm);f.textFramePreferences.textColumnGutter=mm(b.columnGap);
+                if(b.role==='body')bodies.push({frame:f,order:b.flowOrder});
+            }
+        },progress));
+        bodies.sort((x,y)=>x.order-y.order);pages.push({page,bodies:bodies.map(x=>x.frame)});
+        for(const {frame} of bodies){if(allBodies.length)allBodies[allBodies.length-1].nextTextFrame=frame;allBodies.push(frame);}
+    }
+    plan.pages.forEach(add);
+    const story=allBodies[0].parentStory;story.contents=a.body.replace(/\r\n?|\n/g,'\r');
+    story.texts.item(0).applyParagraphStyle(style(plan.pages[0].elements.find(b=>b.role==='body')),true);
+    story.texts.item(0).appliedCharacterStyle=doc.characterStyles.item(0);doc.recompose();
+    while(story.overflows&&pages.length<L.MAX_PAGES){add(L.continuationFor(plan,a),pages.length);doc.recompose();}
+    if(story.overflows)throw new Error('본문이 40페이지를 초과했습니다. 원고를 나눠주세요.');
+    // Never delete an original first-page body frame, even if it remains empty.
+    while(pages.length>1&&pages[pages.length-1].bodies.every(f=>f.contents.length===0)){pages.pop().page.remove();doc.recompose();}
 }
 function rgb(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));}
 function createStyles(doc,s,bodyFont,titleFont,progress){
@@ -137,8 +186,8 @@ async function create(raw,plan,progress){
     const generation=session;
     // A failed new attempt must never silently export the previous successful document.
     latest=null;
-    const a=D.step('create.validate',()=>{const value=L.article(raw);L.validate(plan,value);return value;},progress),s=L.settings(plan.settings);
-    const fonts=D.step('create.fonts',()=>({body:installedFont(s.bodyFont),title:installedFont(s.titleFont)}),progress);
+    const a=D.step('create.validate',()=>{const value=L.article(raw);L.validate(plan,value);if(plan.origin==='json'&&value.images.length>plan.design.contentSlots.images.max)throw new Error('이 디자인은 사진 '+plan.design.contentSlots.images.max+'장까지 사용합니다.');return value;},progress),s=plan.origin==='json'?plan.settings:L.settings(plan.settings);
+    const fonts=D.step('create.fonts',()=>plan.origin==='json'?Object.fromEntries(designFonts(plan).map(name=>[name,installedFont(name)])):{body:installedFont(s.bodyFont),title:installedFont(s.titleFont)},progress);
     for(const image of a.images){
         if(!image.path)throw new Error('사진 파일을 다시 선택해주세요.');
         await D.asyncStep('create.imageAccess',async()=>{const stat=await fs.lstat('file:'+image.path);if(typeof stat.isFile==='function'&&!stat.isFile())throw new Error('파일이 아닙니다.');},progress);
@@ -158,6 +207,7 @@ async function create(raw,plan,progress){
             // Smart reflow must not silently introduce host-created pages outside this plan.
             doc.textPreferences.smartTextReflow=false;
             },progress);
+            if(plan.origin==='json'){D.step('create.jsonPages',()=>createJSONPages(doc,a,plan,fonts,progress),progress);return;}
             const styles=D.step('create.styles',()=>createStyles(doc,s,fonts.body,fonts.title,progress),progress);
             const bodyFrames=[];
             plan.pages.forEach((design,i)=>bodyFrames.push(D.step('create.page.'+(i+1),()=>addPage(doc,design,s,a,styles,i),progress)));
@@ -181,6 +231,7 @@ async function create(raw,plan,progress){
             }},progress);
         },ID.ScriptLanguage.JAVASCRIPT,[],ID.UndoModes.ENTIRE_SCRIPT,'Create original magazine design'),progress);
         const report=D.step('create.initialCheck',()=>check(doc,progress),progress);
+        if(plan.origin==='json'){report.warnings.push(...plan.warnings);if(a.images.length<plan.design.contentSlots.images.min)report.warnings.push('사진 없음: 원본 이미지 프레임을 비워 두었습니다.');}
         if(generation===session)latest=doc;
         return report;
     }catch(e){
@@ -212,4 +263,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,listFonts,validateFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
+module.exports={create,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};

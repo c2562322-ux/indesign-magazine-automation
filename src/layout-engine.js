@@ -1,14 +1,15 @@
 /* Shared by the UXP panel and the browser preview. Geometry is in millimetres. */
 (function (root, factory) {
-    if (typeof module === 'object' && module.exports) module.exports = factory();
-    else root.MagazineLayout = factory();
-})(typeof window !== 'undefined' ? window : this, function () {
+    if (typeof module === 'object' && module.exports) module.exports = factory(require('./json-design.js'));
+    else root.MagazineLayout = factory(root.MagazineJSONDesign);
+})(typeof window !== 'undefined' ? window : this, function (J) {
     'use strict';
-    const PT = 72 / 25.4;
+    const PT = J.PT;
     const MAX_PAGES = 40;
     // Renderer contract: mm geometry, pt type, InDesign tracking in 1/1000 em.
     const RENDER = Object.freeze({ gutter: 5, ink: '#1D2126', muted: '#5F6367', imageFit: 'cover', imagePosition: 'center' });
     function typography(b, s) {
+        if(b.typography)return b.typography;
         const role=b.role, size=b.fontSize || 8;
         return { font: role==='title'?s.titleFont:s.bodyFont, size,
             leading:size*(role==='title'?1.3:role==='subtitle'?1.5:role==='body'?1.55:1.4),
@@ -72,9 +73,10 @@
             imageIndex: imageIndex == null ? -1 : imageIndex };
     }
     function capacity(b, s) {
-        const columnWidth = (b.width - (b.columns - 1) * RENDER.gutter) / b.columns;
-        const glyphs = Math.max(1, Math.floor(columnWidth * PT / s.bodySize));
-        const lines = Math.max(1, Math.floor(b.height * PT / (s.bodySize * 1.55)));
+        const inset=b.inset||[0,0,0,0],t=typography(b,s);
+        const columnWidth = (b.width-inset[1]-inset[3] - (b.columns - 1) * (b.columnGap===undefined?RENDER.gutter:b.columnGap)) / b.columns;
+        const glyphs = Math.max(1, Math.floor(columnWidth * PT / t.size));
+        const lines = Math.max(1, Math.floor((b.height-inset[0]-inset[2]) * PT / t.leading));
         return glyphs * lines * b.columns * 0.82;
     }
     function textHeight(text, width, size, leadingFactor) {
@@ -151,6 +153,7 @@
         return finish(a, s, names[kind], descriptions[kind], blocks, 'local', 'local-' + kind);
     }
     function validate(plan, a) {
+        if(plan&&plan.origin==='json'){const expected=fromDesign(plan.design,a,plan.fontOverrides);if(JSON.stringify(plan)!==JSON.stringify(expected))throw new Error('JSON plan이 원본 디자인 명세와 다릅니다. 다시 선택해주세요.');return true;}
         if (!plan || !Array.isArray(plan.pages) || !plan.pages.length || plan.pages.length > MAX_PAGES) throw new Error('잘못된 페이지 설계입니다.');
         const s = settings(plan.settings), seen = { title: 0, subtitle: 0, body: 0 }, imgs = [];
         plan.pages.forEach((page, pi) => {
@@ -201,10 +204,27 @@
         const blocks = spec.blocks.map(b => box(b.role,b.x,b.y,b.width,b.height,b.fontSize,b.columns,b.imageIndex));
         return finish(a,s,String(spec.name || 'AI 디자인').slice(0,60),String(spec.description || '').slice(0,300),blocks,'ai','ai');
     }
+
+    function pageElements(plan,a,index){return plan.origin==='json'?plan.pages[index].elements:furniture(plan.settings,a,index+1).concat(plan.pages[index].elements);}
+    function content(b,a,page){return b.role==='pageNumber'?String(page):b.text!==undefined?b.text:b.role==='header'?a.kicker:a[b.role]||'';}
+    function continuationFor(plan,a){
+        const page=continuation(plan.settings,a);
+        if(plan.origin==='json'){const source=plan.pages[0].elements.find(b=>b.role==='body');Object.assign(page.elements[0],{typography:{...source.typography},columnGap:RENDER.gutter,inset:[0,0,0,0],flowOrder:1,label:'JSON_BODY_CONTINUATION'});}
+        return page;
+    }
+    function fromDesign(raw,rawArticle,overrides={}){
+        const a=article(rawArticle),n=J.normalize(raw,overrides),body=n.elements.find(b=>b.role==='body'),title=n.elements.find(b=>b.role==='title');
+        if(a.images.length>n.design.contentSlots.images.max)throw new Error('이 디자인은 사진 '+n.design.contentSlots.images.max+'장까지 사용합니다. 추가 사진을 제거해주세요.');
+        const s={...DEFAULTS,width:n.design.page.widthMm,height:n.design.page.heightMm,margin:Math.min(18,n.design.page.widthMm/10,n.design.page.heightMm/10),bleed:0,bodySize:body.fontSize,bodyFont:body.typography.font,titleFont:title.typography.font};
+        const p={version:1,origin:'json',id:n.design.id,name:n.design.name,description:'IDML 기반 JSON · 원본 첫 페이지 유지',design:n.design,fontOverrides:{...overrides},settings:s,warnings:n.warnings,pages:[{elements:n.elements}]};
+        let remaining=demand(a.body)-n.elements.filter(b=>b.role==='body').reduce((sum,b)=>sum+capacity(b,s),0);
+        while(remaining>0){if(p.pages.length>=MAX_PAGES)throw new Error('예상 페이지가 40장을 넘습니다.');const page=continuationFor(p,a);p.pages.push(page);remaining-=capacity(page.elements[0],s);}
+        p.estimatedPages=p.pages.length;return p;
+    }
     function safeArticle(a) {
         const c = article(a);
         c.images = c.images.map(im => ({path:im.path,name:im.name,width:im.width,height:im.height}));
         return c;
     }
-    return { DEFAULTS, PT, MAX_PAGES, RENDER, typography, furniture, settings, article, units, demand, capacity, textHeight, candidates, validate, continuation, fromAI, safeArticle };
+    return { J, fromDesign, continuationFor, pageElements, content, ptToMm:J.ptToMm, mmToPt:J.mmToPt, DEFAULTS, PT, MAX_PAGES, RENDER, typography, furniture, settings, article, units, demand, capacity, textHeight, candidates, validate, continuation, fromAI, safeArticle };
 });

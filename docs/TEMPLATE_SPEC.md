@@ -166,3 +166,8 @@
 ## 1.1 새 디자인 모드 — 기존 템플릿 계약과 별개
 
 새 모드는 입력 템플릿을 요구하지 않는다. 별도 새 문서에 `AUTO_TITLE`, `AUTO_SUBTITLE`, `AUTO_BODY_N`, `AUTO_IMAGE_N`, `AUTO_HEADER_N`, `AUTO_FOOTER_N`, `AUTO_RULE_N` 라벨을 부여한다. 좌표 단위는 mm, 글자 크기는 pt. AUTO 라벨 생성은 사용자 요청으로 승인된 D026의 새 문서에만 적용한다. 기존 프레임 라벨/위치/스타일 규칙은 변경하지 않는다. 실제 앱 검증은 아직 없다.
+
+
+## 새 디자인 모드의 외부 JSON (json-design-01)
+
+기존 INDD Script Label 계약과 별개로, designs/의 IDML 추출 draft JSON을 새 문서로 생성하는 경로를 추가했다. 기존 template.js/시작페이지/목차 코드는 사용하거나 변경하지 않는다. 스키마·역할 매핑·단위·폰트·사진·overflow·추가 방법은 [JSON_DESIGNS.md](JSON_DESIGNS.md)를 따른다. 이는 INDD 직접 등록/IDML 파서 기능이 아니다.

@@ -1,0 +1,18 @@
+{
+  "schema": "magazine-studio-layout-library/v1-draft",
+  "source": "매거진자동화템플릿2.idml",
+  "templates": [
+    {
+      "id": "layout-01-wide-image-2col",
+      "file": "layout-01-wide-image-2col.json"
+    },
+    {
+      "id": "layout-02-side-image-2col",
+      "file": "layout-02-side-image-2col.json"
+    },
+    {
+      "id": "layout-03-wide-image-3col",
+      "file": "layout-03-wide-image-3col.json"
+    }
+  ]
+}
