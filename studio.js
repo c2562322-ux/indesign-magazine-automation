@@ -36,6 +36,8 @@ async function saveProduction(name,types,write,progress){
  return write(path,progress);
 }
 Studio.mount({registration:api=>require('./src/design-registration-ui').mount(document.getElementById('registeredDesigns'),api,{
+ hostKind:'adobe',capability:entry=>require('./src/registered-native').support(entry),
+ saveBatch:data=>{const expected=token;guard(expected);return saveAs('registered-page-verification.private.json',['json'],async f=>{const text=require('./src/production-diagnostics').diagnosticJSON(data);await f.write(text);guard(expected);if(await f.read()!==text)throw new Error('검증 결과 저장 후 내용 불일치');guard(expected);return true;});},
  load:async()=>{const requestToken=token;const f=await fs.getFileForOpening({types:['json']});guard(requestToken);if(!f)return null;const text=await f.read();guard(requestToken);if(text.length>32*1024*1024)throw new Error('최대 32MB');return JSON.parse(text);},
  save:data=>saveAs('registered-designs.private.json',['json'],async f=>{await f.write(JSON.stringify(data));return true;}),
  fonts:()=>{guard();return Host.listFonts(false);},

@@ -32,21 +32,62 @@ function draft(model,pageId,name){
  return d;
 }
 function confirm(d,id,role,requirement){
- if(!ROLES.includes(role))throw new Error('지원하지 않는 역할');
+ if(!ROLES.includes(role)&&!/^image[1-9]\d*$/.test(role))throw new Error('지원하지 않는 역할');
  if(/^image/.test(role)&&!['required','optional'].includes(requirement))throw new Error('사진 필수/선택 확인 필요');
  delete d.roles[id];delete d.images[id];d.preserveElementIds=d.preserveElementIds.filter(x=>x!==id);
  if(role==='keep')d.preserveElementIds.push(id);
  else {d.roles[id]={role,confirmed:true};if(/^image/.test(role)){if(!['required','optional'].includes(requirement))throw new Error('사진 필수/선택 확인 필요');d.images[id]=requirement;}}
  return d;
 }
+function autoDraft(model,pageId,name){
+ const d=draft(model,pageId,name),page=model.pages.find(p=>p.id===pageId),all=frames(model,pageId),review=[],evidence=[];
+ const text=all.filter(e=>e.textFrame).map(e=>{const story=model.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?story.paragraphs.flatMap(p=>p.runs):[],content=runs.flatMap(r=>r.tokens.filter(t=>t.type==='Content').map(t=>t.text)).join(''),sizes=runs.map(r=>r.resolvedProperties.PointSize).filter(Number.isFinite);return {e,story,content,b:e.pageBounds[pageId],size:Math.max(0,...sizes)};});
+ const assign=(t,role,confidence,reason)=>{confirm(d,t.e?t.e.id:t.id,role,/^image/.test(role)?'required':undefined);evidence.push({elementId:t.e?t.e.id:t.id,role,confidence,reason});};
+ const titles=text.filter(t=>t.content.trim().length>=4&&t.content.length<=120&&t.size>=20&&!/^(대표|일반)?이미지$/.test(t.content.trim())).sort((a,b)=>b.size-a.size);
+ if(titles.length&&(!titles[1]||titles[0].size>=titles[1].size*1.2))assign(titles[0],'title',.9,'유일한 큰 제목 프레임');else review.push('제목 후보가 없거나 여러 개: 핵심 역할 확인');
+ const title=titles[0],bodies=text.filter(t=>t!==title&&t.content.length>=100&&t.size>=9&&t.size<=18&&t.b[2]-t.b[0]>=20&&!/캡션.*입력|문구.*입력/.test(t.content)&&t.b[0]<page.height*.9).sort((a,b)=>Math.abs(a.b[0]-b.b[0])<20?a.b[1]-b.b[1]:a.b[0]-b.b[0]);
+ for(const t of bodies)assign(t,'body',.85,'긴 본문 프레임 · 위→아래/왼쪽→오른쪽');
+ if(!bodies.length)review.push('본문 영역 확인 필요');
+ if(bodies.length>1){d.bodyFlow=[...new Set(bodies.map(t=>t.story.id))];evidence.push({role:'body',confidence:.85,reason:'독립 Story에 원본 글 분량 비율로 연속 분배; 문자 누락/복제 없음'});}
+ if(title&&bodies.length){const subs=text.filter(t=>t!==title&&!bodies.includes(t)&&t.content.length>=8&&t.content.length<=160&&t.size>=11&&t.size<title.size&&t.b[0]>=title.b[2]-2&&t.b[2]<=Math.min(...bodies.map(b=>b.b[0]))+2);if(subs.length===1)assign(subs[0],'subtitle',.85,'제목과 본문 사이의 단독 설명 프레임');else if(subs.length>1)review.push('부제 후보 여러 개: 핵심 역할 확인');}
+ const images=all.filter(e=>['Rectangle','Oval','Polygon'].includes(e.type)).filter(e=>{const b=e.pageBounds[pageId];return b&&(b[2]-b[0])>=80&&(b[3]-b[1])>=80&&text.some(t=>/^(대표|일반)?이미지$/.test(t.content.trim())&&t.b[0]>=b[0]&&t.b[2]<=b[2]&&t.b[1]>=b[1]&&t.b[3]<=b[3]);}).sort((a,b)=>{const x=a.pageBounds[pageId],y=b.pageBounds[pageId];return Math.abs(x[0]-y[0])<20?x[1]-y[1]:x[0]-y[0];});
+ images.forEach((e,i)=>assign(e,'image'+(i+1),.95,'원본 이미지 자리표시 문구를 포함한 프레임'));
+ const placed=all.filter(e=>(e.image||[]).length&&!images.includes(e));if(placed.length)review.push('배치 이미지 '+placed.length+'개: 기사 사진/설명·배경 여부 확인 (현재 유지)');
+ const captions=text.filter(t=>!d.roles[t.e.id]&&/^(캡션|caption)[:：]/i.test(t.content.trim()));if(captions.length===1)assign(captions[0],'caption',.9,'명시적 캡션 라벨');else if(captions.length>1)review.push('캡션 여러 개: 분배 확인');
+ d.mappingReview=review;d.mappingEvidence=evidence;return d;
+}
 function gate(entry){
  // A saved file cannot grant itself production authorization. Full renderer/readback is pending.
- return {state:entry.profile.readyForMatching?'READY_FOR_FIDELITY_TEST':'ROLE_MAPPING_REQUIRED',productionReady:false,
-  reasons:entry.profile.issues.concat('실제 Host Fidelity 검사 전 · 검증 제작 가능, 출력은 검사 결과에 따름')};
+ return {state:(entry.descriptor.capability?.fidelityReasons||[]).length?'UNSUPPORTED':entry.profile.readyForMatching?'READY_FOR_FIDELITY_TEST':'ROLE_MAPPING_REQUIRED',productionReady:false,
+  reasons:(entry.descriptor.capability?.fidelityReasons||[]).concat(entry.profile.issues).concat('실제 Host Fidelity 검사 전 · 검증 제작 가능, 출력은 검사 결과에 따름')};
 }
 function register(model,descriptor){const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
-function recommendations(entries,article,fonts){const result=Match.rank(entries,article,{installedFonts:fonts});return {...result,candidates:result.candidates.slice(0,3),selectedId:null};}
+function recommendations(entries,article,fonts){const result=Match.rank(entries,article,{installedFonts:fonts});return {...result,allCandidates:result.candidates,candidates:result.candidates.slice(0,3),selectedId:null};}
 function selection(entry,article,fonts){return {designId:entry.descriptor.id,articleSignature:JSON.stringify(article),overlay:Match.bindContent(entry,article,{installedFonts:fonts}),fidelity:gate(entry)};}
+function lifecycle(entry,evidence){
+ const unsupported=entry.descriptor.capability?.fidelityReasons||[],production=entry.descriptor.capability?.productionReasons||[],mappingState=entry.profile.readyForMatching?'MAPPED':'ROLE_MAPPING_REQUIRED';
+ let fidelityState=unsupported.length?'UNSUPPORTED':'FIDELITY_TEST_REQUIRED',productionReady=false,reasons=[...unsupported,...entry.profile.issues,...production];
+ if(!unsupported.length&&evidence?.host==='adobe'&&evidence.report){const r=evidence.report,f=r.fidelity,issues=r.issues||[];
+  const failed=!f||f.phase==='FIDELITY_FAILED'||issues.some(i=>['GENERATOR_MISMATCH','SOURCE_OVERFLOW','SOURCE_INSPECTION'].includes(i.cause))||(f.proofOnly&&(r.errors||[]).length);
+  fidelityState=failed?'FIDELITY_FAILED':['FIDELITY_PASSED','CONTENT_APPLIED'].includes(f.phase)?'FIDELITY_VERIFIED':'FIDELITY_TEST_REQUIRED';
+  productionReady=entry.profile.readyForMatching&&!production.length&&!failed&&f.phase==='CONTENT_APPLIED'&&!(r.errors||[]).length&&r.outputReady===true;
+  reasons=reasons.concat(r.errors||[]);
+ }
+ const state=unsupported.length?'UNSUPPORTED':mappingState==='ROLE_MAPPING_REQUIRED'?mappingState:productionReady?'PRODUCTION_READY':fidelityState;
+ return {state,mappingState,fidelityState,productionReady,reasons};
+}
+function groupFailures(evidence){
+ const groups=new Map();for(const [designId,item] of Object.entries(evidence||{})){
+  const report=item.report||{},entry=item.entry,records=report.fidelity?.records||[],issues=report.issues||[],seen=new Set();
+  for(const r of records.concat(issues))for(const d of r.comparison?.differences||r.differences||[]){const elementId=r.elementId||/^\$\.objects\.([^.]+)/.exec(d.path||'')?.[1],objectType=entry?.original.elements.find(e=>e.id===elementId)?.type||null,path=(d.path||'$').replace(/\.runs\.\d+/g,'.runs.*').replace(/\.objects\.[^.]+/g,'.objects.*'),key=JSON.stringify([path,d.expected,d.actual,objectType,r.cause||'FIDELITY_MISMATCH']),one=JSON.stringify([elementId,d.path,d.expected,d.actual]);if(seen.has(one))continue;seen.add(one);if(!groups.has(key))groups.set(key,{path,expected:d.expected,actual:d.actual,objectType,cause:r.cause||'FIDELITY_MISMATCH',count:0,designIds:[]});const g=groups.get(key);g.count++;if(!g.designIds.includes(designId))g.designIds.push(designId);}
+  const failure=item.diagnostic?.hostFailure?.registeredFailure;
+  if(failure||(!records.some(r=>r.comparison?.differences?.length)&&!issues.some(r=>r.differences?.length))){
+   const errors=failure?[{path:failure.property||failure.operation,actual:failure.adobeMessage,objectType:failure.object?.type||null,cause:failure.operation}]:[...new Set(report.errors||[])].map(message=>({path:'$',actual:message,objectType:null,cause:'HOST_OR_INSPECTION_FAILURE'}));
+   for(const e of errors){const key=JSON.stringify([e.path,null,e.actual,e.objectType,e.cause]);if(!groups.has(key))groups.set(key,{...e,expected:null,count:0,designIds:[]});const g=groups.get(key);g.count++;if(!g.designIds.includes(designId))g.designIds.push(designId);}
+  }
+ }
+ return [...groups.values()];
+}
 function diagnose({comparison,originalOverflow,currentOverflow,missingFonts=false}){
  if(missingFonts)return {cause:'MISSING_FONT',autoFix:false};
  if(!comparison||!comparison.equal)return {cause:comparison?'GENERATOR_MISMATCH':'FIDELITY_UNVERIFIED',autoFix:false};
@@ -55,5 +96,5 @@ function diagnose({comparison,originalOverflow,currentOverflow,missingFonts=fals
 }
 function pack(entries){const models={};return {schema:'magazine-registered-library/v1',models,designs:entries.map(e=>{const key=e.original.metadata.sourceSha256;models[key]=e.original;return {modelKey:key,descriptor:copy(e.descriptor)};})};}
 function unpack(data){if(!data||data.schema!=='magazine-registered-library/v1'||!Array.isArray(data.designs))throw new Error('등록 라이브러리 JSON이 아닙니다.');const entries=[],errors=[],ids=new Set(),cache=new Map();for(const row of data.designs)try{const model=cache.get(row.modelKey)||data.models&&data.models[row.modelKey]||row.model;const entry=register(model,row.descriptor);if(ids.has(entry.descriptor.id))throw new Error('중복 디자인 ID');ids.add(entry.descriptor.id);if(row.modelKey)cache.set(row.modelKey,entry.original);entries.push(entry);}catch(e){errors.push(String(e.message));}return {entries,errors};}
-return {ROLES,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
+return {ROLES,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
 });

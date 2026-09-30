@@ -103,21 +103,21 @@ function libraryEntry(model,descriptor){
     for(const id of Object.keys(d.roles||{}))if(!elements.some(e=>e.id===id))throw new Error('Role mapping is outside selected pages: '+id);
     const mapped=elements.map(e=>{
         const override=d.roles&&d.roles[e.id];
-        if(override&&(!ROLES.includes(override.role)||override.confirmed!==true))throw new Error('Role mapping requires user confirmation');
+        if(override&&(!(ROLES.includes(override.role)||/^image[1-9]\d*$/.test(override.role))||override.confirmed!==true))throw new Error('Role mapping requires user confirmation');
         const role=override?override.role:e.role&&e.role.confirmed;
         if(role&&(['title','subtitle','body','caption','header','footer','pageNumber'].includes(role)?e.type!=='TextFrame':!['Rectangle','Oval','Polygon'].includes(e.type)))throw new Error('Role/object type mismatch: '+e.id);
         return {element:e,role:role||null};
     });
     const text=mapped.filter(x=>x.element.textFrame),requiredFonts=[];
     for(const {element:e} of text){const s=model.stories.find(s=>s.id===e.textFrame.storyRef);for(const r of s?s.paragraphs.flatMap(p=>p.runs):[]){const t=r.resolvedProperties;if(t.AppliedFont&&t.FontStyle&&!requiredFonts.some(f=>f.family===t.AppliedFont&&f.style===t.FontStyle))requiredFonts.push({family:t.AppliedFont,style:t.FontStyle});}}
-    const imageSlots=mapped.filter(x=>/^image[12]$/.test(x.role||'')).map(({element:e,role})=>{
+    const imageSlots=mapped.filter(x=>/^image[1-9]\d*$/.test(x.role||'')).map(({element:e,role})=>{
         const b=e.pageBounds[e.pageCandidates[0]],width=b[3]-b[1],height=b[2]-b[0],page=pages.find(p=>p.id===e.pageCandidates[0]);
         const declared=d.images&&d.images[e.id],fitting=e.details&&e.details.FrameFittingOption;
         if(declared&&!['required','optional'].includes(declared))throw new Error('Image policy must be explicit required/optional');
         return {elementId:e.id,role,width,height,aspectRatio:width/height,orientation:width===height?'square':width>height?'landscape':'portrait',
             prominence:width*height/(page.width*page.height),requirement:declared||'unknown',fitting:fitting||null};
     });
-    const issues=[];
+    const issues=[...(d.mappingReview||[])];
     if(imageSlots.some(s=>!Number.isFinite(s.aspectRatio)||s.width<=0||s.height<=0))issues.push('이미지 슬롯 geometry 확인 필요');
     for(const {element:e} of text){
         const story=model.stories.find(s=>s.id===e.textFrame.storyRef);
@@ -127,7 +127,7 @@ function libraryEntry(model,descriptor){
     if(!mapped.some(x=>x.role==='body'))issues.push('본문 역할 확인 필요');
     for(const role of ['title','subtitle','body']){
         const entries=mapped.filter(x=>x.role===role),stories=new Set(entries.map(x=>x.element.textFrame.storyRef));
-        if(stories.size>1)issues.push(role+' 복수 Story 콘텐츠 분배 확인 필요');
+        if(stories.size>1&&!(role==='body'&&Array.isArray(d.bodyFlow)&&d.bodyFlow.length===stories.size&&new Set(d.bodyFlow).size===stories.size&&d.bodyFlow.every(id=>stories.has(id))))issues.push(role+' 복수 Story 콘텐츠 분배 확인 필요');
         for(const {element:e} of entries){
             const all=model.elements.filter(x=>x.textFrame&&x.textFrame.storyRef===e.textFrame.storyRef);
             if(all.some(x=>!entries.some(v=>v.element.id===x.id)))issues.push(role+' Story가 선택 영역/역할 밖으로 연결됨');
@@ -168,7 +168,7 @@ function evaluate(entry,article,{installedFonts=null}={}){
     if(a.subtitlePresent&&!p.supportedRoles.includes('subtitle'))add(p.readyForMatching?hard:review,'SUBTITLE_UNSUPPORTED','부제를 넣을 확정 영역이 없습니다.');
     if(a.captionPresent&&!p.supportedRoles.includes('caption'))add(p.readyForMatching?hard:review,'CAPTION_UNSUPPORTED','캡션을 넣을 확정 영역이 없습니다.');
     if(a.imageCount>p.imageSlots.length)add(p.readyForMatching?hard:review,'EXTRA_IMAGES','사진 수보다 확인된 이미지 슬롯이 적습니다.');
-    for(const slot of p.imageSlots){const index=Number(slot.role.slice(-1))-1,image=a.images[index];
+    for(const slot of p.imageSlots){const index=Number(slot.role.slice(5))-1,image=a.images[index];
         if(!image&&slot.requirement==='required')add(hard,'MISSING_IMAGE',slot.role+' 필수 사진이 없습니다.');
         if(image){if(!image.known)add(review,'IMAGE_DIMENSIONS_UNKNOWN','사진 비율 확인 필요');
             else {const ppi=Math.min(image.width/(slot.width/72),image.height/(slot.height/72));if(ppi<150)add(soft,'IMAGE_RESOLUTION','사진 '+(index+1)+' 해상도가 슬롯 크기에 비해 낮습니다 (추정 '+Math.round(ppi)+' ppi).',10);const retained=Math.min(image.aspectRatio/slot.aspectRatio,slot.aspectRatio/image.aspectRatio);
@@ -214,6 +214,7 @@ async function loadLibrary(manifest,read){
     }
     return {entries,errors};
 }
+function storyWeight(model,id){const s=model.stories.find(s=>s.id===id);return Math.max(1,s.paragraphs.flatMap(p=>p.runs).flatMap(r=>r.tokens).reduce((n,t)=>n+(t.type==='Content'?t.text.length:t.type==='Br'?1:0),0));}
 function bindContent(entry,article,options){
     if(!entry.profile.readyForMatching)throw new Error('Confirm roles and source references before binding');
     const suitability=evaluate(entry,article,options);
@@ -223,9 +224,23 @@ function bindContent(entry,article,options){
         const e=entry.original.elements.find(e=>e.id===t.elementId);
         if(!bindings.some(b=>b.storyId===e.textFrame.storyRef))bindings.push({storyId:e.textFrame.storyRef,role:t.role,text:String(article[t.role]||'')});
     }
-    for(const slot of entry.profile.imageSlots){const image=(article.images||[])[Number(slot.role.slice(-1))-1];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null});}
+    const body=bindings.filter(b=>b.role==='body');
+    if(body.length>1){
+        const ordered=entry.descriptor.bodyFlow.map(id=>body.find(b=>b.storyId===id));
+        const chars=String(article.body||'').match(/\r\n|[\s\S]/gu)||[];if(chars.length<ordered.length)throw new Error('본문이 독립 BODY 영역 수보다 짧습니다. 다른 템플릿을 선택해주세요.');
+        let offset=0,total=ordered.reduce((n,b)=>n+storyWeight(entry.original,b.storyId),0);
+        for(let i=0;i<ordered.length;i++){
+            const b=ordered[i],weight=storyWeight(entry.original,b.storyId);let end=chars.length;
+            if(i<ordered.length-1){const limit=chars.length-(ordered.length-i-1),target=Math.min(limit,Math.max(offset+1,offset+Math.round((chars.length-offset)*weight/total)));
+                const breaks=[];for(let j=offset+1;j<=limit;j++)if(/\s/.test(chars[j-1])&&chars[j-1]!=='\r')breaks.push(j);
+                end=breaks.length?breaks.reduce((a,n)=>Math.abs(n-target)<Math.abs(a-target)?n:a,breaks[0]):target;
+            }
+            b.text=chars.slice(offset,end).join('');offset=end;total-=weight;
+        }
+    }
+    for(const slot of entry.profile.imageSlots){const image=(article.images||[])[Number(slot.role.slice(5))-1];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null});}
     return {original:entry.original,content:bindings,runtimeAdjustments:[],suitability,productionReady:false,
-        reason:'v2 전체 지면 renderer 연결 전입니다. 기존 생성기로 자동 변환하지 않습니다.'};
+        reason:'원본 Fidelity 검사 후 registered-native에서 콘텐츠만 교체합니다. 바인딩만으로 출력 승인하지 않습니다.'};
 }
 function calibration(estimate,observed){
     if(!estimate.known||!observed||typeof observed.overflows!=='boolean'||!Number.isFinite(observed.characters)||!observed.documentEvidence)throw new Error('Measured Host evidence required');

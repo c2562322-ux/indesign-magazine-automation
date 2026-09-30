@@ -11,8 +11,9 @@ function validatePageStories(entry){
  const spreads=new Set(entry.original.pages.filter(p=>selected.has(p.id)).map(p=>p.spreadId));
  for(const e of entry.original.elements){
   const children=entry.original.elements.filter(c=>c.groupId===e.id);
+  const retainedGroup=e.type==='Group'&&children.length&&children.every(c=>c.pageCandidates.length===1&&selected.has(c.pageCandidates[0]))&&new Set(children.map(c=>c.pageCandidates[0])).size===1;
   const removedGroup=e.type==='Group'&&children.length&&children.every(c=>c.pageCandidates.length===1&&!selected.has(c.pageCandidates[0]));
-  if((e.pageCandidates.some(id=>selected.has(id))&&e.pageCandidates.length!==1)||(!e.pageCandidates.length&&spreads.has(e.spreadId)&&!removedGroup))throw new Error('UNSUPPORTED 페이지 귀속/공유 객체: '+e.id);
+  if((e.pageCandidates.some(id=>selected.has(id))&&e.pageCandidates.length!==1)||(!e.pageCandidates.length&&spreads.has(e.spreadId)&&!removedGroup&&!retainedGroup))throw new Error('UNSUPPORTED 페이지 귀속/공유 객체: '+e.id);
  }
  for(const e of entry.original.elements){if(!e.textFrame)continue;const id=e.textFrame.storyRef;if(!stories.has(id))stories.set(id,[]);stories.get(id).push(e);}
  for(const frames of stories.values()){
@@ -20,12 +21,12 @@ function validatePageStories(entry){
   if(frames.some(e=>e.pageCandidates.length!==1||!selected.has(e.pageCandidates[0])))throw new Error('선택 페이지 밖 Story 연결 · 고정 콘텐츠를 포함한 원본 유지');
  }
 }
-function packagePlan(entry){
+function packagePlan(entry,{allowUnmapped=false}={}){
  validatePageStories(entry);
  const m=entry.original;if(!m.sourceXml||!m.sourceXml['designmap.xml'])throw new Error('원본 IDML XML이 없는 모델입니다. 다시 추출해주세요.');
  const unsupported=(m.issues||[]).filter(i=>['MISSING_STYLE','STYLE_CYCLE','DUPLICATE_STYLE','UNMODELED_SPREAD_OBJECT'].includes(i.code));
  if(unsupported.length)throw new Error('UNSUPPORTED 원본 참조/객체: '+unsupported.map(i=>i.code+' '+i.ref).join(', '));
- if(!entry.profile.readyForMatching)throw new Error('제목/본문/사진 역할을 먼저 확인해주세요.');
+ if(!allowUnmapped&&!entry.profile.readyForMatching)throw new Error('제목/본문/사진 역할을 먼저 확인해주세요.');
  const trees=clone(m.sourceXml),normal=new Set(m.pages.filter(p=>p.kind==='Spread').map(p=>p.id));
  const tagged=new Set([...m.spreads.map(p=>p.id),...m.pages.map(p=>p.id),...m.stories.map(s=>s.id),...m.elements.map(e=>e.id)]);
  function tag(n){if(tagged.has(n.attributes&&n.attributes.Self)){
@@ -114,8 +115,25 @@ function replacementPlan(entry,article){const binding=Match.bindContent(entry,ar
   }else edits.push(b);}
  return edits;
 }
+function support(entry){
+ const fidelity=[],production=[];
+ try{validatePageStories(entry);}catch(e){fidelity.push(e.message);}
+ const m=entry.original;
+ if(!m.sourceXml||!m.sourceXml['designmap.xml'])fidelity.push('원본 IDML XML 없음');
+ const unknown=(m.metadata.packageInventory||[]).filter(x=>!m.sourceXml?.[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));if(unknown.length)fidelity.push('원본 바이너리 리소스 미보존: '+unknown.map(x=>x.name).join(', '));
+ for(const e of m.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
+  if((e.image||[]).length)fidelity.push('고정 graphic source transform/color readback 미지원');
+  if(Object.keys(e.details||{}).some(k=>/Transparency|Shadow|Glow|Feather|Bevel|Satin/.test(k)))fidelity.push('graphic effect readback 미지원');
+  const role=entry.descriptor.roles[e.id]?.role;
+  if(e.textFrame&&['title','subtitle','body','caption'].includes(role)){
+   const story=m.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?.paragraphs.flatMap(p=>p.runs)||[];
+   if(!runs.length||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type))||!Model.compare(r.resolvedProperties,runs[0].resolvedProperties).equal||r.styleRef!==runs[0].styleRef||!Model.compare(r.properties,runs[0].properties).equal)||story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!Model.compare(p.properties,story.paragraphs[0].properties).equal))production.push(role+' 혼합 Typography 교체 미지원');
+  }
+ }
+ return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};
+}
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
- const plan=packagePlan(entry);guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
+ const plan=packagePlan(entry,{allowUnmapped:mode==='proof'});guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
  let failure;
  const operation=(name,o,p,v,fn)=>Trace.run(progress,name,o,p,v,fn);
  progress('registered.document.acquired '+JSON.stringify(Trace.identity(doc)));
@@ -168,7 +186,7 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  if(context.phase==='FIDELITY_FAILED'&&context.originalInspection)for(const message of context.originalInspection.errors)issues.push({cause:/overflow|넘칩니다|넘침/i.test(message)?'SOURCE_OVERFLOW':'SOURCE_INSPECTION',category:'BLOCKING',message:'원본 단계: '+message,hint:'원고 교체/Auto Fix로 원본 오류를 숨기지 않습니다.'});
  if(context.snapshot){
   const current=F.capture(context.doc,context.entry.descriptor.pageIds,undefined,ID),kept=F.preservation(context.snapshot,current,context.edits);
-  if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체/페이지/Story/레이어/쌓임 순서 보존 불일치',detail:JSON.stringify(kept.differences)});
+  if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체 · 페이지 · Story · 레이어 · 쌓임 순서 보존 불일치',differences:kept.differences,failureOperation:'registered.preservation.compare',detail:JSON.stringify(kept.differences)});
   const live=diagnostics(context.entry,context.doc,ID,{ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
   for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,elementId:r.elementId,differences:r.comparison.differences,failureOperation:r.readbackFailure&&r.readbackFailure.operation,property:r.readbackFailure&&r.readbackFailure.property,adobeError:r.readbackFailure&&r.readbackFailure.message,adobeErrorCode:r.readbackFailure&&r.readbackFailure.code,detail:JSON.stringify(r.comparison.differences)});
  }
@@ -182,4 +200,4 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  return issues;
  }finally{ID.app.scriptPreferences.measurementUnit=old;}}
 function rebind(context,doc){context.doc=doc;const all=items(doc.allPageItems);for(const c of context.contentChecks){const found=all.find(f=>f.extractLabel(KEY)===c.elementId);if(!found)throw new Error('저장 후 등록 프레임 재연결 실패');c.frame=found;}}
-module.exports={KEY,packagePlan,replacementPlan,diagnostics,create,check,rebind};
+module.exports={support,KEY,packagePlan,replacementPlan,diagnostics,create,check,rebind};

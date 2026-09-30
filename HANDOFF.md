@@ -1,3 +1,18 @@
+# 기존 25페이지 공통 등록/추천/검증 연결 — 2026-09-30
+
+- 재개 HEAD 6f71f8dc8572ba3bafa6b3989123d40e0a848cb9. 미커밋 design-matching/design-registration/registered-native 변경 보존 후 완성. 새 원본/샘플 디자인 생성 없음.
+- 개인 결과 파일: assets/templates/working/registered-pages-25.private.json (약15MB, source models2 + descriptors25). 한 번 불러오면25페이지 전체 DOCX 평가. 원본 모델/INDD/IDML/기존 reference.review는 읽기만 수행. 새 산출물은 ignored, Git 미포함.
+- 표: docs/REGISTERED_PAGE_STATUS.md. 총25 / 역할확인16 / 매핑9 / Fidelity 정적검증가능9(빈지면1 포함) / 매핑+검증준비8 / Unsupported16. 역할확인과Unsupported 중복. 실제 Fidelity 완료1은 사용자 보고 original/u335e; 나머지24 실기 미검증. Production Ready0 (u335e 이미지/제작 후 고정객체 오류 미확정).
+- 공통 autoDraft: 제목/본문/부제/명시적 이미지 자리표시/캡션 규칙과 confidence, 나머지 원본 유지. 별도 source/page 하드코딩 없음. 기존 u335e 확정 descriptor 유지. Capability에는 공유 페이지객체, 고정graphic/effects readback 및 혼합Typography 제한 기록.
+- 다중 BODY: 명시적 bodyFlow 유효성 확인, 원본 글분량 비율로 연속 분배. CRLF/Unicode 문자 보존, 누락/중복 방지. 프레임/Story/스타일 변경 없음. IMAGE1..N은 전체 숫자 인덱스로 바인딩/배치. 실제 IMAGE10까지 Mock 회귀. Group 귀속은 모든 직접 자식이 한 선택페이지에 확실히 속할 때만 유지 허용; 공유 지면은 여전히 차단.
+- 검증용 proof는 역할 미완료 페이지도 원본 검사 가능하되 제작은 역할/Fidelity/육안확인 gate 유지. 개발자 전체 페이지 선택/다음 미검증 디자인 검증/전체 검증 결과 저장 추가. 다음 버튼은 미시도+정적지원 페이지1개씩 실행, 반복 import 불필요. 실패는 목록에서 재시도. 상태는 source/page ID별 세션에만 보관; 파일이 스스로 Production Ready 승인하지 못함. 실제 Host CONTENT_APPLIED+오류0+outputReady일 때만 Production Ready.
+- 전체 실패는 property/path + expected/actual + object type + cause로 그룹화. 원본/recheck 중복 제거, 전체 원문 보고서 보존. 새 batch JSON은 UTF8 write→readback 일치 및 Reload guard 후 저장완료.
+- u335e 고정 객체 오류: 실제 최신 JSON 미수신. 메시지 slash가 경로 redaction으로 가려지는 표시 문제만 고침, preservation differences/operation을 구조화. 실제 mismatch 무시/Auto Fix 없음. DOCX 이미지 place/링크/수/geometry/fitting 검사 유지, 실제 배치 성공 미확정.
+- 검증: Node255/Python16 전체 통과. 실제25파일 unpack 오류0, 전체25 추천평가, 지원9페이지 IDML 패키지 생성/검증 성공(Adobe open 아님), 역할준비8 콘텐츠 binding 성공. Adobe 미검증을 성공으로 보고하지 않음.
+- NEXT STEP: Reload → DOCX → registered-pages-25.private.json 한 번 불러오기 → 추천 또는 개발자 다음 미검증 디자인 검증. 각 성공본 육안비교 후 제작/검사. Reload 전 전체 페이지 검증 결과 저장. u335e는 제작 직후 Fidelity 진단 JSON과 이미지 슬롯 화면 전달 필요.
+
+---
+
 # 최신 766 differences 전체 분석/공통 정규화 — 2026-09-30
 
 - 입력: 개인 진단 createdAt 2026-09-30T07:52:07.365Z. 전체 comparison differences 766, recheck 중복 별도 합산하지 않음. 모두 $.runs.*.KerningMethod / Metrics → 메트릭. 객체별 TITLE u7c7e=13, KEEP u7dba=5, BODY u7c96=721, SUBTITLE u7caf=27. 공통 원인1(locale canonicalization), 다른 geometry/typography/생성기 mismatch 없음. 이전 언어45건 해소.

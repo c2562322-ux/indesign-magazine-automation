@@ -42,3 +42,43 @@ test('template setup/proof controls are separate from normal recommendation and 
  for(const text of ['디자인 모델 / 등록 파일 불러오기','등록 라이브러리 저장','검증용 문서 생성','원본과 비교 완료'])assert.ok(inside.includes(text));
  assert.ok(!inside.includes('등록 디자인에서 추천'));assert.ok(!inside.includes('선택한 등록 디자인으로 제작'));
 });
+
+test('automatic page mapping preserves source and leaves ambiguous core roles for review',()=>{
+ const m=model(),before=JSON.stringify(m),d=R.autoDraft(m,'p1');assert.equal(JSON.stringify(m),before);assert.ok(d.mappingReview.length);assert.ok(d.preserveElementIds.length);assert.equal(R.register(m,d).profile.readyForMatching,false);
+});
+test('all 25 pages evaluated while top-three API remains compatible; saved claims cannot authorize production',()=>{
+ const e=registered(),entries=Array.from({length:25},(_,i)=>R.register(e.original,{...e.descriptor,id:'p'+i}));const ranked=R.recommendations(entries,article,fonts);assert.equal(ranked.allCandidates.length+ranked.reviewRequired.length+ranked.excluded.length,25);assert.equal(ranked.candidates.length,3);
+ assert.equal(R.lifecycle(e,{host:'mock',report:{errors:[],fidelity:{phase:'CONTENT_APPLIED'}}}).productionReady,false);
+ assert.equal(R.lifecycle(e,{host:'adobe',report:{errors:[],fidelity:{phase:'FIDELITY_PASSED'}}}).state,'FIDELITY_VERIFIED');
+ assert.equal(R.lifecycle(e,{host:'adobe',report:{errors:[],outputReady:true,fidelity:{phase:'CONTENT_APPLIED'}}}).state,'PRODUCTION_READY');
+ assert.equal(R.lifecycle(e,{host:'adobe',report:{errors:['fixed mismatch'],fidelity:{phase:'CONTENT_APPLIED'}}}).productionReady,false);
+ const packed=R.pack([e]);packed.designs[0].descriptor.productionReady=true;assert.equal(R.lifecycle(R.unpack(packed).entries[0]).productionReady,false);
+});
+test('next unverified uses one loaded library, skips unsupported, and exports full grouped reports',async()=>{
+ const e=registered(),e2=R.register(e.original,{...e.descriptor,id:'second'}),blocked=R.register(e.original,{...e.descriptor,id:'blocked',capability:{fidelityReasons:['shared object']}});let saved,calls=[];
+ const x=setup({hostKind:'adobe',load:async()=>R.pack([e,blocked,e2]),saveBatch:async data=>{saved=data;return true;}});
+ x.studio.createRegistered=async(entry,a,mode)=>{calls.push([entry.descriptor.id,mode]);return {errors:[],issues:[],fidelity:{phase:'FIDELITY_PASSED',proofOnly:true,records:[]}};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('다음 미검증 디자인 검증');await x.click('다음 미검증 디자인 검증');await x.click('다음 미검증 디자인 검증');
+ assert.deepEqual(calls,[[e.descriptor.id,'proof'],['second','proof']]);await x.click('전체 페이지 검증 결과 저장');assert.equal(saved.reports.length,2);assert.equal(saved.states.length,3);
+ await x.click('디자인 모델 / 등록 파일 불러오기');assert.equal(Object.keys(x.ui.state.evidence).length,0);
+});
+test('same mismatch is grouped across pages without duplicate original/recheck counts',()=>{
+ const e=registered(),diff={path:'$.runs.1.PointSize',expected:12,actual:15},r={elementId:'title',comparison:{differences:[diff]}};
+ const report={fidelity:{records:[r]},issues:[{elementId:'title',cause:'GENERATOR_MISMATCH',differences:[diff]}]};const groups=R.groupFailures({one:{entry:e,report},two:{entry:e,report}});assert.equal(groups.length,1);assert.equal(groups[0].count,2);assert.equal(groups[0].designIds.length,2);
+});
+
+test('auto mapping identifies unique title, independent body flow and image placeholders without editing source',()=>{
+ const m=model(),title=m.elements.find(e=>e.id==='title'),body=m.elements.find(e=>e.id==='body');
+ const ts=m.stories.find(s=>s.id===title.textFrame.storyRef),bs=m.stories.find(s=>s.id===body.textFrame.storyRef);
+ ts.paragraphs[0].runs[0].tokens=[{type:'Content',text:'기사 제목'}];for(const r of ts.paragraphs.flatMap(p=>p.runs))r.resolvedProperties.PointSize=40;
+ bs.paragraphs[0].runs[0].tokens=[{type:'Content',text:'본문 내용 '.repeat(40)}];
+ const before=JSON.stringify(m),d=R.autoDraft(m,'p1');assert.equal(d.roles.title.role,'title');assert.equal(d.roles.body.role,'body');assert.ok(d.mappingEvidence.every(x=>x.confidence>=.85));assert.equal(JSON.stringify(m),before);
+});
+test('content overflow keeps verified Fidelity separate and blocks production readiness',()=>{
+ const e=registered(),result=R.lifecycle(e,{host:'adobe',report:{outputReady:false,errors:['본문 overflow'],issues:[{cause:'CONTENT_OVERFLOW'}],fidelity:{phase:'CONTENT_APPLIED'}}});assert.equal(result.fidelityState,'FIDELITY_VERIFIED');assert.equal(result.productionReady,false);
+ const groups=R.groupFailures({a:{report:{errors:['native getter failed']}},b:{report:{errors:['native getter failed']}}});assert.equal(groups.length,1);assert.equal(groups[0].count,2);
+});
+
+test('preservation grouping removes source object IDs but retains type and differences',()=>{
+ const e=registered(),e2=copy(e);e2.original.elements.find(x=>x.id==='title').id='other-title';const report=id=>({issues:[{cause:'GENERATOR_MISMATCH',differences:[{path:'$.objects.'+id+'.object.strokeWeight',expected:0,actual:1}]}]});const groups=R.groupFailures({a:{entry:e,report:report('title')},b:{entry:e2,report:report('other-title')}});assert.equal(groups.length,1);assert.equal(groups[0].objectType,'TextFrame');assert.equal(groups[0].count,2);
+});

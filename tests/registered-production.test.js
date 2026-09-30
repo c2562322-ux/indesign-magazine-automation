@@ -309,3 +309,25 @@ test('other locales resolve only exact unambiguous Adobe keys; unknown and Roman
  assert.equal(F.compare({KerningMethod:'Metrics'},{KerningMethod:'unknown'},{app:{findKeyStrings:()=>['$ID/Metrics','$ID/Optical']}}).equal,false);
  assert.equal(F.compare({KerningMethod:'Metrics'},{KerningMethod:'메트릭 - 로마자 전용'},{}).equal,false);
 });
+
+test('independent BODY stories partition content once in explicit order and preserve frame typography',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),body=e.original.elements.find(e=>e.id==='body'),story=e.original.stories.find(s=>s.id==='bodyStory');
+ e.original.elements.push({...JSON.parse(JSON.stringify(body)),id:'body2',textFrame:{...body.textFrame,storyRef:'bs2'}});e.original.stories.push({...JSON.parse(JSON.stringify(story)),id:'bs2'});e.descriptor.roles.body2={role:'body',confirmed:true};e.descriptor.bodyFlow=['bodyStory','bs2'];
+ const entry=R.register(e.original,e.descriptor);assert.equal(entry.profile.readyForMatching,true);
+ const a={title:'새 제목',body:'한글 본문 첫 부분\r\nSecond paragraph 😀 마지막 문단.',images:[]},binding=Match.bindContent(entry,a,{installedFonts:entry.profile.requiredFonts}).content.filter(x=>x.role==='body');assert.equal(binding.map(b=>b.text).join(''),a.body);assert.ok(binding.every(b=>b.text.length));
+ const h=host(entry),c=await N.create(entry,a,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0);
+ assert.equal(c.contentChecks.filter(x=>x.role==='body').map(x=>x.frame.parentStory.contents).join(''),a.body.replace(/\r\n?|\n/g,'\r'));
+ const bad=R.register(e.original,{...e.descriptor,bodyFlow:['bodyStory','bodyStory']});assert.equal(bad.profile.readyForMatching,false);
+});
+test('IMAGE 1 through 10 bind and place distinct internal files without single-digit truncation',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),base=e.original.elements.find(e=>e.type==='Rectangle');for(let i=1;i<=10;i++){e.original.elements.push({...JSON.parse(JSON.stringify(base)),id:'photo'+i,pageCandidates:['p1'],pageBounds:{p1:[10,450,150,590]},properties:{},details:{},image:[],groupId:null});e.descriptor.roles['photo'+i]={role:'image'+i,confirmed:true};e.descriptor.images['photo'+i]='required';}
+ const entry=R.register(e.original,e.descriptor),a={title:'새 제목',body:'새 본문',images:Array.from({length:10},(_,i)=>({source:'docx',path:'C:/smoke/'+i+'.png',widthPx:1200,heightPx:800,documentOrder:i+1}))};
+ const h=host(entry),c=await N.create(entry,a,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(c.contentChecks.find(x=>x.role==='image10').imagePath,'C:/smoke/9.png');assert.equal(N.check(c,h.ID).length,0);
+});
+test('unassigned Group wholly contained by selected child pages is safe; shared children still block',()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),child=e.original.elements[0];child.groupId='container';e.original.elements.push({id:'container',type:'Group',pageCandidates:[],spreadId:child.spreadId,properties:{},image:[]});assert.doesNotThrow(()=>N.packagePlan(e));
+ child.pageCandidates=['p1','p2'];assert.throws(()=>N.packagePlan(e),/귀속/);
+});
+test('original proof can inspect unmapped pages without permitting production content writes',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));e.profile.readyForMatching=false;assert.throws(()=>N.packagePlan(e),/역할/);const h=host(e),c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_PASSED');assert.deepEqual(c.edits,[]);
+});
