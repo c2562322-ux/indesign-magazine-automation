@@ -1,3 +1,16 @@
+# 등록 Library 일괄 원본 검증 — 2026-10-01
+
+- 개발자 버튼 전체 등록 디자인 일괄 검증: 로드한 Library 전체를 순차 검사. 기존 selectForProof/generate/createRegistered proof 경로 재사용, 페이지별 하드코딩 없음. 원고 교체/Auto Fix/PDF 실행 없음.
+- capability fidelityReasons가 있는 페이지는 UNSUPPORTED+전체 사유 저장, Host 생성을 강행하지 않음. ROLE_MAPPING_REQUIRED라도 정적 Fidelity 지원이면 proof 실행. 한 페이지의 thrown DOM 오류나 Studio에서 null 반환된 실패 모두 기록하고 다음 페이지 진행.
+- 전체 재실행은 이전 성공/실패 캐시를 건너뛰지 않고 새 run. 중지는 현재 작업 완료 후 적용, 나머지 NOT_RUN. 새 Library import는 이전 batch를 분리/초기화. 결과는 기존 전체 페이지 검증 결과 저장에서 JSON 하나로 저장(기존 write/readback 검증 사용).
+- JSON: run 시간/host/중지여부, 전체/Adobe통과/Mock통과/역할확인/미지원/실패/미실행 수, sourceHash+pageIds별 상태, structured host failure 원문(operation/object/sourceId/property/Adobe message/code/Page/Spread), 모든 report/diagnostic/differences, 오류유형별 pageCount 및 source/page 목록. 역할확인 수는 실행 결과와 겹칠 수 있음.
+- u3d6 Group u7e7e fillColor 혼합값 오류는 historicalIssues 첫 항목 USER_REPORTED_PREVIOUS_RUN_NOT_CURRENT_RESULT로 포함. 수정 전 사용자 실기 이력이며 현재 실패 개수에 더하지 않음. 이번 재현 여부는 current reports/groups만으로 판단.
+- 생성된 검증 문서는 자동 저장/닫기하지 않음. 기존 실패 cleanup은 기존 새문서 처리 정책 유지. batch 전에 다른 원고 작업을 마치고 실행, 완료 후 필요한 문서를 확인. batch는 Production Ready를 부여하거나 육안 비교를 승인하지 않음.
+- Node268/Python16 통과. 25개 synthetic UI batch에서 throw/null 실패2건 후 계속, unsupported skip, 역할미확정 proof 실행, 동일 오류2페이지 그룹화, 전체 재실행, cancellation partial JSON 및 Mock의 Adobe통과 집계 금지 검증. 실제 Adobe25페이지 batch 미실행.
+- NEXT STEP: UDT Reload → DOCX/25페이지 Library 한 번 로드 → 개발자 전체 등록 디자인 일괄 검증 → 완료 후 전체 페이지 검증 결과 저장. 저장대화상자에서 registered-page-verification.private.json 저장 후 그 파일 하나 전달. 실패페이지별 수동 반복 불필요. 저장 전 Reload 금지(세션 결과 초기화).
+
+---
+
 # 등록 디자인 실제 제작 연결 보강 — 2026-09-30
 
 - 원본 검증 문서는 proofOnly로 샘플 콘텐츠 유지, PDF 금지. 일반 제작 버튼은 mode=production으로 별도 IDML 문서를 열고 원본 자동 Fidelity 통과 후 TITLE/SUBTITLE/BODY/IMAGE를 교체한다. 이 기존 경로를 재사용했으며 추천 엔진/원본 모델/페이지 geometry는 변경하지 않았다.

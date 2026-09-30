@@ -120,3 +120,17 @@ test('role editor exposes IMAGE ordinals from available frames beyond two',async
  const m=model(),base=m.elements.find(e=>e.type==='Rectangle');for(let i=0;i<4;i++)m.elements.push({...copy(base),id:'newPhoto'+i,pageCandidates:['p1'],pageBounds:{p1:[10,20,100,100]}});
  const x=setup({load:async()=>m});await x.click('디자인 모델 / 등록 파일 불러오기');x.nodes().find(n=>n.tagName==='select').value='p1';await x.click('이 페이지 역할 확인');assert.ok(x.nodes().some(n=>n.tagName==='label'&&n.textContent==='사진 4'));const e=m.elements.find(e=>e.id==='newPhoto0');e.role={confirmed:'image4'};assert.equal(R.candidates(m,e)[0].role,'image4');
 });
+
+
+test('batch continues after native failure, skips unsupported, saves all pages and groups common failures',async()=>{
+ const e=registered(),entries=Array.from({length:25},(_,i)=>R.register(e.original,{...e.descriptor,id:'batch'+i,...(i===3?{capability:{fidelityReasons:['shared source page']}}:i===4?{mappingReview:['핵심 역할 확인']}:{})}));let saved;const calls=[],x=setup({hostKind:'adobe',load:async()=>R.pack(entries),saveBatch:async p=>{saved=p;return true;}});
+ const failure=id=>({operation:'registered.snapshot.read',object:{type:'Group',sourceId:id},property:'fillColor',adobeMessage:'mixed graphics',adobeCode:7});
+ x.studio.createRegistered=async(entry,a,mode)=>{calls.push([entry.descriptor.id,mode]);if(entry.descriptor.id==='batch0'){const e=new Error('mixed graphics');e.registeredFailure=failure('g0');throw e;}if(entry.descriptor.id==='batch1'){x.ui.failed('mixed graphics');x.studio.state.fidelityJSON=JSON.stringify({hostFailure:{registeredFailure:failure('g1')},trace:['read']});return null;}return {errors:[],issues:[],outputReady:false,fidelity:{phase:'FIDELITY_PASSED',proofOnly:true}};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('전체 등록 디자인 일괄 검증');await x.click('전체 페이지 검증 결과 저장');assert.equal(calls.length,24);assert.ok(calls.every(c=>c[1]==='proof'));assert.equal(saved.counts.total,25);assert.equal(saved.counts.passed,22);assert.equal(saved.counts.fidelityFailed,2);assert.equal(saved.counts.unsupported,1);assert.equal(saved.counts.roleMappingRequired,1);assert.equal(saved.groups[0].pageCount,2);assert.equal(saved.groups[0].property,'fillColor');assert.equal(saved.reports.length,25);assert.equal(saved.states.find(s=>s.designId==='batch1').failure.object.sourceId,'g1');assert.ok(saved.historicalIssues[0].status.includes('NOT_CURRENT'));assert.ok(saved.states.every(s=>!s.productionReady));
+ await x.click('전체 등록 디자인 일괄 검증');assert.equal(calls.length,48); // full rerun, including previous failures/successes
+});
+
+test('batch cancellation preserves partial results; Mock success never counts as Adobe pass',async()=>{
+ const e=registered(),entries=Array.from({length:3},(_,i)=>R.register(e.original,{...e.descriptor,id:'cancel'+i}));let saved;const x=setup({hostKind:'mock',load:async()=>R.pack(entries),saveBatch:async p=>{saved=p;return true;}});let calls=0;
+ x.studio.createRegistered=async()=>{calls++;await x.click('일괄 검증 중지');return {errors:[],issues:[],fidelity:{phase:'FIDELITY_PASSED',proofOnly:true}};};await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('전체 등록 디자인 일괄 검증');await x.click('전체 페이지 검증 결과 저장');assert.equal(calls,1);assert.equal(saved.counts.passed,0);assert.equal(saved.counts.mockPassed,1);assert.equal(saved.counts.notRun,2);assert.equal(saved.run.cancelled,true);
+});
