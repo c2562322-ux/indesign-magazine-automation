@@ -87,13 +87,18 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
     if(!ignoreStories.includes(story.id))for(const p of story.paragraphs)for(const r of p.runs){
      const text=r.tokens.map(t=>t.type==='Content'?t.text:t.type==='Br'?'\r':'').join('');
      if(r.tokens.some(t=>!['Content','Br'].includes(t.type))||/[\uD800-\uDFFF]/.test(text)){expected.unsupported='UNSUPPORTED 복합 텍스트 토큰/문자 인덱스';continue;}if(!text)continue;
-     const source=r.resolvedProperties,range=f.parentStory.characters.itemByRange(offset,offset+text.length-1),got=readType(range,ID),want={};
+     const source=r.resolvedProperties,want={};
      for(const k of [...Object.keys(fields),'AppliedFont','FontStyle','Justification'])if(source[k]!==undefined)want[k]=canonical(k,source[k]);
      for(const k of ['AppliedFont','FontStyle','PointSize','Leading','Tracking','Justification','SpaceBefore','SpaceAfter'])if(source[k]===undefined)want[k]='SOURCE_UNRESOLVED';
      if(source.Leading==='Auto'&&!Number.isFinite(source.AutoLeading))want.AutoLeading='SOURCE_UNRESOLVED';
+     // A plural Character specifier can return arrays rather than scalar properties.
+     // Read every character, including paragraph breaks; never certify only the first.
+     for(let index=0;index<text.length;index++){
+     const range=f.parentStory.characters.item(offset+index),got=readType(range,ID);
      const direct=F.directCompare(range,{...p.properties,...r.properties},ID);
      const colorsExpected={},colorsActual={};for(const key of ['FillColor','StrokeColor'])if(source[key]!==undefined){colorsExpected[key]=F.colorExpected(entry.original,source[key]);colorsActual[key]=F.colorActual(range[key[0].toLowerCase()+key.slice(1)],ID,doc);}
-     expected.runs.push({text,...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:String(range.contents),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});offset+=text.length;
+     expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:String(range.contents),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
+     }offset+=text.length;
     }
    }
    record(role,e.id,expected,actual);

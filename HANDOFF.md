@@ -1,3 +1,15 @@
+# 실제 Host JSON 기반 Fidelity readback 수정 — 2026-09-30
+
+- 실제 magazine-fidelity.private.json 분석: 오류6 = 집계 차단1 + 객체5. u7c78 FillColor.space expected CMYK / actual undefined, 채널 [10,0,0,0] 및 bounds/crop 동일. u7c7e(TITLE), u7dba(KEEP), u7c96(BODY), u7caf(SUBTITLE)는 모두 readback supported / UNSUPPORTED direct override 비교: FontStyle. 실제 폰트 불일치 값이 아니라 readback 차단이다. 해당6건에 NOT_APPLICABLE로 바꿀 항목 없음.
+- ColorSpace는 native enum의 Object.keys 열거에 의존하지 않고 명시적 CMYK/RGB/LAB/MIXEDINK 상수와 비교. 알 수 없는 공간은 차단, 채널 수로 추정하지 않음.
+- plural Characters.itemByRange 대신 모든 scalar Character.item(index)를 읽는다. 중간 문자와 CR도 전부 typography/direct override/color/text 비교. 원본/생성값 비교 및 허용오차 변경 없음. 이전 Mock은 plural도 scalar 값을 반환해 Host 차이를 검출하지 못했다.
+- 원인 범위: JSON은 native FontStyle의 실제 타입/값을 보존하지 못한 readback 실패 기록이다. plural 반환/enum 열거 의존을 제거했지만 이것만으로 Adobe의 전체 Fidelity 통과를 확정하지 않는다. 다음 실제 검사에서 추가로 드러나는 차이는 그대로 차단한다.
+- 기존 콘텐츠 경로 유지·회귀 확인: Fidelity 재검사 → TITLE/SUBTITLE/BODY 교체 및 원본 스타일/direct override 복원 → 내부 이미지 파일 IMAGE place/원본 fitting → recompose → 콘텐츠 검사 → 기존 INDD/PDF. KEEP/geometry/색상/원본 overflow 차단 및 콘텐츠 overflow 분리 유지. Auto Fix 없음.
+- 기준 시작 메인 · 사진 1장 / u335e. 개인 원본과 DOCX/진단 파일 수정·커밋 없음. Node238/Python16 통과. Adobe 콘텐츠 제작/이미지 crop/출력은 아직 미검증.
+- NEXT STEP: UDT Reload → registered-smoke.docx → e2e-reference.review.json → 등록 디자인에서 추천 → 시작 메인 · 사진 1장 분석 후보로 선택 → 검증용 문서 생성. Fidelity 통과 시 원본과 육안 비교 후 원본과 비교 완료 → 선택 디자인으로 제작 → 문서 검사 → INDD 저장 → PDF 내보내기. 실패 시 진단 JSON 전달, 강제 통과 금지.
+
+---
+
 # Fidelity 진단 JSON 저장 완료 — 2026-09-30
 
 - 개발 브랜치 codex/magazine-studio-1.1, 재개 HEAD dd0c7eca1892b758e3cf8370e2c074325ea2e1a1. 기존 미커밋 UI/진단/4슬롯 회귀 작업 모두 보존하여 함께 검토.

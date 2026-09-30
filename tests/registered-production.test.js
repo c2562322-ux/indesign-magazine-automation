@@ -30,7 +30,7 @@ function host(entry,{drift=false,originalOverflow=false,contentOverflow=false,on
    const t={};for(const [k,v] of Object.entries(props))t[k[0].toLowerCase()+k.slice(1)]=v;
    Object.assign(t,{appliedFont:{fontFamily:props.AppliedFont},fontStyle:props.FontStyle,justification:M.ALIGN[props.Justification],fillColor:color(props.FillColor),appliedCharacterStyle:{name:runs[0].styleRef},appliedParagraphStyle:{name:s.paragraphs[0].styleRef}});
    Object.defineProperty(t,'contents',{enumerable:true,get:()=>contents});
-   const story={extractLabel:()=>s.id,get contents(){return contents;},set contents(v){contents=v;},get overflows(){return contents==='새 본문'&&contentOverflow;},textContainers:[f],characters:{item:()=>t,itemByRange:(a,b)=>({...t,contents:contents.slice(a,b+1)})},paragraphs:{item:()=>t},texts:{item:()=>t}};
+   const story={extractLabel:()=>s.id,get contents(){return contents;},set contents(v){contents=v;},get overflows(){return contents==='새 본문'&&contentOverflow;},textContainers:[f],characters:{item:i=>Object.create(t,{contents:{get:()=>contents[i]}}),itemByRange:()=>{throw new Error('Plural Character properties are not scalar');}},paragraphs:{item:()=>t},texts:{item:()=>t}};
    f.parentStory=story;const prefs=Match.framePreferences(entry.original,e).effective;f.textFramePreferences={textColumnCount:prefs.TextColumnCount,textColumnGutter:prefs.TextColumnGutter,insetSpacing:prefs.InsetSpacing};
   }else{
    f.frameFittingOptions={autoFit:false,leftCrop:0,topCrop:0,rightCrop:0,bottomCrop:0,fittingOnEmptyFrame:'None',fittingAlignment:'CenterAnchor'};
@@ -239,4 +239,20 @@ test('real synthetic DOCX text and internal image complete all four slots throug
   for(const role of ['title','subtitle','body']){const edit=c.contentChecks.find(x=>x.role===role);assert.equal(edit.frame.parentStory.contents,a[role].replace(/\n/g,'\r'));}
   const image=c.contentChecks.find(x=>x.role==='image1');assert.equal(image.frame.allGraphics[0].itemLink.filePath,pngPath);assert.equal(image.imageMetadata.widthPx,1200);assert.equal(image.imageMetadata.heightPx,800);assert.ok(trace.some(s=>s.startsWith('registered.content.image1.place')));assert.ok(trace.includes('registered.content.inspection.ready'));
  }finally{assert.equal(path.dirname(path.resolve(tmp)),path.resolve(os.tmpdir()));assert.ok(path.basename(tmp).startsWith('registered-e2e-'));fs.rmSync(tmp,{recursive:true,force:true});}})();
+});
+
+test('UXP non-enumerable color enums retain exact space and channels; unknown spaces block',()=>{
+ const F=require('../src/registered-fidelity'),ColorSpace={};
+ Object.defineProperty(ColorSpace,'CMYK',{value:1129142603});
+ const c={name:'test',space:{equals:v=>v===1129142603},colorValue:[10,0,0,0]};
+ assert.deepEqual(F.colorActual(c,{ColorSpace},{}),{space:'CMYK',values:[10,0,0,0]});
+ assert.throws(()=>F.colorActual({...c,space:999},{ColorSpace},{}),/UNSUPPORTED color space/);
+ assert.equal(M.compare(F.colorActual(c,{ColorSpace},{}),{space:'CMYK',values:[11,0,0,0]}).equal,false);
+});
+test('scalar Character inspection detects interior font differences before any content replacement',async()=>{
+ const entry=fixture(),h=host(entry),story=h.frames[0].parentStory,original=story.contents,item=story.characters.item;
+ story.characters.item=i=>{const c=item(i);return i===1?Object.create(c,{fontStyle:{value:'Different face'}}):c;};
+ const c=await N.create(entry,{title:'new',body:'new',images:[]},h.env);
+ assert.equal(c.phase,'FIDELITY_FAILED');assert.equal(story.contents,original);assert.equal(c.autoFixAllowed,false);
+ assert.ok(c.baseline.records.some(r=>r.comparison.differences.some(d=>d.path.includes('FontStyle'))));
 });

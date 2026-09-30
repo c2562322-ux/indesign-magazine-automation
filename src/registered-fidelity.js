@@ -73,7 +73,10 @@ function colorActual(v,ID,doc){
  if(!v)return null;
  const none=doc.swatches&&doc.swatches.item(0);if(none&&v.id!==undefined&&v.id===none.id)return {none:true};
  if(['None','[None]','$ID/None','없음','[없음]'].includes(v.name)||v==='none')return {none:true};
- return {space:Object.keys(ID.ColorSpace||{}).find(k=>enumEqual(v.space,ID.ColorSpace[k])),values:v.colorValue?Array.from(v.colorValue,Number):null};
+ // Native enum members need not be enumerable in UXP. Never infer space from channel count.
+ const space=['CMYK','RGB','LAB','MIXEDINK'].find(k=>ID.ColorSpace&&ID.ColorSpace[k]!==undefined&&enumEqual(v.space,ID.ColorSpace[k]));
+ if(!space)throw new Error('UNSUPPORTED color space readback');
+ return {space,values:v.colorValue?Array.from(v.colorValue,Number):null};
 }
 function objectProperties(model,e){
  const style=model.styles.object.find(s=>s.id===e.objectStyleRef),p=style&&style.resolvedProperties||{},out={};
