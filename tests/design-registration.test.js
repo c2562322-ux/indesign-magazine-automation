@@ -82,3 +82,26 @@ test('content overflow keeps verified Fidelity separate and blocks production re
 test('preservation grouping removes source object IDs but retains type and differences',()=>{
  const e=registered(),e2=copy(e);e2.original.elements.find(x=>x.id==='title').id='other-title';const report=id=>({issues:[{cause:'GENERATOR_MISMATCH',differences:[{path:'$.objects.'+id+'.object.strokeWeight',expected:0,actual:1}]}]});const groups=R.groupFailures({a:{entry:e,report:report('title')},b:{entry:e2,report:report('other-title')}});assert.equal(groups.length,1);assert.equal(groups[0].objectType,'TextFrame');assert.equal(groups[0].count,2);
 });
+
+
+test('recommendation UI caps cards and collapses extra candidates without dropping evaluation',async()=>{
+ const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'card'+i}));const x=setup({load:async()=>R.pack(entries)});
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');
+ assert.equal(x.ui.state.entries.length,8);assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,3);
+ const toggle=x.nodes().find(n=>n.textContent==='추가 후보 5개');assert.ok(toggle);const parent=x.nodes().find(n=>n.children.includes(toggle)),content=parent.children[0];assert.equal(content.style.display,'none');await toggle.click();assert.equal(content.style.display,'');
+});
+
+test('near subtitle separated from section heading maps safely while crowded alternatives stay review',()=>{
+ const m=model(),title=m.elements.find(e=>e.id==='title'),body=m.elements.find(e=>e.id==='body');
+ title.pageBounds.p1=[20,20,70,420];body.pageBounds.p1=[250,20,700,420];
+ const set=(e,text,size)=>{const st=m.stories.find(s=>s.id===e.textFrame.storyRef);for(const r of st.paragraphs.flatMap(p=>p.runs)){r.tokens=[];r.resolvedProperties.PointSize=size;}st.paragraphs[0].runs[0].tokens=[{type:'Content',text}];};set(title,'기사 제목입니다',40);set(body,'본문 내용 '.repeat(40),10);
+ for(const [id,b] of [['subtitle',[90,20,103,420]],['section',[180,20,195,420]]]){const e=copy(title),st=copy(m.stories.find(s=>s.id===title.textFrame.storyRef));e.id=id;e.role.confirmed=null;e.textFrame.storyRef=id+'Story';st.id=e.textFrame.storyRef;e.pageBounds.p1=b;m.elements.push(e);m.stories.push(st);set(e,'설명하는 문장입니다',13);}
+ const before=JSON.stringify(m),d=R.autoDraft(m,'p1');assert.equal(d.roles.subtitle.role,'subtitle');assert.ok(d.preserveElementIds.includes('section'));assert.equal(JSON.stringify(m),before);
+ m.elements.find(e=>e.id==='section').pageBounds.p1=[105,20,118,420];assert.ok(R.autoDraft(m,'p1').mappingReview.some(s=>s.includes('부제 후보')));
+});
+
+
+test('review and excluded designs stay bounded and excluded reasons expand on demand',async()=>{
+ const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,3);assert.ok(x.nodes().some(n=>n.textContent==='추가 후보 5개'));
+ const y=setup({load:async()=>R.pack(entries)});y.studio.read=()=>({article:{...article,images:[{width:1200,height:800}]}});await y.click('디자인 모델 / 등록 파일 불러오기');await y.click('등록 디자인에서 추천');assert.equal(y.nodes().filter(n=>n.className==='registered-card').length,0);const toggle=y.nodes().find(n=>n.textContent==='제외된 디자인 8개'),parent=y.nodes().find(n=>n.children.includes(toggle));assert.equal(parent.children[0].style.display,'none');await toggle.click();assert.equal(parent.children[0].style.display,'');assert.equal(y.ui.state.entries.length,8);
+});

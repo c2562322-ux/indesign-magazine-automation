@@ -1,3 +1,14 @@
+# 25페이지 추천·역할 재검토 — 2026-09-30
+
+- 기존 미커밋3파일 보존 후 진행. 역할완료9→10 / 확인16→15. 신규 private Library: assets/templates/working/registered-pages-25-reviewed.private.json. 원본 모델/INDD/IDML 수정 없음.
+- 상세25페이지 표/원인/수용량 정책/PC 순서: docs/REGISTERED_RECOMMENDATION_REVIEW.md. IMAGE0/1/2/3/4+ = 19/3/1/2/0. 확정4사진 지면 없음. 공유 프레임/장식/설명그림을 억지 교체 슬롯으로 지정하지 않음.
+- 수용량 원본 Story 관측값 추가, 추정 상한보다 원문이 긴 단독 프레임은 추정 미보정 검토로 분류. 상한/원본 디자인/Fidelity 판정 불변. UI 추천3/검토3 이하, 나머지 접힘; 내부25전체 평가 유지.
+- 실제 테스트원고.docx는 Desktop/Downloads 모두 미발견(Downloads 샌드박스 밖에서도 확인). 실제 문단/이미지 크기 미측정. 보고된 문자수 기반 합성 조건 결과0/14/11은 실제 DOCX 결과 아님.
+- Node259/Python16 통과. actual Adobe Fidelity1은 기존 사용자 u335e 보고, 새 실기 성공 주장 없음. Production Ready0.
+- NEXT STEP: UDT Reload → 실제 DOCX → reviewed private Library → 추천/접힌 이유 확인. DOCX가 현재 작업 환경에 제공되면 실제 문단/이미지 프로필로 재평가. 파일 미확보가 남아 있어 실제 원고 재평가는 미완료.
+
+---
+
 # 기존 25페이지 공통 등록/추천/검증 연결 — 2026-09-30
 
 - 재개 HEAD 6f71f8dc8572ba3bafa6b3989123d40e0a848cb9. 미커밋 design-matching/design-registration/registered-native 변경 보존 후 완성. 새 원본/샘플 디자인 생성 없음.

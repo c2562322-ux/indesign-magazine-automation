@@ -74,6 +74,7 @@ function capacity(model,e,{paragraphs=1,cjkFraction=1}={}){
     const low=Math.max(0,Math.floor((width-indent)/maxAdvance))*lines*columns;
     const high=Math.max(0,Math.floor(width/minAdvance))*highLines*columns;
     return {known:true,estimatedCharacters:{low:Math.floor(low*.75),high:Math.floor(high*1.15)},confidence:'low',
+        sourceObservation:{characters:count(runs.flatMap(r=>r.tokens.filter(t=>t.type==='Content').map(t=>t.text)).join('')),paragraphs:story.paragraphs.length,exclusiveFrame:model.elements.filter(x=>x.textFrame&&x.textFrame.storyRef===story.id).length===1,hostFitVerified:false},
         practicalLines:lines,columns,columnGap:gap,insets:clone(inset),fontSize:maxSize,leading,
         assumptions:['실제 glyph metric 미측정; 첫 줄 높이 0.7~1.1em 가정','혼합 run의 보수적 행간/글자 폭','문단 간격 반영; keep/조판/단어 줄바꿈 근사','추정 하한 -25%, 상한 +15%'],
         fontFaces:[...new Set(types.map(t=>t.AppliedFont+'\t'+t.FontStyle))]};
@@ -189,7 +190,8 @@ function evaluate(entry,article,{installedFonts=null}={}){
             const floor=Math.min(original,Math.max(Fit.POLICY.title.min,original*Fit.POLICY.title.ratio));
             if(Number.isFinite(min)&&min>0&&min<=original&&min>=floor&&metrics.characters<=high*Math.pow(original/min,2))add(soft,'AUTO_FIT_REQUIRED','제목은 승인된 축소 한계 내 추정이나 충돌/넘침 실기 확인 필요',20);
             else add(hard,'TITLE_CAPACITY','제목이 승인된 추정 범위를 초과합니다.');
-        }else if(metrics.characters>high*1.5)add(hard,'SEVERE_CAPACITY',role+' 분량이 추정 상한을 크게 초과합니다 (실기 미확정).');
+        }else if(caps.some(c=>c.sourceObservation.exclusiveFrame&&c.sourceObservation.characters>c.estimatedCharacters.high))add(review,'SOURCE_CAPACITY_UNCALIBRATED',role+' 추정 상한이 원본 Story 분량보다 작음: 원본 overflow/실제 폰트 metric 확인 필요 (적합 판정 아님)');
+        else if(metrics.characters>high*1.5)add(hard,'SEVERE_CAPACITY',role+' 분량이 추정 상한을 크게 초과합니다 (실기 미확정).');
         else add(review,'OVER_ESTIMATE',role+' 추정 상한 초과: 실제 조판 확인 전 추천 보류');
     }
     return {id:p.id,name:p.name,status:hard.length?'excluded':review.length?'review-required':'candidate',score:Math.max(0,score),hard,review,soft,reasons,estimates,

@@ -108,3 +108,11 @@ test('large point size with short leading cannot imply many usable lines in a ti
     for(const r of m.stories[0].paragraphs[0].runs)Object.assign(r.resolvedProperties,{PointSize:60,Leading:15,SpaceBefore:0,SpaceAfter:0});
     const result=Match.capacity(m,e);assert.equal(result.known,true);assert.equal(result.estimatedCharacters.high,0);
 });
+
+
+test('source text conflicting with estimated capacity requires calibration, never proves fit',()=>{
+ const {m,d}=design({bodyHeight:60});const st=m.stories.find(s=>s.id==='bodyStory');for(const r of st.paragraphs.flatMap(p=>p.runs))r.tokens=[];st.paragraphs[0].runs[0].tokens=[{type:'Content',text:'가'.repeat(1000)}];
+ const entry=Match.libraryEntry(m,d),r=Match.evaluate(entry,{...article,body:'가'.repeat(650)},{installedFonts:fonts});assert.equal(r.status,'review-required');assert.ok(r.review.some(i=>i.code==='SOURCE_CAPACITY_UNCALIBRATED'));assert.equal(r.productionReady,false);
+ const c=Match.capacity(m,m.elements.find(e=>e.id==='body'));assert.equal(c.sourceObservation.characters,1000);assert.equal(c.sourceObservation.hostFitVerified,false);assert.ok(c.estimatedCharacters.high<650);
+ const linked=copy(m.elements.find(e=>e.id==='body'));linked.id='linked';m.elements.push(linked);assert.equal(Match.capacity(m,m.elements.find(e=>e.id==='body')).sourceObservation.exclusiveFrame,false);
+});

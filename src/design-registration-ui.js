@@ -33,7 +33,13 @@ function mount(root,studio,adapter){
   if(!fresh()||JSON.stringify(studio.read().article)!==signature)return;
   const ranked=R.recommendations(state.entries,article,fonts),profile=Match.articleProfile(article);results.textContent='';state.selected=null;
   el('p','제목 '+profile.title.characters+'자 · 본문 '+profile.body.characters+'자 · 사진 '+profile.imageCount+'장',results);
-  const rows=(ranked.allCandidates||ranked.candidates).concat(ranked.reviewRequired);
+  const candidates=ranked.allCandidates||ranked.candidates;
+  const reviewRows=ranked.reviewRequired.slice().sort((a,b)=>{
+   const priority=row=>{const e=state.entries.find(e=>e.descriptor.id===row.id);return (e.profile.readyForMatching?4:0)+(e.profile.supportedRoles.includes('body')?2:0)+((e.descriptor.capability?.fidelityReasons||[]).length?0:1);};
+   return priority(b)-priority(a)||b.score-a.score||a.id.localeCompare(b.id);
+  });
+  const rows=candidates.slice(0,3).concat(reviewRows.slice(0,3));
+  function collapsed(label,items,describe){if(!items.length)return;const area=el('div',undefined,results),content=el('div',undefined,area);content.style.display='none';const toggle=button(label,()=>{const open=content.style.display==='none';content.style.display=open?'':'none';toggle.setAttribute('aria-expanded',String(open));},area);toggle.setAttribute('aria-expanded','false');for(const row of items)el('p',describe(row),content);}
   for(const row of rows){const card=el('div',undefined,results);card.className='registered-card';el('h3',row.name+' · '+(row.status==='candidate'?'구조적 후보':'확인 필요'),card);
    el('p',row.reasons.concat(row.soft.map(r=>r.message||r.reason||r.code),row.review.map(r=>r.message||r.reason||r.code)).join(' / '),card);
    el('p',R.lifecycle(state.entries.find(e=>e.descriptor.id===row.id),state.evidence[row.id]).state+' · 실패하면 콘텐츠 교체/PDF 차단',card);
@@ -43,8 +49,9 @@ function mount(root,studio,adapter){
    choose.registrationDisabled=!entry.profile.readyForMatching||(entry.descriptor.capability?.fidelityReasons||[]).length>0;choose.disabled=choose.registrationDisabled;
    if(choose.disabled)el('p','역할·사진 정책을 확인하고 다시 등록해야 선택할 수 있습니다.',card);
   }
-  status.textContent='구조적 후보 '+ranked.candidates.length+' · 확인 필요 '+ranked.reviewRequired.length+' · 조건 불일치 '+ranked.excluded.length+' (자동 선택 없음)';
-  for(const row of ranked.excluded)el('p',row.name+' 제외: '+row.hard.map(r=>r.message||r.reason||r.code).join(' / '),results);
+  status.textContent='전체 평가 '+state.entries.length+' · 구조적 후보 '+candidates.length+' · 확인 필요 '+ranked.reviewRequired.length+' · 조건 불일치 '+ranked.excluded.length+' (자동 선택 없음)';
+  collapsed('추가 후보 '+(Math.max(0,candidates.length-3)+Math.max(0,ranked.reviewRequired.length-3))+'개',candidates.slice(3).concat(reviewRows.slice(3)),row=>row.name+' · '+row.status+' · '+row.review.map(r=>r.message||r.code).join(' / ')+' · 개발자 전체 페이지 목록에서 확인');
+  collapsed('제외된 디자인 '+ranked.excluded.length+'개',ranked.excluded,row=>row.name+' 제외: '+row.hard.map(r=>r.message||r.reason||r.code).join(' / '));
  });
  async function generate(fresh,mode){if(!state.selected)throw new Error('추천 후보를 먼저 선택해주세요.');const selected=state.selected;if(JSON.stringify(studio.read().article)!==selected.articleSignature)throw new Error('원고 변경 · 다시 추천해주세요.');if(mode==='proof'){state.proofPassed=false;state.visualConfirmed=false;}const report=await studio.createRegistered(selected.entry,selected.article,mode);if(fresh()){if(report)api.report(report);else if(state.evidence[selected.entry.descriptor.id]&&studio.state.fidelityJSON){try{state.evidence[selected.entry.descriptor.id].diagnostic=JSON.parse(studio.state.fidelityJSON);}catch(e){/* raw save remains available in Studio */}}status.textContent=report?(mode==='proof'?'검증용 새 문서를 원본과 비교해주세요. 원본 파일은 변경하지 않았습니다.':'제작 결과는 아래 검사 및 출력 영역에서 확인해주세요.'):'생성 실패 · 아래 검사 및 출력 영역의 오류를 확인하고 다시 시도해주세요.';}}
  libraryState=el('p','',developer);librarySelect=el('select',undefined,developer);librarySelect.setAttribute('aria-label','등록된 전체 페이지 디자인');
