@@ -7,9 +7,10 @@ const fs = require('fs');
 const D = require('./production-diagnostics.js');
 const Fit = require('./auto-fit.js');
 let fitContexts=new WeakMap();
+let registeredContexts=new WeakMap();
 let latest = null;
 let fontCatalog = null, session = 0;
-function resetSession(){latest=null;fitContexts=new WeakMap();fontCatalog=null;session++;}
+function resetSession(){latest=null;fitContexts=new WeakMap();registeredContexts=new WeakMap();fontCatalog=null;session++;}
 // UXP DOM enum values may be distinct wrappers for the same value.
 function sameEnum(value,expected){return value!=null&&typeof value.equals==='function'?value.equals(expected):value===expected;}
 function mm(n) { return n + 'mm'; }
@@ -222,7 +223,15 @@ function check(doc,progress,repair=false){
     if(context&&context.records.some(r=>r.poisoned)){const message='자동 수정 원복 확인 실패: 새 문서를 만들어주세요.';errors.push(message);other.push({message,category:'BLOCKING',cause:'UNKNOWN',hint:message});}
     if(changed){D.step('check.autoFix.recompose',()=>doc.recompose(),progress);return check(doc,progress,false);}
     if(context)context.records.forEach(r=>r.initial=false);
-    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
+    const registered=registeredContexts.get(doc);
+    if(registered){const extra=require('./registered-native').check(registered,ID);errors.push(...extra.map(i=>i.message));other.push(...extra);}
+    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),fidelity:registered?{phase:registered.phase,records:registered.baseline.records}:undefined,autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
+}
+async function createRegistered(entry,article,open,progress){
+ const generation=session;latest=null;
+ const guard=()=>{if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 다시 제작해주세요.');};
+ try{const context=await require('./registered-native').create(entry,article,{ID,open,guard,inspect:doc=>check(doc,progress,false),progress});guard();registeredContexts.set(context.doc,context);latest=context.doc;return check(latest,progress,false);}
+ catch(e){if(e.registeredDocument&&e.registeredDocument.isValid)try{e.registeredDocument.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}throw e;}
 }
 async function create(raw,plan,progress){
     const generation=session;
@@ -288,7 +297,7 @@ function save(path,progress){
     const doc=D.step('save.latest',current,progress);
     const saved=D.step('save.Document.save',()=>doc.save(path),progress);
     // Document.save may close the original and return the newly opened copy.
-    if(saved&&saved.isValid)latest=saved;
+    if(saved&&saved.isValid){const context=registeredContexts.get(doc);if(context){require('./registered-native').rebind(context,saved);registeredContexts.set(saved,context);}latest=saved;}
     try{return check(current(),progress);}catch(e){throw D.failure('save.completed.postCheck',new Error(e.message));}
 }
 function exportPdf(path,progress){
@@ -307,4 +316,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress,true),progress),save,exportPdf};
+module.exports={create,createRegistered,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress,true),progress),save,exportPdf};

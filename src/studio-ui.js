@@ -36,7 +36,8 @@
     const editable=['autoTitle','autoSubtitle','autoBody','autoKicker','autoAuthor','pageWidth','pageHeight','pageMargin','pageBleed','bodySize','accent','publication','bodyFont','titleFont'];
     const safe=message=>D.redact(message,[$('apiKey').value].concat(state.images.map(im=>im.path)));
     status=(message,error)=>{$('studioStatus').textContent=safe(message);$('studioStatus').className='studio-status'+(error?' error':'');};
-    function read(){return {article:L.article({title:$('autoTitle').value,subtitle:$('autoSubtitle').value,body:$('autoBody').value,kicker:$('autoKicker').value,author:$('autoAuthor').value,images:state.images}),settings:L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value})};}
+    function inputArticle(raw){const value=L.article({...raw,images:[]});value.images=(raw.images||[]).map(im=>L.article({...raw,images:[im]}).images[0]);return value;}
+    function read(){return {article:inputArticle({title:$('autoTitle').value,subtitle:$('autoSubtitle').value,body:$('autoBody').value,kicker:$('autoKicker').value,author:$('autoAuthor').value,images:state.images}),settings:L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value})};}
     function fingerprint(a,s){return JSON.stringify({article:L.safeArticle(a),settings:s});}
     function fresh(){const v=read();if(!state.plans.length||state.signature!==fingerprint(v.article,v.settings))throw new Error('원고 또는 설정이 바뀌었습니다. 시안을 다시 만들어주세요.');return v;}
     function buttons(){
@@ -46,7 +47,7 @@
         let valid=false;try{const v=read();valid=state.plans.length>0&&state.signature===fingerprint(v.article,v.settings);}catch(e){}
         $('btnCreateAuto').disabled=state.busy||!valid||!adapter.native;
         $('btnSaveProject').disabled=state.busy||!valid;
-        const isCurrent=valid&&state.documentKey===state.signature+'|'+JSON.stringify(state.plans[state.selected]);
+        let isCurrent=false;try{isCurrent=(state.registeredEntry||valid)&&state.documentKey===documentKey();}catch(e){}
         ['btnSaveIndd','btnExportPdf','btnCheckAuto'].forEach(id=>$(id).disabled=state.busy||!state.hasDocument||!isCurrent||!adapter.native);
         $('btnExportPdf').disabled=$('btnExportPdf').disabled||!state.pdfReady;
         $('btnAI').disabled=state.busy||!adapter.native||!aiAvailable;
@@ -62,7 +63,7 @@
         for(const child of $('jsonDesignList').children)child.disabled=state.busy||child.designError===true;
         const p=state.plans[state.selected];
         if(!state.busy)inspectionUI(isCurrent&&state.hasDocument?state.report:null);
-        $('selectedDesign').textContent=valid&&p?'✓ 현재 선택: '+p.name+' · '+p.settings.width+' × '+p.settings.height+' mm':'원고·설정에 맞는 디자인을 먼저 선택해주세요.';
+        $('selectedDesign').textContent=state.registeredEntry?'등록 디자인 제작 대상: '+state.registeredEntry.profile.name:valid&&p?'✓ 현재 선택: '+p.name+' · '+p.settings.width+' × '+p.settings.height+' mm':'원고·설정에 맞는 디자인을 먼저 선택해주세요.';
         $('pdfReason').textContent=!adapter.native?'INDD/PDF는 InDesign 플러그인에서 사용할 수 있습니다.':!isCurrent||!state.hasDocument?'다음 단계: 선택한 디자인으로 새 문서를 만들어주세요.':state.busy?'작업 중입니다. 완료 후 다음 단계가 열립니다.':state.pdfReady?'✓ 기본 검사 통과 · PDF 내보내기 가능':state.report&&state.report.errors.length?'PDF 차단: 검사 오류 '+state.report.errors.length+'건을 안내에 따라 수정한 뒤 다시 검사해주세요.':'PDF 출력 전 문서 검사를 실행해주세요.';
         $('btnCheckAuto').textContent=state.report?'다시 검사':'문서 검사';
 
@@ -80,13 +81,13 @@
     function imageList(){
         const root=$('autoImages');root.textContent='';
         state.images.forEach((im,i)=>{const row=doc.createElement('div');row.className='image-row';const label=doc.createElement('span');label.textContent=im.name||im.path||('사진 '+(i+1));row.appendChild(label);const remove=doc.createElement('button');remove.textContent='삭제';remove.className='quiet';remove.addEventListener('click',()=>{if(state.busy||api.disposed)return;state.images.splice(i,1);imageList();changed();status('사진을 제거했습니다. 시안을 다시 만들어주세요.');});row.appendChild(remove);root.appendChild(row);});
-        $('imageCount').textContent=state.images.length+' / 2';
+        $('imageCount').textContent=state.images.length+'장 (별도 추가는 2장까지)';
     }
     function fill(a,s){
         const values={autoTitle:a.title,autoSubtitle:a.subtitle||a.pointText||'',autoBody:a.body,autoKicker:a.kicker||'ARTICLE',autoAuthor:a.author||'',pageWidth:s.width,pageHeight:s.height,pageMargin:s.margin,pageBleed:s.bleed,bodySize:s.bodySize,accent:s.accent,publication:s.publication,bodyFont:s.bodyFont,titleFont:s.titleFont};
         Object.keys(values).forEach(id=>$(id).value=values[id]);state.images=a.images||[];imageList();changed();
     }
-    function invalidateDocument(){state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
+    function invalidateDocument(){state.registeredEntry=null;state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
     function changed(){
         if(api.registration)api.registration.invalidate();
         $('wordCount').textContent=($('autoBody').value||'').length.toLocaleString()+'자';
@@ -150,7 +151,7 @@
             const button=element('button','candidate'+(i===state.selected?' selected':''));button.setAttribute('aria-pressed',i===state.selected?'true':'false');
             button.appendChild(element('span','candidate-num',String(i+1).padStart(2,'0')));
             button.appendChild(element('strong','',p.name+(i===state.selected?' ✓ 선택됨':'')));button.appendChild(element('span','candidate-desc',p.origin==='ai'?'AI 제안 · '+p.estimatedPages+'p 예상':p.estimatedPages+'p 예상'));
-            button.addEventListener('click',()=>{if(state.busy||api.disposed)return;try{fresh();state.selected=i;state.page=0;if(state.documentKey!==documentKey())$('productionStatus').textContent='';render();}catch(e){status(e.message,true);}});grid.appendChild(button);
+            button.addEventListener('click',()=>{if(state.busy||api.disposed)return;try{fresh();state.registeredEntry=null;state.selected=i;state.page=0;if(state.documentKey!==documentKey())$('productionStatus').textContent='';render();}catch(e){status(e.message,true);}});grid.appendChild(button);
         });
         renderLibrary();designInfo(plan);fontCurrent();$('designName').textContent=plan.name;$('designDescription').textContent=plan.description;
         $('pageIndicator').textContent=(state.page+1)+' / '+plan.pages.length;
@@ -176,7 +177,7 @@
                 button.addEventListener('click',()=>{if(api.disposed||state.busy)return;state.action='JSON 디자인 선택';return run(async()=>{
                     const v=read(),p=L.fromDesign(row.design,v.article);invalidateDocument();state.designIssues=[];state.designFontsChecked=false;
                     if(state.signature!==fingerprint(v.article,v.settings)){try{state.plans=L.candidates(v.article,v.settings);}catch(e){state.plans=[];}}
-                    state.plans=state.plans.filter(x=>x.origin!=='json');state.plans.push(p);state.selected=state.plans.length-1;state.page=0;state.signature=fingerprint(v.article,v.settings);render();
+                    state.registeredEntry=null;state.plans=state.plans.filter(x=>x.origin!=='json');state.plans.push(p);state.selected=state.plans.length-1;state.page=0;state.signature=fingerprint(v.article,v.settings);render();
                     if(adapter.validateDesignFonts){if(adapter.yieldUI)await adapter.yieldUI();if(api.disposed)return;const issues=await adapter.validateDesignFonts(p);if(api.disposed)return;state.designIssues=issues.filter(f=>f.error);state.designFontsChecked=true;designInfo(p);}
                     status(state.designIssues.length?'이 디자인에 필요한 폰트가 없습니다. 설정 → 폰트 더보기에서 제목/본문 대체 폰트를 선택해주세요.':'JSON 디자인을 선택했습니다. 사진이 없으면 이미지 프레임을 비워 둡니다.',!!state.designIssues.length);
                 });});}
@@ -201,13 +202,13 @@
     on('btnClear','click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];state.hasDocument=false;state.documentKey='';state.pdfReady=false;$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote','hostReport','jsonDesignInfo'].forEach(id=>$(id).textContent='');$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';renderLibrary();fontCurrent();status('새 원고를 입력해주세요.');}));
     on('btnLoadAuto','click',()=>run(async()=>{
         const result=await adapter.load();if(api.disposed)return;if(!result){status('불러오기를 취소했습니다.');return;}
-        const a=L.article(result.article),s=L.settings(result.settings||readSettingsOnly());
+        const a=inputArticle(result.article),s=L.settings(result.settings||readSettingsOnly());
         if(result.plan){L.validate(result.plan,a);if(result.plan.origin!=='json'&&JSON.stringify(L.settings(result.plan.settings))!==JSON.stringify(s))throw new Error('저장된 시안과 설정이 일치하지 않습니다.');}
-        fill(a,s);prepare();
+        fill(a,s);if(a.images.length<=2)prepare();else{state.plans=[];buttons();}
         if(result.plan){state.plans.push(result.plan);state.selected=state.plans.length-1;render();}
         const issues=result.plan&&result.plan.origin==='json'&&adapter.validateDesignFonts?await adapter.validateDesignFonts(result.plan):adapter.validateFonts?await adapter.validateFonts(s):[];if(api.disposed)return;
         const missing=issues.filter(f=>f.error);if(result.plan&&result.plan.origin==='json'){state.designIssues=missing;state.designFontsChecked=!!adapter.validateDesignFonts;designInfo(result.plan);}
-        status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.name?f.name.replace(/\t/g,' — ')+': ':f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. 사진과 추출된 내용을 확인해주세요.',!!missing.length);
+        status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.name?f.name.replace(/\t/g,' — ')+': ':f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. '+(result.article.images||[]).filter(im=>im.source==='docx').length+'장 Word 이미지 감지 · '+(result.warnings||[]).join(' / '),!!missing.length);
     }));
     function readSettingsOnly(){try{return L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value});}catch(e){return L.DEFAULTS;}}
     on('btnAddImage','click',()=>run(async()=>{if(state.images.length>=2)throw new Error('사진은 최대 2장입니다.');const im=await adapter.image();if(api.disposed)return;if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));
@@ -293,13 +294,14 @@
         state.hasDocument=true;state.report=report;
         state.pdfReady=report.errors.length===0;
         $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n')+(report.issues?'\n'+report.issues.map(i=>[i.category||'',i.cause||'',i.role||'',i.detail||''].join(' · ')).join('\n'):''):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
+        if(report.fidelity)$('hostReport').textContent+='\n원본 재현 비교\n'+safe(JSON.stringify(report.fidelity,null,2));
         if(report.autoFixes&&report.autoFixes.length)$('hostReport').textContent+='\n자동 수정 기록\n'+safe(JSON.stringify(report.autoFixes,null,2));
         if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
         else status(label+(report.errors.length?' 완료 · 검사 오류가 있어 PDF를 차단했습니다. 수정 후 문서 검사를 다시 실행해주세요.':' 성공'),!!report.errors.length);
     }
-    function documentKey(){return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
+    function documentKey(){if(state.registeredEntry)return 'registered|'+state.registeredEntry.descriptor.id+'|'+state.registeredEntry.original.metadata.sourceSha256+'|'+JSON.stringify(L.safeArticle(read().article));return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
     function requireCurrentDocument(){
-        fresh();
+        if(!state.registeredEntry)fresh();
         if(!state.hasDocument||state.documentKey!==documentKey())throw new Error('현재 원고와 시안으로 새 문서를 먼저 만들어주세요.');
     }
     function production(label,action){return run(async()=>{
@@ -332,7 +334,7 @@
     if($('modeStudio'))on('modeStudio','click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});
     diagnostic('Events binding complete · '+listeners.length+' listeners');
     fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
-    Object.assign(api,{read,state,prepare,diagnostics});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
+    Object.assign(api,{read,state,prepare,diagnostics,createRegistered:(entry,article)=>production('등록 디자인 제작',async progress=>{invalidateDocument();if(!adapter.createRegistered)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredEntry=entry;const key=documentKey();const report=await adapter.createRegistered(entry,article,progress);if(api.disposed)return;state.documentKey=key;return report;})});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
     }catch(e){diagnostic('Studio init 실패: '+e.message);api.destroy();const el=$('studioStatus');if(el)el.textContent='Studio init 실패: '+D.redact(e.message);throw e;}
  }
  return {mount,SAMPLE};

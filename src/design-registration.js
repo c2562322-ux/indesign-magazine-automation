@@ -28,7 +28,7 @@ function draft(model,pageId,name){
  const errors=Model.validate(model);if(errors.length)throw new Error(errors.join('; '));
  if(!model.pages.some(p=>p.id===pageId&&p.kind==='Spread'))throw new Error('일반 페이지를 선택해주세요.');
  const d={id:model.metadata.sourceSha256.slice(0,16)+'-'+pageId,name:name||pageId,sourceSha256:model.metadata.sourceSha256,pageIds:[pageId],roles:{},images:{},preserveElementIds:[]};
- for(const e of frames(model,pageId)){const c=candidates(model,e)[0];if(c.confirmed)confirm(d,e.id,c.role);}
+ for(const e of frames(model,pageId)){const c=candidates(model,e)[0];if(c.confirmed&&!/^image/.test(c.role))confirm(d,e.id,c.role);else confirm(d,e.id,'keep');}
  return d;
 }
 function confirm(d,id,role,requirement){
@@ -42,7 +42,7 @@ function confirm(d,id,role,requirement){
 function gate(entry){
  // A saved file cannot grant itself production authorization. Full renderer/readback is pending.
  return {state:entry.profile.readyForMatching?'READY_FOR_FIDELITY_TEST':'ROLE_MAPPING_REQUIRED',productionReady:false,
-  reasons:entry.profile.issues.concat('전체 지면 Host 재현 미검증 · 분석/단일 프레임 검증만 가능')};
+  reasons:entry.profile.issues.concat('실제 Host Fidelity 검사 전 · 검증 제작 가능, 출력은 검사 결과에 따름')};
 }
 function register(model,descriptor){const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
 function recommendations(entries,article,fonts){const result=Match.rank(entries,article,{installedFonts:fonts});return {...result,candidates:result.candidates.slice(0,3),selectedId:null};}

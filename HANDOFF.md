@@ -1,3 +1,81 @@
+# HANDOFF — 중간 작업 보존 (2026-09-30)
+
+> **WIP / 미완성. 사용자 요청으로 개발 중단. 새 계정에서는 이 절을 먼저 읽으세요.**
+> 이전 아래 절은 역사적 기록입니다. 이번 작업을 Adobe 실기 성공 또는 제작 완료로 해석하지 마세요.
+
+## A–C. 목적 / 기준 / 시작 상태
+- 제품 목적: DOCX 글·이미지와 기존 디자이너 디자인을 구조적으로 비교 → 사용자 선택 → 원본 디자인 유지·콘텐츠 교체 → 검사 → INDD/PDF. AI API 불필요.
+- 브랜치 `codex/magazine-studio-1.1`; 시작 HEAD `47e0822088813ca5d282abe954fe78a40d5e4b04`.
+- 시작 main 및 중단 전 main: `ce20690bd6d32facfd4f5658dfd2ac696473a762`. main 변경 금지.
+- 시작: v2 모델/역할 확인/등록/추천/overlay/단일 프레임 proof, Node173/Python15. 전체 등록 디자인 제작 미연결.
+- 시작부터 있던 미추적 사용자 파일: `sample/magazine-design.indd`. 그대로 보존, stage 금지.
+- 이번 보존 커밋은 본 문서를 포함하는 `WIP: preserve DOCX-to-design production work for handoff`; 정확한 SHA는 `git log -1`로 확인. SHA 자기참조를 위해 추가 커밋하지 않음.
+
+## D–F. 구현 상태 (완료 = 코드/자동 검증 범위, Adobe 성공 아님)
+| 항목 | 상태 | 실제 범위 |
+|---|---|---|
+| DOCX relationship·등장 순서·중복 제거·PNG/JPEG 크기/비율 | 완료(제한된 형식) | 신규 11개 테스트 중 관련 테스트 통과. VML/외부/장식은 경고/제외 |
+| 글+이미지 Article Profile | 완료(코드) | 기존 텍스트 분석 + 이미지 순서/문단위치/픽셀 크기. 네이티브 파일 추출 실기 필요 |
+| 여러 기존 디자인 비교/최대3 추천/사용자 선택 | 기존 완료 + 일부 수정 | API 없이 기존 코어 사용. 낮은 추정 ppi 경고 추가, 라이브러리 import 병합 |
+| Role UX | 부분 완료 | 핵심 6개 슬롯 선택, 나머지 기본 keep, 상세 기존 화면 유지. 브라우저 직접 재검증 미완료 |
+| 추천 → 실제 제작 | 부분 완료 | 새 UI→Studio→native adapter→임시 IDML open→검사 연결. Adobe 미검증 |
+| 원본 Fidelity | 부분 완료 | 실제 원본 XML158개 재직렬화 대조 차이0(내부 라벨 제외), CRC 정상. Host typography/geometry readback 코드+Mock. 전체 그래픽 fidelity 보장 아님 |
+| TITLE/SUBTITLE/BODY 콘텐츠 교체 | 부분 완료 | 동일 effective run 스타일만 허용. 혼합 스타일/선택 밖 story 연결은 거부 |
+| IMAGE 슬롯 교체 | 부분 완료 | 확정 슬롯만 place, 원본 fitting 옵션 요청. 실제 사진/고정 장식 보존 실기와 세부 회귀 테스트 부족 |
+| 검사·INDD·PDF 연결 | 부분 완료 | 기존 latest/check/save/export 경로 재사용. Fidelity 실패/overflow 차단 코드. 실제 저장/PDF 미검증 |
+| Adobe 실제 E2E·시각 Fidelity | 아직 시작하지 않음 | 실제 Adobe 접근 불가. 이번 브라우저 열기 도구도 사용자가 중단 |
+| 등록 디자인 Auto Fix / 혼합 run 재분배 | 아직 시작하지 않음 | 보수적으로 등록 디자인 autoFixAllowed=false; 기존 v1 Auto Fix 유지 |
+
+## G–H. 현재 코드 구조 / DOCX
+- **신규** `src/docx-media.js`: document.xml + document.xml.rels의 DrawingML embed 추적. media 전체 스캔 안 함. 실제 등장 중복은 occurrences로 보존하고 같은 파일은 하나의 사진으로 처리. 명시적 decorative/behindDoc 제외. 32장/32MB 제한. PNG/JPEG만 지원, EXIF는 dimensions unknown 가능. conventional w/a/r/wp namespace prefix 중심이라는 한계.
+- `studio.js`: UXP data folder에 추출 이미지 저장; path/handle을 Article에 연결. Reload guard. 실제 파일 권한/쓰기/배치는 미검증.
+- `preview.js`, `preview.html`, `src/image-dimensions.js`: 브라우저 DOCX 이미지 Blob preview와 UMD 연결. 직접 브라우저 검증은 미완료.
+- `src/layout-engine.js`: 기존 무료 시안 2장 제한 유지, DOCX 이미지 metadata 보존 필드 추가.
+- `src/studio-ui.js`: 등록 원고는 2장 초과 분석 가능; free prepare 제한. registeredEntry/documentKey, 공통 production wrapper 연결. 이미지 3장 이상 시 이전 preview 잔존 여부 등 실제 UI 후속 점검 필요.
+
+## I–K. Design Library / 원본 / 역할
+- 두 기존 실제 source model 유지: 기존 일반14쪽 + 센트럴 일반11쪽 = 25개 페이지 분석 대상. **25개 모두 제작승인된 디자인이라는 뜻 아님.** UI 저장 등록 수는 사용자가 불러온 라이브러리에 따라 다름. 원본을 번들에 커밋하지 않음.
+- `src/design-registration.js`: 미지정은 기본 KEEP_AS_IS. 명시적 역할 외 TITLE/BODY를 임의 확정하지 않음.
+- `src/design-registration-ui.js`: 핵심 슬롯 title/subtitle/body/image1/image2/caption, 상세 프레임 접기. import는 기존 entry를 유지하며 ID별 병합. 추천 선택에 entry/article 연결, 제작 버튼 추가.
+- 참고 분석용 로컬 등록 파일: `assets/templates/working/e2e-reference.review.json` (이번 생성, ignored). 기존 원본 page u335e: title u7c7e / subtitle u7caf / body u7c96 / image1 u7c78. 원문의 명확한 placeholder를 보고 만든 **개발자 검토용 매핑**이며 디자이너 승인/Adobe 검증 아님.
+- 같은 페이지의 대표이미지 텍스트 u7dba 등 비역할 객체는 그대로 유지. 다른 샘플/페이지 삭제 안 함.
+
+## L–P. Fidelity / 추천 / 제작 / 출력
+- **신규** `src/package-xml.js`: raw XML tree→namespace XML→stored ZIP, CRC. XML attribute tab/newline numeric escape 수정(실제 원본 대조로 발견). 데이터 좌표 재계산/복제 없음.
+- **신규, 미완성** `src/registered-native.js`: sourceXml 복제→Page/PageItem에 별도 private key label→임시 IDML→InDesign native importer. 원본을 열거나 수정하지 않음. 임시 복원 문서에서 선택 밖 페이지 제거(원본 아님). source binary 누락은 거부.
+- STEP A: 원본 XML import 후 geometry/run typography/frame columns/gutter/inset + 기존 검사. 실패하면 콘텐츠 교체 없이 Fidelity 오류와 Auto Fix 금지.
+- STEP B: 동일 스타일 story만 교체, font/size/leading/tracking 등 native 값을 재적용, 슬롯 이미지만 place/기존 fitting 요청, recompose→content 검사.
+- `src/auto-indesign.js`: registeredContexts WeakMap, createRegistered, 기존 검사에 fidelity/content issues 추가, 기존 save 반환 문서의 frame rebind. latest/state/session 보호 재사용.
+- `src/design-matching.js`: pixel aliases/순서/문단 위치와 낮은 추정ppi soft 경고. 정확한 인쇄 품질 보장 아님.
+- 일반 생성 경로의 leading fallback은 이번 작업에서 변경하지 않음. 등록 경로는 source XML/native style 상속을 사용하지만 Host 모든 상속/override 보존은 미검증.
+- static library productionReady는 여전히 false. 런타임 통과만으로 디자인 전체 영구 승인하지 않음. PDF 기존 재검사/차단 유지.
+
+## Q–R. 검증 결과와 미검증
+- 중단 후 재실행: **Node184/184 (기존173 + 신규11), 실패0, skip0; Python15/15, 실패0**. `git diff --check` 통과(LF→CRLF 안내만 있음).
+- `package.json`의 npm test 목록에 신규 `tests/registered-production.test.js` 포함. 이 PC에서 npm 대신 동일 `node --test` 명령 실행.
+- 신규 테스트: DOCX 순서/중복/장식/경로 거부/치수/profile, ZIP CRC/XML, 원본 실패→콘텐츠 미교체, geometry mismatch, content overflow 구분, stale open cleanup. **모든 요구 시나리오를 완성한 테스트 세트 아님.**
+- 실제 기존 IDML과 로컬 e2e-reference.idml의 XML158개 비교 차이0(추가 식별 라벨/빈 wrapper 정규화 제외; container 제외). 패키지 CRC 오류 없음. 전체 네이티브 importer 검증은 아님.
+- 이번 브라우저 실행 도구는 사용자 중단으로 완료 못함. 실제 버튼 조작 확인 안 함. 테스트용 http.server 세션은 중단 시 Ctrl+C로 종료.
+- 아직 Adobe에서 app.open/페이지삭제/label 보존/폰트/style 범위/그룹·Parent·z-order/고정 이미지/저장·PDF/Reload 확인 안 함.
+
+## S. NEXT STEP — 새 계정이 가장 먼저 할 일
+1. 브랜치/HEAD/status 확인 후 이 문서와 diff를 읽기. **WIP이므로 사용자에게 완료판이라고 안내하지 말기.** 개인 샘플은 새 clone에 없으므로 별도 안전하게 전달받기.
+2. `src/registered-native.js` 우선 코드 감사: import 후 선택 페이지 축소가 spread/Parent/공유 객체/thread에 미치는 영향, readback에서 누락된 fill/stroke/layer/z-order/graphics, uniform 스타일 교체 시 keep/rule/기타 override 보존. 혼합 스타일 거부 정책 유지.
+3. `src/package-xml.js`/packagePlan 실제 XML fixture 회귀 추가: container 중복 방지·속성 tab/newline(현재 로컬 대조만으로 확인). private 모델을 테스트에 커밋하지 말기.
+4. `src/docx-media.js` namespace/빈 문단 subtitle index/EXIF/중복의미/실제 DOCX fixtures 보강. UXP 파일 쓰기/이미지 place 확인.
+5. `src/studio-ui.js`/registration UI 직접 실행: >2장 입력, free↔JSON↔registered 선택·stale document·Reload·실패 재시도. 등록 create→기존 check/save/PDF Mock통합 테스트 보강.
+6. 기준 페이지를 **사용자가 역할 확인**한 뒤 Adobe에서 source fidelity 먼저 확인. 원본 단계 overflow/mismatch면 콘텐츠/Auto Fix로 숨기지 말기. content replacement 이후 별도 검사.
+7. 위 점검 후에만 완성 개발을 이어가기. 이번 커밋은 중간 보존이며 개발 확대 승인으로 해석하지 말기.
+
+## T–U. 보호 / 제외 / 파일 보존
+- main/reset/clean/force push 금지. 기존 시작페이지/Inspector/목차/무료·JSON·AI/폰트/Reload/Auto Fix 회귀 금지. 테스트 완화 금지.
+- 원본 INDD/IDML, 개인 Word/이미지/추출 XML 모델, API키, cache는 수정/커밋하지 않음.
+- 이번 신규 개인 파생물(모두 ignored·로컬 보존): `assets/templates/working/e2e-reference.review.json`, `assets/templates/working/e2e-reference.idml`. GitHub에 없으므로 다른 PC/계정은 별도 파일 전달 필요.
+- 기존 개인 모델 `original-model-final.json`, `central-model-final.json` 및 working 내 분석/원본 복사본은 그대로 보존.
+- staged 파일은 시작 시 없음. 보존 대상은 코드15개 + HANDOFF/WORKLOG; sample/magazine-design.indd는 미추적 그대로 남김.
+
+---
+
 # HANDOFF — 1.1.0
 
 ## 최신 상태 — 등록 디자인 역할 확인/추천 검증판

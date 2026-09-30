@@ -19,7 +19,11 @@ async function load(){
    const data=JSON.parse((await f.read()).replace(/^\uFEFF/,''));
    if(data.schemaVersion===1 && data.article)result={article:data.article,settings:data.settings,plan:data.plan};
    else result={article:Input.parse(f.name,JSON.stringify(data))};
- }else result={article:Input.parse(f.name,await f.read(/\.docx$/i.test(f.name)?{format:U.storage.formats.binary}:undefined))};
+ }else if(/\.docx$/i.test(f.name)){
+   const expected=token;result=require('./src/docx-media').extract(await f.read({format:U.storage.formats.binary}));guard(expected);
+   if(result.article.images.length){const base=await fs.getDataFolder();const folder=await base.createFolder('docx-'+Date.now()+'-'+Math.random().toString(36).slice(2));guard(expected);
+    for(let i=0;i<result.article.images.length;i++){const im=result.article.images[i],out=await folder.createFile('image-'+(i+1)+(im.mimeType==='image/png'?'.png':'.jpg'));await out.write(im.bytes.buffer.slice(im.bytes.byteOffset,im.bytes.byteOffset+im.bytes.byteLength),{format:U.storage.formats.binary});guard(expected);im.path=out.nativePath;im.extractedPathOrHandle=out.nativePath;delete im.bytes;}}
+ }else result={article:Input.parse(f.name,await f.read())};
  (result.article.images||[]).forEach(im=>{im.path=Input.resolve(f.nativePath,im.path);im.preview=previewPath(im.path);});
  return result;
 }
@@ -38,6 +42,7 @@ Studio.mount({registration:api=>require('./src/design-registration-ui').mount(do
  proof:async plan=>{guard();const ID=require('indesign'),proof=require('./src/design-model-host');const handle=proof.create(plan,ID);const generated=proof.readback(handle,ID);return {original:proof.comparisonTarget(plan),generated,comparison:require('./src/design-model').compare(proof.comparisonTarget(plan),generated),overflows:!!handle.frame.parentStory.overflows,omitted:plan.omitted};}
 }),designs:async()=>{const folder=await fs.getPluginFolder();return require('./src/json-design.js').load(async name=>(await folder.getEntry('designs/'+name)).read());},validateDesignFonts:Host?Host.validateDesignFonts:undefined,native:!!Host,hostError,resetSession,dispose,invalidateDocument:()=>{if(Host&&Host.invalidateDocument)Host.invalidateDocument();},yieldUI:()=>new Promise(resolve=>setTimeout(resolve,0)),load,image:async()=>{const f=await fs.getFileForOpening({types:['png','jpg','jpeg']});if(!f)return null;let size={};try{const metadata=await f.getMetadata();if(metadata.size<=32*1024*1024)size=require('./src/image-dimensions').dimensions(await f.read({format:U.storage.formats.binary}));}catch(e){/* Unknown dimensions never block photo selection. */}return {path:f.nativePath,name:f.name,preview:previewPath(f.nativePath),...size};},fonts:refresh=>{guard();if(!Host)throw new Error('Host를 초기화하지 못했습니다.');return Host.listFonts(refresh);},validateFonts:Host?Host.validateFonts:undefined,
  saveProject:obj=>saveAs('magazine-project.json',['json'],async f=>{await f.write(JSON.stringify(obj,null,2));return true;}),
+ createRegistered:async(entry,article,progress)=>{guard();const expected=token;return Host.createRegistered(entry,article,async bytes=>{guard(expected);const folder=await fs.getTemporaryFolder();const f=await folder.createFile('registered-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.idml');await f.write(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),{format:U.storage.formats.binary});guard(expected);return require('indesign').app.open(f.nativePath,true);},progress);},
  create:(...args)=>{guard();return Host.create(...args);},check:(...args)=>{guard();return Host.check(...args);},
  saveIndd:progress=>saveProduction('magazine-design.indd',['indd'],(path,cb)=>Host.save(path,cb),progress),
  exportPdf:progress=>saveProduction('magazine-design.pdf',['pdf'],(path,cb)=>Host.exportPdf(path,cb),progress)});

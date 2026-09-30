@@ -1145,3 +1145,8 @@
 - 실제 IDML 두 종 raw XML 대조 통과. 기존14/신규11쪽 모두 미승인 역할로 추천 확정 안 함. 원문 불변 확인.
 - 브라우저 직접 실행: 신규14.8MB 모델 불러오기, 11개 일반 페이지, 첫 페이지 이미지 원본유지 등록, 제목/본문/폰트 확인 필요 결과, Reload/무료3안. 처리 중 메시지 잔존 수정. 파일 선택 도구 지연 관찰(플러그인 원인 미확정).
 - 전체 Node173(기존160+13)/Python15. 실제 Adobe proof/full document 미검증. 원본 재현 완료/productionReady 선언 안 함. 상세 docs/DESIGN_REGISTRATION.md.
+
+
+## 2026-09-30 — WIP handoff / user-requested stop
+
+Stopped feature development at user request. Preserved DOCX media extraction, partial native IDML reconstruction/content replacement and registered production wiring. Node184/Python15 pass; no Adobe verification, browser attempt interrupted. Source XML158 comparison passed excluding private labels/container. HANDOFF.md now documents partial status, gaps, private local files and NEXT STEP. No original samples or personal extracted models staged.

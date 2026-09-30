@@ -9,8 +9,9 @@ window.magazineApp=MagazineStudio.mount({registration:api=>MagazineRegistrationU
  if(file.size>32*1024*1024)throw new Error('원고 파일은 최대 32MB입니다.');
  let result;
  if(/\.json$/i.test(file.name)){const obj=JSON.parse(await file.text());result=obj.schemaVersion===1?{article:obj.article,settings:obj.settings,plan:obj.plan}:{article:Input.parse(file.name,JSON.stringify(obj))};}
- else result={article:Input.parse(file.name,/\.docx$/i.test(file.name)?await file.arrayBuffer():await file.text())};
- (result.article.images||[]).forEach(im=>{im.preview='';});return result;
+ else if(/\.docx$/i.test(file.name)){result=MagazineDocxMedia.extract(await file.arrayBuffer());for(const im of result.article.images){im.preview=URL.createObjectURL(new Blob([im.bytes],{type:im.mimeType}));im.path=im.originalName;delete im.bytes;}}
+ else result={article:Input.parse(file.name,await file.text())};
+ (result.article.images||[]).forEach(im=>{if(im.source!=='docx')im.preview='';});return result;
 },image:async()=>{
  const file=await pick('image/png,image/jpeg');if(!file)return null;
  const preview=URL.createObjectURL(file),img=new Image();img.src=preview;await img.decode();

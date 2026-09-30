@@ -1,3 +1,4 @@
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.MagazineImageDimensions=factory();})(typeof window!=='undefined'?window:this,function(){
 'use strict';
 // Header-only metadata. JPEG with EXIF is unknown until orientation is resolved;
 // never silently swap or guess dimensions. Malformed/unsupported data is harmless.
@@ -17,4 +18,5 @@ function dimensions(bytes){
   return exif?{}:found||{};
  }catch(e){return {};}
 }
-module.exports={dimensions};
+return {dimensions};
+});

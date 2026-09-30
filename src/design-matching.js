@@ -11,7 +11,7 @@ const originals=new WeakSet();
 function immutable(model){if(originals.has(model))return model;const value=freeze(clone(model));originals.add(value);return value;}
 const count=text=>Array.from(String(text||'')).length;
 function imageProfile(image={}){
-    const width=image.width,height=image.height;
+    const width=image.width||image.widthPx,height=image.height||image.heightPx;
     if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return {known:false,width:null,height:null,aspectRatio:null,orientation:'unknown'};
     const ratio=width/height;
     return {known:true,width,height,aspectRatio:ratio,orientation:Math.abs(ratio-1)<.05?'square':ratio>1?'landscape':'portrait',source:'supplied-pixel-dimensions'};
@@ -21,7 +21,7 @@ function articleProfile(article){
         return {characters:chars,words:text.trim()?text.trim().split(/\s+/u).length:0,paragraphs:paragraphs.length,averageParagraphLength:paragraphs.length?chars/paragraphs.length:0,
             cjkFraction:chars?(text.match(/[\u3000-\u9fff\uac00-\ud7af]/g)||[]).length/chars:0};};
     return {schema:'magazine-article-profile/v1',title:metrics(article.title),subtitle:metrics(article.subtitle),body:metrics(article.body),
-        subtitlePresent:!!String(article.subtitle||'').trim(),captionPresent:!!String(article.caption||'').trim(),images:(article.images||[]).map(imageProfile),imageCount:(article.images||[]).length,
+        subtitlePresent:!!String(article.subtitle||'').trim(),captionPresent:!!String(article.caption||'').trim(),images:(article.images||[]).map(im=>({...imageProfile(im),documentOrder:im.documentOrder??null,paragraphPosition:im.paragraphIndex??null})),imageCount:(article.images||[]).length,
         category:typeof article.category==='string'?article.category:null};
 }
 function parseArticle(name,bytes,images=[]){
@@ -171,7 +171,7 @@ function evaluate(entry,article,{installedFonts=null}={}){
     for(const slot of p.imageSlots){const index=Number(slot.role.slice(-1))-1,image=a.images[index];
         if(!image&&slot.requirement==='required')add(hard,'MISSING_IMAGE',slot.role+' 필수 사진이 없습니다.');
         if(image){if(!image.known)add(review,'IMAGE_DIMENSIONS_UNKNOWN','사진 비율 확인 필요');
-            else {const retained=Math.min(image.aspectRatio/slot.aspectRatio,slot.aspectRatio/image.aspectRatio);
+            else {const ppi=Math.min(image.width/(slot.width/72),image.height/(slot.height/72));if(ppi<150)add(soft,'IMAGE_RESOLUTION','사진 '+(index+1)+' 해상도가 슬롯 크기에 비해 낮습니다 (추정 '+Math.round(ppi)+' ppi).',10);const retained=Math.min(image.aspectRatio/slot.aspectRatio,slot.aspectRatio/image.aspectRatio);
                 if(retained<.8)add(soft,'IMAGE_RATIO','사진과 슬롯 비율 차이: 크롭/여백 확인 필요',Math.round((1-retained)*15));
                 else reasons.push('사진 '+(index+1)+' 비율이 슬롯에 가깝습니다.');}}
     }

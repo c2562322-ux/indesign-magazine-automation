@@ -59,7 +59,8 @@
         const images = input.images || (input.heroImage ? [{ path: input.heroImage }] : []);
         if (!Array.isArray(images) || images.length > 2) throw new Error('현재 버전은 기사당 사진을 최대 2장 지원합니다.');
         a.images = images.map((im, i) => ({ path: txt(im.path), name: txt(im.name || '사진 ' + (i + 1)),
-            preview: txt(im.preview), width: Number(im.width) || 0, height: Number(im.height) || 0 }));
+            preview: txt(im.preview), width: Number(im.width||im.widthPx) || 0, height: Number(im.height||im.heightPx) || 0,
+            ...Object.fromEntries(['source','originalName','mimeType','widthPx','heightPx','aspectRatio','orientation','documentOrder','paragraphIndex','occurrences'].filter(k=>im[k]!==undefined).map(k=>[k,im[k]])) }));
         return a;
     }
     function units(text) {
