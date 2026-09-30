@@ -62,6 +62,7 @@
             encoding:'Undefined and non-finite numbers use __diagnosticType tagged objects; null is not a missing-value substitute.',
             selectedDesign:descriptor?{id:descriptor.id,name:descriptor.name,pageIds:descriptor.pageIds,sourceSha256:original.metadata.sourceSha256}:null,
             fidelityErrorCount:errors.length,reportedErrorCount:report&&report.errors?report.errors.length:hostFailure?1:0,
+            differenceSummary:fidelityRows(report||{}).reduce((groups,row)=>{const property=row.path.replace(/\.runs\.\d+/g,'.runs.*'),key=row.classification+' '+property;groups[key]=(groups[key]||0)+1;return groups;},{}),
             contentOverflowCount:issues.filter(i=>i.cause==='CONTENT_OVERFLOW').length,errors,
             comparisons:(report&&report.fidelity&&report.fidelity.records||[]).map(r=>({...context(r.elementId),role:r.role||null,original:r.original,generated:r.generated,comparison:r.comparison,readbackFailure:r.readbackFailure||null})),
             rawReport:report||null,hostFailure:hostFailure?{message:hostFailure.message,registeredFailure:failure||null}:null,trace};

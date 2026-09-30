@@ -256,3 +256,25 @@ test('scalar Character inspection detects interior font differences before any c
  assert.equal(c.phase,'FIDELITY_FAILED');assert.equal(story.contents,original);assert.equal(c.autoFixAllowed,false);
  assert.ok(c.baseline.records.some(r=>r.comparison.differences.some(d=>d.path.includes('FontStyle'))));
 });
+
+test('locale normalization uses Adobe keys and untranslated language names without weakening typography',()=>{
+ const F=require('../src/registered-fidelity'),ID={app:{translateKeyString:k=>({'$ID/Metrics':'메트릭','$ID/Optical':'광학'})[k]||k}};
+ assert.deepEqual(F.canonicalPair('KerningMethod','$ID/Metrics','메트릭',ID),{expected:'Metrics',actual:'Metrics'});
+ assert.equal(F.directCompare({kerningMethod:'메트릭',appliedLanguage:{name:'한국어',untranslatedName:'Korean'}},{KerningMethod:'Metrics',AppliedLanguage:'$ID/Korean'},ID).comparison.equal,true);
+ assert.equal(F.directCompare({appliedLanguage:{name:'독일어',untranslatedName:'German: 2006 Reform'}},{AppliedLanguage:'German: 2006 Reform'},ID).comparison.equal,true);
+ assert.equal(F.directCompare({kerningMethod:'광학'},{KerningMethod:'Metrics'},ID).comparison.equal,false);
+ assert.equal(F.directCompare({appliedLanguage:{name:'영어',untranslatedName:'English: USA'}},{AppliedLanguage:'Korean'},ID).comparison.equal,false);
+ assert.equal(F.directCompare({fontStyle:'메트릭'},{FontStyle:'Metrics'},ID).comparison.equal,false);
+ assert.equal(F.directCompare({kerningMethod:'메트릭'},{KerningMethod:'Metrics'},{}).comparison.equal,false);
+ assert.throws(()=>F.canonicalPair('KerningMethod','Metrics','메트릭',{app:{translateKeyString(){throw new Error('Host translation failed');}}}),/Host translation failed/);
+});
+test('localized kerning passes both resolved typography and direct override gates in native production',async()=>{
+ const entry=fixture();for(const s of entry.original.stories)for(const p of s.paragraphs)for(const r of p.runs){r.resolvedProperties.KerningMethod='Metrics';r.properties.KerningMethod='Metrics';}
+ const h=host(entry);h.ID.app.translateKeyString=k=>k==='$ID/Metrics'?'메트릭':k;
+ for(const f of h.frames)if(f.parentStory)f.parentStory.texts.item(0).kerningMethod='메트릭';
+ const c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0);
+});
+test('diagnostic groups remaining differences without dropping full evidence',()=>{
+ const D=require('../src/production-diagnostics'),report={fidelity:{records:[{elementId:'x',comparison:{differences:[{path:'$.runs.0.PointSize',expected:12,actual:13},{path:'$.runs.1.PointSize',expected:12,actual:13}]}}]}};
+ const out=D.fidelityDiagnostic(report);assert.equal(out.differenceSummary['TYPOGRAPHY_MISMATCH $.runs.*.PointSize'],2);assert.equal(out.comparisons[0].comparison.differences.length,2);
+});

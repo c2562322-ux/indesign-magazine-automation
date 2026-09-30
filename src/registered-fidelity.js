@@ -100,13 +100,27 @@ function restore(target,values){
  for(const key of ['appliedFont','fontStyle'])if(Object.prototype.hasOwnProperty.call(values,key))target[key]=values[key];
  for(const [key,v] of Object.entries(values))if(!['appliedFont','fontStyle'].includes(key))target[key]=v;
 }
+// Only Adobe-owned localized properties use this conversion. Unknown values stay unequal.
+function canonicalPair(key,expected,actual,ID){
+ const strip=v=>typeof v==='string'?v.replace(/^\$ID\//,''):v;
+ if(key==='AppliedLanguage')return {expected:strip(expected),actual:strip(actual&&actual.untranslatedName||actual&&actual.name||actual)};
+ if(key!=='KerningMethod')return {expected,actual};
+ const e=strip(expected),a=strip(actual);
+ if(e===a)return {expected:e,actual:a};
+ const app=ID&&ID.app;
+ if(typeof e==='string'&&typeof a==='string'&&app&&typeof app.translateKeyString==='function'){
+  const translated=app.translateKeyString('$ID/'+e);
+  if(typeof translated==='string'&&translated===actual)return {expected:e,actual:e};
+ }
+ return {expected:e,actual:a};
+}
 function directCompare(source,properties,ID){
  const expected={},actual={};for(const k of directKeys(properties)){
   const v=properties[k],got=source[hostKey(k)];
   // Numeric/boolean overrides are compared against their source, without defaults.
   if(typeof v==='number'||typeof v==='boolean'){expected[k]=v;actual[k]=value(got);}
   else if(k==='AppliedFont'){expected[k]=v;actual[k]=got&&got.fontFamily;}
-  else if(k==='AppliedLanguage'){expected[k]=String(v).replace(/^\$ID\//,'');actual[k]=got&&String(got.name).replace(/^\$ID\//,'');}
+  else if(k==='AppliedLanguage'||k==='KerningMethod'){const pair=canonicalPair(k,v,got,ID);expected[k]=pair.expected;actual[k]=pair.actual;}
   else if(k==='Justification'){expected[k]=v;actual[k]=Object.keys(Model.ALIGN).find(n=>enumEqual(got,(ID.Justification||{})[Model.ALIGN[n]]));}
   else if(k==='Leading'&&v==='Auto'){expected[k]='Auto';actual[k]=enumEqual(got,ID.Leading.AUTO)?'Auto':value(got);}
   else if(typeof v==='string'&&typeof got==='string'){expected[k]=k==='KerningMethod'?v.replace(/^\$ID\//,''):v;actual[k]=k==='KerningMethod'?got.replace(/^\$ID\//,''):got;}
@@ -114,4 +128,4 @@ function directCompare(source,properties,ID){
  }
  return {expected,actual,comparison:Model.compare(expected,actual)};
 }
-module.exports={applicability,na,noPaint,list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};
+module.exports={canonicalPair,applicability,na,noPaint,list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};

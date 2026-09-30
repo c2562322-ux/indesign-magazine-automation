@@ -1,3 +1,16 @@
+# Locale false positive 수정 — 실기 재검증 필요 (2026-09-30)
+
+- 사용자 실제 Host 보고: 811 differences 중 Metrics/메트릭 및 Korean/한국어 반복. 최신811 전체 JSON 미수신으로 다른 종류/잔여 개수는 확정하지 않음.
+- 원인: resolved KerningMethod와 direct override가 $ID/ 제거 후 raw string 비교, AppliedLanguage는 localized name 비교. 문자별 검사에서 반복 증폭.
+- 등록 Fidelity 경로에 한정한 canonicalPair: KerningMethod는 Adobe app.translateKeyString('$ID/'+원본키)와 실제 Host 값의 정확한 대응이 확인될 때만 원본키로 정규화. 언어는 Language/LanguageWithVendors.untranslatedName 사용. 임의 폰트명/스타일명/다른 문자열 번역 금지. 번역 불명은 불일치 유지, Host 예외는 기존 차단.
+- Model.compare 허용오차/제작 gate/Auto Fix 정책/원본 디자인 변경 없음. 현재 locale에서 동일하게 읽은 콘텐츠 교체 전후 snapshot 비교도 유지.
+- 진단 JSON differenceSummary에 문자 인덱스를 묶은 분류/속성별 잔여 차이 개수 추가. comparisons 및 모든 differences 보존. 811을 자동으로 해결됐다고 선언하지 않음.
+- Node241/Python16 통과. 신규3: 커닝/언어 canonical 및 실제 차이 차단, localized resolved+direct 제작 경로, 잔여차이 집계와 원본 evidence 보존.
+- NEXT STEP: UDT Reload → 기존 Smoke DOCX/등록파일 → 추천/기준 선택 → 검증용 문서 생성 → 결과 확인. 실패하면 새 진단 JSON 전달(잔여차이 분석용). 통과 후 육안 비교/비교 완료 → 제작 → 검사. Adobe 통과 자동 처리 없음.
+- API 근거: https://developer.adobe.com/indesign/uxp/dom/api/a/application/ (translateKeyString), https://developer.adobe.com/indesign/uxp/dom/api/l/language/ 및 language-with-vendors/ (untranslatedName).
+
+---
+
 # 실제 Host JSON 기반 Fidelity readback 수정 — 2026-09-30
 
 - 실제 magazine-fidelity.private.json 분석: 오류6 = 집계 차단1 + 객체5. u7c78 FillColor.space expected CMYK / actual undefined, 채널 [10,0,0,0] 및 bounds/crop 동일. u7c7e(TITLE), u7dba(KEEP), u7c96(BODY), u7caf(SUBTITLE)는 모두 readback supported / UNSUPPORTED direct override 비교: FontStyle. 실제 폰트 불일치 값이 아니라 readback 차단이다. 해당6건에 NOT_APPLICABLE로 바꿀 항목 없음.

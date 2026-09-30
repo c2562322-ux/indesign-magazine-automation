@@ -95,6 +95,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
      // Read every character, including paragraph breaks; never certify only the first.
      for(let index=0;index<text.length;index++){
      const range=f.parentStory.characters.item(offset+index),got=readType(range,ID);
+     if(want.KerningMethod!==undefined){const pair=F.canonicalPair('KerningMethod',want.KerningMethod,got.KerningMethod,ID);want.KerningMethod=pair.expected;got.KerningMethod=pair.actual;}
      const direct=F.directCompare(range,{...p.properties,...r.properties},ID);
      const colorsExpected={},colorsActual={};for(const key of ['FillColor','StrokeColor'])if(source[key]!==undefined){colorsExpected[key]=F.colorExpected(entry.original,source[key]);colorsActual[key]=F.colorActual(range[key[0].toLowerCase()+key.slice(1)],ID,doc);}
      expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:String(range.contents),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
