@@ -1,3 +1,16 @@
+# u3d6 Group 혼합 paint snapshot 수정 — 2026-10-01
+
+- 실제 사용자 오류: Group u7e7e / Page u3d6 / Spread u3ce / registered.snapshot.read.fillColor / 여러 그래픽 값. 이미지 개수 제한과 무관.
+- 원본 effective paint 확인: 자식 Rectangle u7de9 FillColor=Color/C=10 M=0 Y=0 K=0, TextFrame u7e2f FillColor=Swatch/None. 양쪽 Stroke=None/weight0. 그룹 자체 단일 fill read를 요구한 것이 원인. Adobe Group 및 PageItems DOM 근거: https://developer.adobe.com/indesign/uxp/dom/api/g/group/ ; https://developer.adobe.com/indesign/uxp/dom/api/p/page-items/ .
+- 공통 Group snapshot 분기: aggregate fill/stroke/tint/overprint/fitting/paths/allGraphics scalar 읽기 대신 CHILD_OBJECTS 관계로 자식 source IDs를 보관. 실제 paint/fitting/path/graphics는 자식의 기존 엄격 snapshot 및 Original→Generated 비교로 검사. NOT_APPLICABLE 일괄 치환/예외 무시 없음.
+- Group 자신의 bounds/rotation/shear/visible/locked/layer/objectStyle/parent/textWrap/blending 효과는 계속 읽음. 자식 ID 없는 경우, 누락 snapshot, 부모 연결 불일치는 차단. 자식 순서는 before/after 비교. 이미지 배치/placeholder 숨김 때 자식 변화가 Group aggregate에 중복 기록되어 오판하지 않도록 관계만 저장.
+- source Group의 직접 자식 구성과 parent, 명시적 visible/locked를 원본 대조. Group 자체 미지원 source effects가 있으면 명시적 UNSUPPORTED mismatch. 기존 페이지 귀속/공유/중첩 관련 지원 제한을 임의로 해제하지 않음.
+- Mock은 이전에 실제 Group mixed getter를 구현하지 않았고 일부 그림 fixture는 부모 Group 자체를 누락했다. fixture에 실제 parent Group 구조를 추가하고 mixed aggregate getters를 모두 throw하도록 회귀 추가. 자식 tint/overprint/stroke drift, Group opacity/order drift, 자식 누락 및 자식 필수 getter 실패를 검출함. 기존 IMAGE1..N/placeholder/u335e 테스트 유지.
+- 전체 Node266/Python16 통과. Adobe u3d6 Fidelity 통과는 미확인, 실기 검증 필요. 원본/개인 파일 변경 없음.
+- NEXT STEP: Reload → 기존3사진 DOCX → 동일 Library → original/u3d6 선택 → 검증용 문서 생성. beforeCleanup.success → cleanup.success → fidelity.start/결과까지 확인. 원본 자동/육안 비교 통과 후에만 제작. 실패 시 새 진단JSON과 operation/object/property 전달.
+
+---
+
 # 이미지 전역 개수 제한 제거 — 2026-10-01
 
 - DOCX 추출32장, 공통 article/parseArticle/별도사진 추가2장 제한 제거. 등록 이미지 역할 편집도 현재 페이지 프레임/기존 IMAGE ordinals에 맞춰 동적 구성. registered-native와 binding의 imageN 숫자 인덱스/배열은 기존 공통 구현 유지.

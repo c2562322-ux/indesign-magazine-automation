@@ -38,6 +38,7 @@ function host(entry,{drift=false,originalOverflow=false,contentOverflow=false,on
   }
   frames.push(f);page.allPageItems.push(f);
  }
+ for(const g of entry.original.elements.filter(e=>e.type==='Group')){const children=frames.filter(f=>entry.original.elements.find(e=>e.id===f.extractLabel()).groupId===g.id);if(!children.length)continue;const page=children[0].parentPage;const group=Object.assign(new (class Group {})(),{extractLabel:()=>g.id,visible:g.properties.Visible,locked:g.properties.Locked,parentPage:page,parent:{extractLabel:()=>g.spreadId},geometricBounds:[Math.min(...children.map(f=>f.geometricBounds[0])),Math.min(...children.map(f=>f.geometricBounds[1])),Math.max(...children.map(f=>f.geometricBounds[2])),Math.max(...children.map(f=>f.geometricBounds[3]))],pageItems:children});for(const child of children)child.parent=group;frames.push(group);page.allPageItems.push(group);}
  const doc={pages,spreads:[{}],recompose(){recomposes++;},allPageItems:frames,swatches:{item:()=>none}};
  return {ID,doc,frames,env:{ID,open:async()=>doc,guard(){},inspect:()=>({errors:originalOverflow?['source overflow']:[],warnings:[],issues:[]})},get recomposes(){return recomposes;}};
 }
@@ -361,4 +362,16 @@ test('DOCX 1/2/3/4/40 images survive extraction, ranking, selection and native p
   const h=host(entry),c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(c.contentChecks.filter(c=>c.imagePath).length,count);assert.equal(N.check(c,h.ID).length,0);assert.equal(c.contentChecks.find(c=>c.role==='image'+count).imagePath,'C:/docx/'+(count-1)+'.png');
   delete e.descriptor.roles['slot'+count];delete e.descriptor.images['slot'+count];e.descriptor.preserveElementIds.push('slot'+count);const fewer=R.register(e.original,e.descriptor);assert.ok(Match.evaluate(fewer,article,{installedFonts:fonts}).hard.some(i=>i.code==='EXTRA_IMAGES'));assert.throws(()=>R.selection(fewer,article,fonts),/EXTRA_IMAGES/);
  }
+});
+
+
+test('mixed Group paint delegates to strict child snapshots and retains container structure/effects',()=>{
+ const F=require('../src/registered-fidelity'),page={extractLabel:()=> 'p',bounds:[0,0,500,500]},group=Object.assign(new (class Group {})(),{extractLabel:()=> 'g',parentPage:page,geometricBounds:[0,0,100,100],transparencySettings:{blendingSettings:{opacity:100,blendMode:'Normal',isolateBlending:false,knockoutGroup:false}}});
+ for(const k of ['fillColor','strokeColor','strokeWeight','fillTint','strokeTint','overprintFill','overprintStroke','strokeType','frameFittingOptions','paths','allGraphics'])Object.defineProperty(group,k,{get(){throw new Error('Mixed aggregate '+k);}});
+ const child=(id,name)=>({extractLabel:()=>id,parent:group,parentPage:page,geometricBounds:[0,0,50,50],fillColor:{name},fillTint:100,overprintFill:false,strokeColor:{name:'Black'},strokeWeight:1,strokeTint:100,overprintStroke:false,strokeType:'Solid'}),a=child('a','Cyan'),b=child('b','Paper');group.pageItems=[a,b];page.allPageItems=[group,a,b];const doc={pages:[page]};
+ const before=F.capture(doc,['p']);assert.equal(before.objects.g.appearanceSource,'CHILD_OBJECTS');assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,true);
+ const oldFill=a.fillColor;a.fillColor={name:'Red'};assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);a.fillColor=oldFill;group.geometricBounds[0]=1;assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);group.geometricBounds[0]=0;
+ for(const [key,v] of [['fillTint',50],['overprintFill',true],['strokeWeight',2],['strokeTint',30],['overprintStroke',true]]){const old=a[key];a[key]=v;assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false,key);a[key]=old;}
+ group.transparencySettings.blendingSettings.opacity=40;assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);group.transparencySettings.blendingSettings.opacity=100;
+ group.pageItems=[b,a];assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);group.pageItems=[a,b];page.allPageItems=[group,a];assert.throws(()=>F.capture(doc,['p']),/child snapshot/);page.allPageItems=[group,a,b];Object.defineProperty(a,'fillColor',{get(){throw new Error('Required child read failed');}});assert.throws(()=>F.capture(doc,['p']),/Required child read failed/);
 });

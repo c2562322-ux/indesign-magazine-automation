@@ -29,6 +29,15 @@ function read(o,keys){const out={};for(const k of keys)out[k]=value(o&&o[k]);ret
 function frameSnapshot(f,progress=()=>{},doc,ID={}){
  const get=Trace.reader(progress,f),V=v=>value(v,get),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false,owner:f}),R=(o,keys)=>Object.fromEntries(keys.map(k=>[k,V(get(o,k))]));
  const page=get(f,'parentPage'),p=page?Array.from(get(page,'bounds'),Number):[0,0,0,0],b=Array.from(get(f,'geometricBounds'),Number);
+ if(f.constructor&&f.constructor.name==='Group'){
+  const children=list(get(f,'pageItems')).map(child=>{const id=ref(child);if(!id)throw new Error('Group child source reference missing');return id;});
+  if(!children.length||new Set(children).size!==children.length)throw new Error('Group children empty or duplicated');
+  const wrap=get(f,'textWrapPreferences'),mode=get(wrap,'textWrapMode'),noWrap=mode!==undefined&&ID.TextWrapModes&&enumEqual(mode,ID.TextWrapModes.NONE);
+  const wrapState={textWrapMode:V(mode)};for(const key of ['textWrapOffset','inverse','textWrapSide'])wrapState[key]=noWrap?na('textWrapMode=NONE'):V(get(wrap,key));
+  // Group paint/fitting/graphics are aggregate child values, not scalar paint.
+  // Keep child identities rather than duplicating mutable image/text content.
+  return {kind:'Group',children,appearanceSource:'CHILD_OBJECTS',page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:R(f,OBJECT),layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),wrap:wrapState,effects:R(get(get(f,'transparencySettings'),'blendingSettings'),['opacity','blendMode','isolateBlending','knockoutGroup'])};
+ }
  const fill=get(f,'fillColor'),stroke=get(f,'strokeColor'),weight=get(f,'strokeWeight'),fillAbsent=noPaint(fill,doc),strokeAbsent=noPaint(stroke,doc)||weight===0;
  const appearance={...R(f,OBJECT),fillColor:V(fill),strokeColor:V(stroke),strokeWeight:V(weight)};
  for(const key of ['fillTint','overprintFill'])appearance[key]=fillAbsent?na('fillColor=None'):V(get(f,key));
@@ -50,6 +59,7 @@ function capture(doc,pageIds,progress=()=>{},ID={}){
  const get=Trace.reader(progress,doc),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false}),pages=list(get(doc,'pages')).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(get(doc,'masterSpreads')).flatMap(s=>list(get(s,'allPageItems')));
  const candidates=pageIds?pages.flatMap(p=>list(get(p,'allPageItems'))).concat(masters):list(get(doc,'allPageItems')).concat(masters);
  const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress,doc,ID),{before:false});}}
+ for(const [id,obj] of Object.entries(objects))if(obj.kind==='Group')for(const child of obj.children)if(!objects[child]||objects[child].group!==id)throw new Error('Group child snapshot/reference missing: '+id+' / '+child);
  return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(ref)})),objects};
 }
 function preservation(before,after,edits=[]){

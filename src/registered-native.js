@@ -58,8 +58,19 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
  const record=(role,id,expected,actual,error=null)=>records.push({role,elementId:id,original:expected,generated:actual,comparison:F.compare(expected,actual,ID),readbackFailure:error?{operation:'registered.fidelity.readback',property:error.registeredFailure&&error.registeredFailure.property||null,message:String(error.message),code:Number.isInteger(error.number)?error.number:null}:null});
  for(const page of pages)for(const f of items(page.allPageItems)){const id=f.extractLabel(KEY);if(id){if(frames.has(id))record('reference',id,{unique:true},{unique:false});frames.set(id,f);}}
  record('page-count','document',{count:entry.descriptor.pageIds.length},{count:pages.length});
+ for(const group of entry.original.elements.filter(e=>e.type==='Group')){
+  const children=entry.original.elements.filter(e=>e.groupId===group.id);if(!children.some(e=>e.pageCandidates.some(id=>entry.descriptor.pageIds.includes(id))))continue;
+  const f=frames.get(group.id);if(!f){record('group',group.id,{present:true},{present:false});continue;}
+  const snap=F.frameSnapshot(f,undefined,doc,ID);
+  const expected={children:children.map(e=>e.id).sort(),parent:group.groupId||group.spreadId||null},actual={children:(snap.children||[]).slice().sort(),parent:snap.group};
+  if(group.pageBounds&&group.pageBounds[snap.page]){expected.bounds=group.pageBounds[snap.page];actual.bounds=snap.bounds;}
+  for(const key of ['Visible','Locked'])if(group.properties[key]!==undefined){expected[key]=group.properties[key];actual[key]=snap.object[key[0].toLowerCase()+key.slice(1)];}
+  const effects=Object.keys(group.details||{}).filter(k=>/Transparency|Shadow|Glow|Feather|Bevel|Satin/.test(k));if(effects.length){expected.effects='supported';actual.effects='UNSUPPORTED: '+effects.join(', ');}
+  record('group',group.id,expected,actual);
+ }
  for(const pageId of entry.descriptor.pageIds){const expected=entry.original.pages.find(p=>p.id===pageId),page=pages.find(p=>p.extractLabel(KEY)===pageId);record('page',pageId,{width:expected.width,height:expected.height},page?{width:page.bounds[3]-page.bounds[1],height:page.bounds[2]-page.bounds[0]}:null);}
  for(const e of entry.original.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
+  if(e.type==='Group')continue; // Container checked via structure and child records, not scalar paint.
   const f=frames.get(e.id),role=entry.descriptor.roles[e.id]?.role||'keep';if(!f){record(role,e.id,{present:true},{present:false});continue;}
   try{
    const expected={bounds:e.pageBounds[e.pageCandidates[0]],page:e.pageCandidates[0]},actual={bounds:relative(f),page:F.ref(f.parentPage)};
