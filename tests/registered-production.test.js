@@ -265,8 +265,8 @@ test('locale normalization uses Adobe keys and untranslated language names witho
  assert.equal(F.directCompare({kerningMethod:'광학'},{KerningMethod:'Metrics'},ID).comparison.equal,false);
  assert.equal(F.directCompare({appliedLanguage:{name:'영어',untranslatedName:'English: USA'}},{AppliedLanguage:'Korean'},ID).comparison.equal,false);
  assert.equal(F.directCompare({fontStyle:'메트릭'},{FontStyle:'Metrics'},ID).comparison.equal,false);
- assert.equal(F.directCompare({kerningMethod:'메트릭'},{KerningMethod:'Metrics'},{}).comparison.equal,false);
- assert.throws(()=>F.canonicalPair('KerningMethod','Metrics','메트릭',{app:{translateKeyString(){throw new Error('Host translation failed');}}}),/Host translation failed/);
+ assert.equal(F.directCompare({kerningMethod:'메트릭'},{KerningMethod:'Metrics'},{}).comparison.equal,true);
+ assert.throws(()=>F.canonicalPair('KerningMethod','Metrics','unknown localized value',{app:{translateKeyString(){throw new Error('Host translation failed');}}}),/Host translation failed/);
 });
 test('localized kerning passes both resolved typography and direct override gates in native production',async()=>{
  const entry=fixture();for(const s of entry.original.stories)for(const p of s.paragraphs)for(const r of p.runs){r.resolvedProperties.KerningMethod='Metrics';r.properties.KerningMethod='Metrics';}
@@ -277,4 +277,35 @@ test('localized kerning passes both resolved typography and direct override gate
 test('diagnostic groups remaining differences without dropping full evidence',()=>{
  const D=require('../src/production-diagnostics'),report={fidelity:{records:[{elementId:'x',comparison:{differences:[{path:'$.runs.0.PointSize',expected:12,actual:13},{path:'$.runs.1.PointSize',expected:12,actual:13}]}}]}};
  const out=D.fidelityDiagnostic(report);assert.equal(out.differenceSummary['TYPOGRAPHY_MISMATCH $.runs.*.PointSize'],2);assert.equal(out.comparisons[0].comparison.differences.length,2);
+});
+
+test('all 766 reported kerning differences normalize with untranslated translation API and preserve raw evidence',()=>{
+ const F=require('../src/registered-fidelity'),ID={app:{translateKeyString:k=>k}};
+ const a={runs:Array.from({length:766},()=>({KerningMethod:'Metrics'}))},b={runs:Array.from({length:766},()=>({KerningMethod:'메트릭'}))};
+ assert.equal(M.compare(a,b).differences.length,766);assert.equal(F.compare(a,b,ID).equal,true);assert.equal(b.runs[0].KerningMethod,'메트릭');
+ for(const [key,value] of Object.entries({KerningMethod:'Optical',AppliedFont:'Other family',FontStyle:'Bold',PointSize:14,Leading:23,Tracking:40})){
+  const expected={runs:[{[key]:key==='KerningMethod'?'Metrics':typeof value==='number'?12:'Original'}]},actual={runs:[{[key]:value}]};assert.equal(F.compare(expected,actual,ID).equal,false,key);
+ }
+ assert.equal(F.compare({bounds:[0,0,10,10]},{bounds:[0,0,11,10]},ID).equal,false);
+ assert.equal(F.compare({kerningMethod:'Metrics'},{kerningMethod:'Metrics - Roman Only'},ID).equal,false);
+ assert.equal(F.compare({fontStyle:'Metrics'},{fontStyle:'메트릭'},ID).equal,false);
+});
+test('proof, recheck and post-content comparisons share kerning canonicalization even when translation fails to resolve',async()=>{
+ const F=require('../src/registered-fidelity'),entry=fixture();for(const s of entry.original.stories)for(const p of s.paragraphs)for(const r of p.runs){r.resolvedProperties.KerningMethod='Metrics';r.properties.KerningMethod='Metrics';}
+ let h=host(entry);h.ID.app.translateKeyString=k=>k;
+ for(const f of h.frames)if(f.parentStory)f.parentStory.texts.item(0).kerningMethod='메트릭';
+ const proof=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},{...h.env,mode:'proof'});
+ assert.equal(proof.phase,'FIDELITY_PASSED');assert.equal(N.check(proof,h.ID).length,0);
+ h=host(entry);h.ID.app.translateKeyString=k=>k;for(const f of h.frames)if(f.parentStory)f.parentStory.texts.item(0).kerningMethod='메트릭';
+ const c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');
+ for(const f of h.frames)if(f.parentStory)f.parentStory.texts.item(0).kerningMethod='Metrics';
+ assert.equal(N.check(c,h.ID).length,0);
+ h.frames[0].parentStory.texts.item(0).kerningMethod='광학';assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
+ assert.equal(F.compare({appliedLanguage:'Korean'},{appliedLanguage:'English: USA'},h.ID).equal,false);
+});
+test('other locales resolve only exact unambiguous Adobe keys; unknown and Roman-only values remain unequal',()=>{
+ const F=require('../src/registered-fidelity');
+ assert.equal(F.compare({KerningMethod:'Metrics'},{KerningMethod:'Métrique'},{app:{findKeyStrings:()=>['$ID/Metrics']}}).equal,true);
+ assert.equal(F.compare({KerningMethod:'Metrics'},{KerningMethod:'unknown'},{app:{findKeyStrings:()=>['$ID/Metrics','$ID/Optical']}}).equal,false);
+ assert.equal(F.compare({KerningMethod:'Metrics'},{KerningMethod:'메트릭 - 로마자 전용'},{}).equal,false);
 });

@@ -1,3 +1,16 @@
+# 최신 766 differences 전체 분석/공통 정규화 — 2026-09-30
+
+- 입력: 개인 진단 createdAt 2026-09-30T07:52:07.365Z. 전체 comparison differences 766, recheck 중복 별도 합산하지 않음. 모두 $.runs.*.KerningMethod / Metrics → 메트릭. 객체별 TITLE u7c7e=13, KEEP u7dba=5, BODY u7c96=721, SUBTITLE u7caf=27. 공통 원인1(locale canonicalization), 다른 geometry/typography/생성기 mismatch 없음. 이전 언어45건 해소.
+- 기존 최초/recheck는 동일 diagnostics를 사용했다. 경로 누락으로 단정할 수 없음. 이전 canonicalPair는 translateKeyString('$ID/Metrics')가 정확히 localized string을 반환할 때만 변환하므로 Host에서 그 조건이 성립하지 않으면 그대로 차단. JSON에는 native 번역 함수 반환값이 없으므로 실제 반환 타입/문자열은 미확정.
+- registered-fidelity 공통 compare 경계 도입: 속성명이 KerningMethod/kerningMethod인 경우에만 정확한 Adobe 의미 키로 변환. Adobe 공식 한국어 문서와 실제 Host로 확인된 Metrics/메트릭, Optical/광학 대응. 다른 locale은 findKeyStrings의 유일한 알려진 키 또는 translateKeyString의 유일한 정확한 대응 사용. 모호/미상/로마자 전용/수동/숫자값은 합치지 않음. 언어 untranslatedName 유지. 임의 font/style/text 이름 번역 없음.
+- 원본 대조/재검사 records, direct overrides, 콘텐츠 교체 후 typography/override 비교가 공통 계층 사용. Snapshot은 같은 Host의 geometry/paint/reference 등이며 커닝 값을 수집하지 않음; 기존 엄격 비교 유지. raw original/generated 값은 보존, 비교 피연산자만 정규화. 원본/허용오차/Fidelity gate/Auto Fix 변경 없음.
+- 실제 개인 JSON 전체 OFFLINE_REPLAY: 766 → 0 differences, 객체4 모두 잔여0. Adobe 재실행 결과가 아니며 실기 재검증 필요. 원본/개인 파일 수정·커밋 없음.
+- Node244/Python16 통과. 신규3: 766건 전체 패턴 재현 및 실제 font/size/leading/tracking/geometry 구분, 번역 미해결 Host의 proof/recheck/post-content 일관성, 다른 locale 키 및 모호/로마자 전용 구분. 기존 번역 부재 테스트는 공식 대응값 정규화 기대값으로 갱신, 미상값/Host 예외 차단은 유지.
+- NEXT STEP: UDT Reload → registered-smoke.docx → e2e-reference.review.json → 추천 → 시작 메인 · 사진 1장 선택 → 검증용 문서 생성. Fidelity 결과 확인; 실패하면 새 JSON 전달. 통과 후 육안 비교/원본과 비교 완료 → 선택 디자인 제작 → 검사. 실제 제작/출력 성공을 이번 오프라인 재비교로 확정하지 않음.
+- 근거: https://helpx.adobe.com/kr/indesign/desktop/format-and-style-text/tabs-indents-and-spacing/about-kerning-and-tracking.html 및 https://developer.adobe.com/indesign/uxp/dom/api/a/application/.
+
+---
+
 # Locale false positive 수정 — 실기 재검증 필요 (2026-09-30)
 
 - 사용자 실제 Host 보고: 811 differences 중 Metrics/메트릭 및 Korean/한국어 반복. 최신811 전체 JSON 미수신으로 다른 종류/잔여 개수는 확정하지 않음.

@@ -100,19 +100,49 @@ function restore(target,values){
  for(const key of ['appliedFont','fontStyle'])if(Object.prototype.hasOwnProperty.call(values,key))target[key]=values[key];
  for(const [key,v] of Object.entries(values))if(!['appliedFont','fontStyle'].includes(key))target[key]=v;
 }
-// Only Adobe-owned localized properties use this conversion. Unknown values stay unequal.
-function canonicalPair(key,expected,actual,ID){
- const strip=v=>typeof v==='string'?v.replace(/^\$ID\//,''):v;
- if(key==='AppliedLanguage')return {expected:strip(expected),actual:strip(actual&&actual.untranslatedName||actual&&actual.name||actual)};
- if(key!=='KerningMethod')return {expected,actual};
- const e=strip(expected),a=strip(actual);
- if(e===a)return {expected:e,actual:a};
+// Property-scoped semantic values, not a general display-name translator.
+// Adobe Korean help documents Metrics=메트릭 and Optical=광학; the former is
+// also confirmed by the user's Host report. Exact aliases only: Roman-only,
+// manual, unknown strings and numeric kerning remain distinct.
+const KERNING=new Map([['Metrics','Metrics'],['메트릭','Metrics'],['Optical','Optical'],['광학','Optical']]);
+const stripKey=v=>typeof v==='string'?v.replace(/^\$ID\//,''):v;
+function kerning(v,ID){
+ const key=stripKey(v);if(KERNING.has(key))return KERNING.get(key);
  const app=ID&&ID.app;
- if(typeof e==='string'&&typeof a==='string'&&app&&typeof app.translateKeyString==='function'){
-  const translated=app.translateKeyString('$ID/'+e);
-  if(typeof translated==='string'&&translated===actual)return {expected:e,actual:e};
+ if(typeof v!=='string'||!app)return key;
+ if(typeof app.findKeyStrings==='function'){
+  const found=app.findKeyStrings(v),keys=Array.isArray(found)?found:[found];
+  const canonical=[...new Set(keys.map(stripKey).filter(k=>k==='Metrics'||k==='Optical'))];
+  if(canonical.length===1)return canonical[0];
+  if(canonical.length>1)return key;
  }
- return {expected:e,actual:a};
+ if(typeof app.translateKeyString==='function'){
+  const matches=['Metrics','Optical'].filter(k=>app.translateKeyString('$ID/'+k)===v);
+  if(matches.length===1)return matches[0];
+ }
+ return key;
+}
+function canonicalPair(key,expected,actual,ID){
+ if(key==='AppliedLanguage'||key==='appliedLanguage'){
+  const language=v=>stripKey(v&&v.untranslatedName||v&&v.name||v);
+  return {expected:language(expected),actual:language(actual)};
+ }
+ if(key==='KerningMethod'||key==='kerningMethod')return {expected:kerning(expected,ID),actual:kerning(actual,ID)};
+ return {expected,actual};
+}
+// All serializable typography comparison paths share this boundary. Raw reports
+// stay untouched; only comparison operands are converted, without tolerance changes.
+function compare(expected,actual,ID){
+ function walk(a,b,key){
+  if(['KerningMethod','kerningMethod','AppliedLanguage','appliedLanguage'].includes(key))return canonicalPair(key,a,b,ID);
+  if(a&&b&&typeof a==='object'&&typeof b==='object'&&Array.isArray(a)===Array.isArray(b)){
+   const x=Array.isArray(a)?[]:{},y=Array.isArray(b)?[]:{};
+   for(const k of new Set([...Object.keys(a),...Object.keys(b)])){const p=walk(a[k],b[k],k);if(Object.prototype.hasOwnProperty.call(a,k))x[k]=p.expected;if(Object.prototype.hasOwnProperty.call(b,k))y[k]=p.actual;}
+   return {expected:x,actual:y};
+  }
+  return {expected:a,actual:b};
+ }
+ const p=walk(expected,actual,'');return Model.compare(p.expected,p.actual);
 }
 function directCompare(source,properties,ID){
  const expected={},actual={};for(const k of directKeys(properties)){
@@ -128,4 +158,4 @@ function directCompare(source,properties,ID){
  }
  return {expected,actual,comparison:Model.compare(expected,actual)};
 }
-module.exports={canonicalPair,applicability,na,noPaint,list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};
+module.exports={compare,canonicalPair,applicability,na,noPaint,list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};
