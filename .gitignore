@@ -13,3 +13,7 @@ assets/fonts/*
 # Microsoft Office lock/temp files (e.g. ~$ticle-eye-clinic-with-photo.docx),
 # created while a .docx/.xlsx is open in Word/Excel and removed when it's closed.
 ~$*
+
+# Offline IDML extractor bytecode; private extracted models belong in ignored working/.
+__pycache__/
+*.pyc

@@ -1,0 +1,13 @@
+<Styles><RootParagraphStyleGroup Self="pg">
+ <ParagraphStyle Self="ParagraphStyle/base" Name="Base" PointSize="12" Tracking="0" FontStyle="9 Black" Justification="LeftAlign" SpaceBefore="0" SpaceAfter="11.338582677165356" LeftIndent="0" RightIndent="0" FirstLineIndent="0" FillColor="Color/ink" Hyphenation="false" KerningMethod="$ID/Metrics" HorizontalScale="100" VerticalScale="100" BaselineShift="0" AutoLeading="120" Ligatures="true" Underline="false" StrikeThru="false" Composer="HL Composer" KinsokuType="KinsokuPushInFirst">
+  <Properties><AppliedFont type="string">Design Test</AppliedFont><Leading type="unit">14</Leading></Properties>
+ </ParagraphStyle>
+ <ParagraphStyle Self="ParagraphStyle/title" Name="Title" PointSize="51" Tracking="-20">
+  <Properties><BasedOn type="object">ParagraphStyle/base</BasedOn><Leading type="unit">54</Leading></Properties>
+ </ParagraphStyle>
+ </RootParagraphStyleGroup>
+ <RootCharacterStyleGroup Self="cg"><CharacterStyle Self="CharacterStyle/none" Name="None"/><CharacterStyle Self="CharacterStyle/emphasis" Name="Emphasis" Underline="true"/></RootCharacterStyleGroup>
+ <RootObjectStyleGroup Self="og"><ObjectStyle Self="ObjectStyle/text" Name="Text" EnableFill="true" EnableStroke="true" FillColor="Swatch/None" StrokeColor="Swatch/None" StrokeWeight="0" EnableTextFrameGeneralOptions="true">
+ <TextFramePreference TextColumnCount="2" TextColumnGutter="12" VerticalJustification="TopAlign" FirstBaselineOffset="AscentOffset" AutoSizingType="Off"><Properties><InsetSpacing type="list"><ListItem type="unit">3</ListItem><ListItem type="unit">4</ListItem><ListItem type="unit">5</ListItem><ListItem type="unit">6</ListItem></InsetSpacing></Properties></TextFramePreference>
+ </ObjectStyle></RootObjectStyleGroup>
+</Styles>

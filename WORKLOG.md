@@ -1107,3 +1107,13 @@
 - 본문 재검사 시 안전한 기존 thread만 continuation 재사용. header/pageNumber는 자동 축소하지 않음.
 - 기존 120 + 신규 12 = 132개 통과. 브라우저 공유정책 Mock 조작 확인; 실제 Adobe 미검증.
 - docs/AUTO_FIX.md에 정책·실기 순서·runtime Preview 차이·기록 수명 문서화.
+
+
+## 2026-09-30 — IDML Design Model v2 / Phase 1
+
+- 실제 IDML과 기존 v1의 typography/paragraph/frame/style/transform/image/group/Parent 정보 손실을 감사하고 DESIGN_MODEL에 표로 기록했다.
+- XML 추출 코어, canonical pt 모델, 참조/미지원 보고, sourceXml 보존, original/runtime 분리 추가. 기존 생산 코드 미변경.
+- 단일 text proof를 동일 plan으로 브라우저/Host에 전달하고 실제 readback 비교하는 개발 도구 추가. Studio UI importer는 아직 없음.
+- 실제 IDML 16페이지(일반14+Parent2), 217객체, 139 text frames, 140 stories 추출. 원본 변경 없음. 결과 ignored. 원본 u1e4 proof 브라우저 표시 확인; 실제 InDesign 생성은 실기 필요.
+- 기존 Node132 회귀 없음 + 신규 Node11 =143 통과. 신규 Node 진입점에서 Python12 검사 통과. 합성 XML fixture로 geometry/type/style/local override/unsupported/security/Mock readback 검증.
+- 사용자 untracked sample INDD 보존. 원본/폰트/개인 추출 결과는 커밋 제외. 사용법/실기 범위는 DESIGN_EXTRACTION, DESIGN_FIDELITY 참고.

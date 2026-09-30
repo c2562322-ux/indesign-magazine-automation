@@ -1,5 +1,18 @@
 # HANDOFF — 1.1.0
 
+## 최신 인수인계 — 2026-09-30 Design Model Phase 1
+
+- 기준 `630e5e557bfae1c7e8de622012241829d05c7878`의 Studio/Auto Fix 제작 경로를 변경하지 않고 별도 v2 추출/검증 코어를 추가했다.
+- `tools/extract_design.py`: IDML ZIP/XML 파싱, sourceXml 보존, geometry/style/story/font/색/참조 추출. INDD 직접 파싱 없음.
+- `src/design-model.js`, `src/design-model-host.js`: v2 검증, runtime 분리, 명시적 단일 텍스트 프레임 proof와 Host readback 비교. 전체 지면 importer/생성기가 아니다. 패널 연동은 아직 없음.
+- 기존 Node 132개 + 신규 11개 = 143개 통과. 신규 진입점 하나에서 Python 12개 검사도 통과. Mock은 실제 Adobe 검증이 아니다.
+- 실제 IDML(일반 14쪽, Parent 2쪽, 객체 217개)을 오프라인 추출하고 text proof를 브라우저에서 표시했다. INDD→새 InDesign 시각 round-trip은 미검증.
+- 사용자 `sample/magazine-design.indd`는 원래 untracked 상태 유지. 제공 INDD/IDML/폰트/추출 원문은 stage하지 않는다. 로컬 결과는 ignored `assets/templates/working/`에 있다.
+- 다음: DESIGN_FIDELITY의 PC proof 실기 → style/graphics/group/Parent/thread renderer 범위 확장 → role mapping/importer UI.
+- 상세: [모델](docs/DESIGN_MODEL.md), [실행](docs/DESIGN_EXTRACTION.md), [fidelity](docs/DESIGN_FIDELITY.md).
+
+아래 기존 상태/테스트 수는 해당 개발 시점의 이력이다. 최신 결과는 위 기준을 따른다.
+
 갱신: 2026-09-29. 사용자 요청: **안정화 유지 + 제공 JSON 디자인 3종 연결.** 개발 브랜치: `codex/magazine-studio-1.1`.
 
 ## 현재 상태

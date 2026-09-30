@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="21.4" Self="d">
+  <Layer Self="layer1" Name="Editorial" Visible="true"/>
+  <idPkg:Styles src="Resources/Styles.xml"/>
+  <idPkg:Fonts src="Resources/Fonts.xml"/>
+  <idPkg:Graphic src="Resources/Graphic.xml"/>
+  <idPkg:Spread src="Spreads/Spread_s1.xml"/>
+  <idPkg:Story src="Stories/Story_story1.xml"/>
+</Document>

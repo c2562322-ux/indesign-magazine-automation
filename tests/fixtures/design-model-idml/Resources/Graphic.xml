@@ -1,0 +1,1 @@
+<Graphic><Color Self="Color/ink" Name="Print Ink" Space="CMYK" Model="Process" ColorValue="10 20 30 40"/><Gradient Self="Gradient/test" Name="Test"><GradientStop StopColor="Color/ink" Location="0"/></Gradient></Graphic>

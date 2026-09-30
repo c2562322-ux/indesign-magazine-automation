@@ -561,3 +561,10 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 
 ## D035 — 생성 문서의 제한적 auto-fit (2026-09-30)
 사용자가 명시한 자동 진단/수정 요청에 따라 원본 JSON/plan은 보존하고 생성 문서 runtime 값만 제한적으로 조정한다. 제목/부제는 충돌·명세 검사 후 높이→작은 글자 축소→recompose→전체 재검사, 실패 시 원복. 본문은 기존 continuation 재사용. 문서별 한 번의 예산과 원복 실패 차단을 적용한다. 이는 D034의 원본 보존을 유지하면서 명시적으로 허용된 runtime 조정 예외이다. 정책·한계: docs/AUTO_FIX.md.
+
+
+## D036 — 원본 보존 v2와 명시적 텍스트 속성 proof 분리 (2026-09-30)
+
+사용자가 허용한 Phase 1로 제한한다. INDD 바이너리 파서 대신 IDML XML을 Python 표준 라이브러리로 오프라인 추출한다. canonical pt, 원본 속성명/스타일 참조/그룹 transform/sourceXml을 보존한다. sourceOrder와 후보 page mapping은 확정 z-order/parentPage로 과장하지 않는다. live composition/visibleBounds는 추측하지 않는다.
+
+기존 v1과 Studio pipeline은 유지한다. v2의 미지원 속성을 v1 기본값으로 바꾸는 자동 다운그레이드는 만들지 않는다. 단일 사각 text frame의 명시적 proof만 Preview/Host 공통 plan으로 만들며 omitted를 표시하고 전체 복제로 취급하지 않는다. 설치 face를 정확히 확인하고 새 문서만 만든다. 원본 스타일 전체 재생성, 그룹/Parent/thread/이미지 renderer와 일반 사용자 import UI는 다음 단계다. Original Design과 Runtime Adjustment는 별도 보관한다.
