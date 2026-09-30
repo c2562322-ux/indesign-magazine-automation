@@ -349,3 +349,16 @@ test('confirmed IMAGE instruction is hidden only after successful placement; pro
  const bad=host(entry,{onPlace:f=>{f.allGraphics=[];}});await assert.rejects(()=>N.create(entry,article,bad.env),/placeholder 유지/);assert.notEqual(bad.frames.find(f=>f.extractLabel()==='guide').visible,false);
  e.descriptor.roles.guide={role:'caption',confirmed:true};assert.equal(Match.imagePlaceholders(R.register(e.original,e.descriptor)).length,0);delete e.descriptor.roles.guide;label.pageBounds.p1=[200,460,215,570];assert.equal(Match.imagePlaceholders(R.register(e.original,e.descriptor)).length,0);
 });
+
+
+test('DOCX 1/2/3/4/40 images survive extraction, ranking, selection and native production; fewer slots reject',async()=>{
+ for(const count of [1,2,3,4,40]){
+  // Synthetic PNG metadata and Host; this is not an Adobe placement test.
+  const parts=[['word/document.xml','<w:document><w:body><w:p><w:r><w:t>제목</w:t></w:r></w:p><w:p><w:r><w:t>본문</w:t></w:r></w:p>'+Array.from({length:count},(_,i)=>'<w:p>'+drawing('r'+i)+'</w:p>').join('')+'</w:body></w:document>'],['word/_rels/document.xml.rels','<Relationships>'+Array.from({length:count},(_,i)=>rel('r'+i,i+'.png')).join('')+'</Relationships>'],...Array.from({length:count},(_,i)=>['word/media/'+i+'.png',png(1200,800)])];
+  const parsed=Match.parseArticle('many.docx',P.zip(parts));assert.equal(parsed.profile.imageCount,count);assert.equal(parsed.article.images.length,count);const article=parsed.article;article.images.forEach((im,i)=>{im.path='C:/docx/'+i+'.png';delete im.bytes;assert.equal(im.documentOrder,i+1);});
+  const e=JSON.parse(JSON.stringify(fixture())),base=e.original.elements.find(e=>e.type==='Rectangle');for(let i=1;i<=count;i++){e.original.elements.push({...JSON.parse(JSON.stringify(base)),id:'slot'+i,pageCandidates:['p1'],pageBounds:{p1:[10,450,150,590]},properties:{},details:{},image:[],groupId:null});e.descriptor.roles['slot'+i]={role:'image'+i,confirmed:true};e.descriptor.images['slot'+i]='required';}
+  const entry=R.register(e.original,e.descriptor),fonts=entry.profile.requiredFonts,rank=R.recommendations([entry],article,fonts);assert.equal(rank.allCandidates.length,1);const selected=R.selection(entry,article,fonts);assert.equal(selected.overlay.content.filter(c=>c.image).length,count);
+  const h=host(entry),c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(c.contentChecks.filter(c=>c.imagePath).length,count);assert.equal(N.check(c,h.ID).length,0);assert.equal(c.contentChecks.find(c=>c.role==='image'+count).imagePath,'C:/docx/'+(count-1)+'.png');
+  delete e.descriptor.roles['slot'+count];delete e.descriptor.images['slot'+count];e.descriptor.preserveElementIds.push('slot'+count);const fewer=R.register(e.original,e.descriptor);assert.ok(Match.evaluate(fewer,article,{installedFonts:fonts}).hard.some(i=>i.code==='EXTRA_IMAGES'));assert.throws(()=>R.selection(fewer,article,fonts),/EXTRA_IMAGES/);
+ }
+});

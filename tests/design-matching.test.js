@@ -23,7 +23,7 @@ test('DOCX uses existing parser and provides measured counts, not invented categ
     const x=Match.parseArticle('article.docx',fs.readFileSync(file));
     assert.ok(x.profile.title.characters>0);assert.ok(x.profile.body.characters>0);assert.ok(x.profile.body.paragraphs>0);
     assert.equal(x.profile.category,null);assert.equal(x.profile.imageCount,0);
-    assert.throws(()=>Match.parseArticle('x.txt','제목\n본문',[{},{},{}]),/최대 2/);
+    assert.equal(Match.parseArticle('x.txt','제목\n본문',[{},{},{}]).profile.imageCount,3);assert.throws(()=>Match.parseArticle('x.txt','제목\n본문',{}),/배열/);
 });
 test('article profile counts codepoints and paragraphs; explicit category only',()=>{
     const p=Match.articleProfile({title:'가😀',body:'하나\n\n둘',category:'의료',images:[{width:1200,height:800}]});

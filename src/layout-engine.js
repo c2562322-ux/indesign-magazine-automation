@@ -57,7 +57,7 @@
         if (a.subtitle.length > 500) throw new Error('부제는 최대 500자입니다.');
         if (a.kicker.length > 60 || a.author.length > 100) throw new Error('분류/필자 이름이 너무 깁니다.');
         const images = input.images || (input.heroImage ? [{ path: input.heroImage }] : []);
-        if (!Array.isArray(images) || images.length > 2) throw new Error('현재 버전은 기사당 사진을 최대 2장 지원합니다.');
+        if (!Array.isArray(images)) throw new Error('사진 목록은 배열이어야 합니다.');
         a.images = images.map((im, i) => ({ path: txt(im.path), name: txt(im.name || '사진 ' + (i + 1)),
             preview: txt(im.preview), width: Number(im.width||im.widthPx) || 0, height: Number(im.height||im.heightPx) || 0,
             ...Object.fromEntries(['source','originalName','mimeType','widthPx','heightPx','aspectRatio','orientation','documentOrder','paragraphIndex','occurrences'].filter(k=>im[k]!==undefined).map(k=>[k,im[k]])) }));

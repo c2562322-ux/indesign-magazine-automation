@@ -1,3 +1,17 @@
+# 이미지 전역 개수 제한 제거 — 2026-10-01
+
+- DOCX 추출32장, 공통 article/parseArticle/별도사진 추가2장 제한 제거. 등록 이미지 역할 편집도 현재 페이지 프레임/기존 IMAGE ordinals에 맞춰 동적 구성. registered-native와 binding의 imageN 숫자 인덱스/배열은 기존 공통 구현 유지.
+- parseArticle DOCX도 docx-media 경유: 모든 지원되는 사용 이미지와 dimensions/order/occurrences 보존. 별도 사진은 뒤에 추가. Browser preview 의존성 순서 조정.
+- 이미지 개수에 따른 truncate 없음. 파일/총 추출 byte 용량32MB 및 ZIP 보안 검사는 유지하고 초과 시 전체 실패(부분 성공 금지). 지원 범위는 본문 DrawingML PNG/JPEG. 장식/배경·외부링크·미지원 포맷은 기존 경고 유지, 동일 미디어 중복 사용은 occurrences에 전부 기록하고 이미지 asset은 한 번 추출. 모든 포맷/헤더푸터 지원을 의미하지 않는다.
+- 디자인별 IMAGE 슬롯 수와 required/optional 정책은 그대로. 사진을 버리거나 슬롯을 신설하지 않음. 기존 JSON 디자인의 슬롯 max는 전역 상한이 아닌 개별 디자인 제약으로 유지. 기존 무료 시안의 DOCX3장 이상 등록추천 안내도 데이터 개수 제한이 아님.
+- 사진1/2/3/4/40장 synthetic DOCX를 각각 추출→Article Profile→충분한 슬롯의 추천→selection→native mock production→검사까지 검증. 모든 imageN path 순서/마지막 ordinal 확인. 슬롯 하나 부족할 때 EXTRA_IMAGES 및 선택 차단 확인. Native Mock용 PNG metadata fixture이며 Adobe 실행 결과 아님.
+- 실제 Library: 사진1장 u335e 제작 성공은 기존 사용자 실기. 2슬롯 original/uad7은 역할/공유지면 확인 필요; 3슬롯 original/u3d6은 실기 검증 필요;4+ 확정 슬롯0. 사진4장 이상의 실제 제작 성공은 아직 없음.
+- 데이터는 article.images 배열, 순서/문단위치, pageIds, Story binding 및 IMAGE ordinals 사용. 이후 여러 페이지 조합에 특정 사진 개수 상한을 추가하지 않음. 여러 페이지 디자인 자동 조합 자체는 이번 범위 밖이며 구현/검증했다고 주장하지 않음.
+- Node265/Python16 전체 통과. 기존2장 제한 테스트는 사용자 요구에 맞춰3장 보존+잘못된 배열 거부로 변경했으며 geometry/원본 Fidelity/placeholder 테스트 유지.
+- NEXT STEP: Reload → 사진1/2/3/4+ DOCX 각각 불러오기 → 추출 수 확인 → 등록 디자인 추천 → 슬롯부족 이유 확인. u335e는1사진으로 기존 제작 회귀; u3d6은3사진으로 원본 검증 후 제작.4+는 실제 확정슬롯이 충분한 디자인이 생기기 전까지 불일치가 정상.
+
+---
+
 # IMAGE placeholder 제작 시 숨김 — 2026-09-30
 
 - 사용자 실제 Adobe: u335e DOCX 제목/부제/본문/내부 이미지 삽입 성공. 이 결과는 사용자 실기이며 이번 placeholder 수정은 아직 Adobe 미검증.

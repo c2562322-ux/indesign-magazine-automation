@@ -5,7 +5,7 @@ const copy=x=>JSON.parse(JSON.stringify(x));
 function frames(model,pageId){return model.elements.filter(e=>e.pageCandidates.length===1&&e.pageCandidates[0]===pageId);}
 function candidates(model,e){
  const explicit=e.role&&e.role.confirmed;
- if(ROLES.includes(explicit))return [{role:explicit,confidence:1,reason:'원본의 명시적 역할',confirmed:true}];
+ if(ROLES.includes(explicit)||/^image[1-9]\d*$/.test(explicit||''))return [{role:explicit,confidence:1,reason:'원본의 명시적 역할',confirmed:true}];
  if(['GraphicLine','Group'].includes(e.type))return [{role:'keep',confidence:1,reason:'선/그룹 컨테이너 유지 (자식은 별도 확인)',confirmed:true}];
  const story=e.textFrame&&model.stories.find(s=>s.id===e.textFrame.storyRef),paras=story?story.paragraphs:[],runs=paras.flatMap(p=>p.runs);
  const text=runs.flatMap(r=>r.tokens.filter(t=>t.type==='Content').map(t=>t.text)).join('');

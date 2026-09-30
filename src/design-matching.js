@@ -1,4 +1,4 @@
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-model'),require('./article-input'),require('./auto-fit'));else root.MagazineMatching=factory(root.MagazineDesignModel,root.MagazineInput,root.MagazineAutoFit);})(typeof window!=='undefined'?window:this,function(Model,Input,Fit){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-model'),require('./article-input'),require('./auto-fit'),require('./docx-media'));else root.MagazineMatching=factory(root.MagazineDesignModel,root.MagazineInput,root.MagazineAutoFit,root.MagazineDocxMedia);})(typeof window!=='undefined'?window:this,function(Model,Input,Fit,Media){
 /* Phase B/C: measurable, offline analysis. Never mutates/creates a Host document.
  * Estimates are not typography metrics and cannot authorize PDF or Auto Fix.
  */
@@ -25,8 +25,8 @@ function articleProfile(article){
         category:typeof article.category==='string'?article.category:null};
 }
 function parseArticle(name,bytes,images=[]){
-    if(!Array.isArray(images)||images.length>2)throw new Error('현재 기사 입력은 별도 사진 최대 2장을 지원합니다.');
-    const article=Input.parse(name,bytes);article.images=clone(images);return {article,profile:articleProfile(article)};
+    if(!Array.isArray(images))throw new Error('사진 목록은 배열이어야 합니다.');
+    const result=/\.docx$/i.test(name)?Media.extract(bytes):{article:Input.parse(name,bytes),warnings:[]};const article=result.article;article.images=(article.images||[]).concat(clone(images));return {...result,article,profile:articleProfile(article)};
 }
 function framePreferences(model,e){
     const direct=e.textFrame&&e.textFrame.properties||{},style=model.styles.object.find(s=>s.id===e.objectStyleRef),inherited={};

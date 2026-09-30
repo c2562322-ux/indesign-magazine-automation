@@ -114,3 +114,9 @@ test('only Adobe production with visual approval permits next manuscript without
  await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');assert.equal(x.nodes().find(n=>n.textContent==='선택한 등록 디자인으로 제작').disabled,true);
  }
 });
+
+
+test('role editor exposes IMAGE ordinals from available frames beyond two',async()=>{
+ const m=model(),base=m.elements.find(e=>e.type==='Rectangle');for(let i=0;i<4;i++)m.elements.push({...copy(base),id:'newPhoto'+i,pageCandidates:['p1'],pageBounds:{p1:[10,20,100,100]}});
+ const x=setup({load:async()=>m});await x.click('디자인 모델 / 등록 파일 불러오기');x.nodes().find(n=>n.tagName==='select').value='p1';await x.click('이 페이지 역할 확인');assert.ok(x.nodes().some(n=>n.tagName==='label'&&n.textContent==='사진 4'));const e=m.elements.find(e=>e.id==='newPhoto0');e.role={confirmed:'image4'};assert.equal(R.candidates(m,e)[0].role,'image4');
+});

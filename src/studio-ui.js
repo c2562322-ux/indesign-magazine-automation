@@ -83,7 +83,7 @@
     function imageList(){
         const root=$('autoImages');root.textContent='';
         state.images.forEach((im,i)=>{const row=doc.createElement('div');row.className='image-row';const label=doc.createElement('span');label.textContent=im.name||im.path||('사진 '+(i+1));row.appendChild(label);const remove=doc.createElement('button');remove.textContent='삭제';remove.className='quiet';remove.addEventListener('click',()=>{if(state.busy||api.disposed)return;state.images.splice(i,1);imageList();changed();status('사진을 제거했습니다. 시안을 다시 만들어주세요.');});row.appendChild(remove);root.appendChild(row);});
-        $('imageCount').textContent=state.images.length+'장 (별도 추가는 2장까지)';
+        $('imageCount').textContent=state.images.length+'장 (등록 디자인의 IMAGE 슬롯 수와 비교)';
     }
     function fill(a,s){
         const values={autoTitle:a.title,autoSubtitle:a.subtitle||a.pointText||'',autoBody:a.body,autoKicker:a.kicker||'ARTICLE',autoAuthor:a.author||'',pageWidth:s.width,pageHeight:s.height,pageMargin:s.margin,pageBleed:s.bleed,bodySize:s.bodySize,accent:s.accent,publication:s.publication,bodyFont:s.bodyFont,titleFont:s.titleFont};
@@ -213,7 +213,7 @@
         status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.name?f.name.replace(/\t/g,' — ')+': ':f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. '+(result.article.images||[]).filter(im=>im.source==='docx').length+'장 Word 이미지 감지 · '+(result.warnings||[]).join(' / '),!!missing.length);
     }));
     function readSettingsOnly(){try{return L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value});}catch(e){return L.DEFAULTS;}}
-    on('btnAddImage','click',()=>run(async()=>{if(state.images.length>=2)throw new Error('사진은 최대 2장입니다.');const im=await adapter.image();if(api.disposed)return;if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));
+    on('btnAddImage','click',()=>run(async()=>{const im=await adapter.image();if(api.disposed)return;if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));
     on('btnSettings','click',()=>{$('settingsPanel').style.display=$('settingsPanel').style.display==='none'?'block':'none';});
     on('btnAiSettings','click',()=>{$('aiPanel').style.display=$('aiPanel').style.display==='none'?'block':'none';});
     function filterFonts(){
