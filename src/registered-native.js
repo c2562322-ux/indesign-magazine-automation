@@ -157,7 +157,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],contentWarnings:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
-  progress('registered.content.plan.start');const edits=replacementPlan(entry,article);context.edits=edits;progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
+  progress('registered.content.plan.start');const edits=replacementPlan(entry,article),placeholders=Match.imagePlaceholders(entry);context.edits=edits;progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
   // Read every destination and direct override before the first write.
   const targets=edits.map(edit=>{
    const f=baseline.frames.get(edit.elementId);if(!f)throw new Error('교체 프레임 식별 실패');if(edit.image&&!edit.image.path)throw new Error('Word 이미지 파일 위치 없음');
@@ -175,6 +175,14 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
     operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));F.restore(f.frameFittingOptions,target.fitting);operation('registered.content.'+edit.role+'.fit',f,'fit()','APPLY_FRAME_FITTING_OPTIONS',()=>f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS));F.restore(f.frameFittingOptions,target.fitting);
+    const graphics=F.list(f.allGraphics),normalizePath=p=>String(p||'').replace(/\\/g,'/');
+    if(graphics.length!==1||normalizePath(graphics[0].itemLink?.filePath)!==normalizePath(edit.image.path))throw new Error(edit.role+' 이미지 place/링크 확인 실패 · placeholder 유지');
+    for(const relation of placeholders.filter(p=>p.imageElementId===edit.elementId)){
+     const placeholder=baseline.frames.get(relation.elementId);if(!placeholder)throw new Error('placeholder 참조 없음: '+relation.elementId);
+     operation('registered.content.placeholder.hide',placeholder,'visible',false,()=>{placeholder.visible=false;});
+     if(placeholder.visible!==false)throw new Error('placeholder 숨김 readback 실패: '+relation.elementId);
+     context.edits.push({...relation,hidePlaceholder:true});
+    }
     const imageProfile=Match.imageProfile(edit.image),frameRatio=(bounds[3]-bounds[1])/(bounds[2]-bounds[0]);
     if(imageProfile.known&&Math.abs(Math.log(imageProfile.aspectRatio/frameRatio))>.05)context.contentWarnings.push(edit.role+' 원고 사진과 원본 프레임 비율이 다릅니다. 원본 fitting/crop 유지 · 잘림/여백을 확인해주세요.');
     const placed=F.frameSnapshot(f,undefined,doc,ID).graphics[0],gb=placed&&placed.bounds;

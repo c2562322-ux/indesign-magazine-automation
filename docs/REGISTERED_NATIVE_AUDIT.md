@@ -1,3 +1,15 @@
+# IMAGE placeholder 제작 시 숨김 — 2026-09-30
+
+- 사용자 실제 Adobe: u335e DOCX 제목/부제/본문/내부 이미지 삽입 성공. 이 결과는 사용자 실기이며 이번 placeholder 수정은 아직 Adobe 미검증.
+- 원본 모델 확인: u7dba / Story u7dbd 안내 텍스트는 IMAGE1 u7c78 안에 완전히 포함된 단독 프레임. 다른 확정 역할/캡션 없음. 페이지 ID별 삭제 규칙 없음.
+- 공통 imagePlaceholders 관계 추론: 명확한 이미지 안내 라벨 + 미지정 보존 객체 + 단독 Story + 동일 페이지의 유일한 확정 빈 IMAGE 프레임 내부 + 작은 안내 영역. 명시적 role/캡션, 공유 Story, 모호한 다중 containment, 슬롯 밖 텍스트는 유지.
+- proof와 원본은 유지. production에서 image place 후 그래픽1개/정확한 링크 확인 → 관계가 있는 안내 TextFrame.visible=false → readback. 객체 삭제/문구 제거/geometry/style 변경 없음. Adobe DOM 근거: https://developer.adobe.com/indesign/uxp/omv/t/TextFrame/ (Boolean visible).
+- preservation는 해당 관계의 의도된 visible=false만 기대값에 반영. 실제 visible, 위치/스타일/Story/쌓임순서 등 나머지는 계속 검사. 숨김 실패/이미지 place 실패는 차단, 실패 무시 없음.
+- Node263/Python16 통과. 새 회귀: proof 유지, 생산 후 안내 숨김/원문 유지, 이미지 실패 시 안내 유지, 캡션/슬롯밖 텍스트 제외, 숨김 취소/geometry 변경 차단.
+- NEXT STEP: Reload → 기존 성공 DOCX/Library → u335e 선택 → 검증용 문서 생성(안내 유지) → 원본과 비교 완료 → 선택 디자인 제작(사진 위 안내 숨김) → 검사 → INDD/PDF 확인. 실패 시 registered.content.placeholder.hide 또는 preservation differences 포함 진단 JSON 저장.
+
+---
+
 # 등록 디자인 실제 제작 연결 보강 — 2026-09-30
 
 - 원본 검증 문서는 proofOnly로 샘플 콘텐츠 유지, PDF 금지. 일반 제작 버튼은 mode=production으로 별도 IDML 문서를 열고 원본 자동 Fidelity 통과 후 TITLE/SUBTITLE/BODY/IMAGE를 교체한다. 이 기존 경로를 재사용했으며 추천 엔진/원본 모델/페이지 geometry는 변경하지 않았다.

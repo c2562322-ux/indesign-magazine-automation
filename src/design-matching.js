@@ -245,11 +245,30 @@ function bindContent(entry,article,options){
     return {original:entry.original,content:bindings,runtimeAdjustments:[],suitability,productionReady:false,
         reason:'원본 Fidelity 검사 후 registered-native에서 콘텐츠만 교체합니다. 바인딩만으로 출력 승인하지 않습니다.'};
 }
+// A relation, not a page/text deletion rule: a unique empty IMAGE slot must
+// wholly contain an unassigned, standalone instruction frame. Captions and
+// explicit roles are never eligible. Ambiguous containment remains untouched.
+function imagePlaceholders(entry){
+ const m=entry.original,d=entry.descriptor,out=[];
+ for(const e of m.elements){
+  if(!e.textFrame||e.pageCandidates.length!==1||!d.pageIds.includes(e.pageCandidates[0])||d.roles[e.id]||e.role?.confirmed||!d.preserveElementIds?.includes(e.id))continue;
+  const story=m.stories.find(s=>s.id===e.textFrame.storyRef);
+  if(!story||m.elements.filter(f=>f.textFrame?.storyRef===story.id).length!==1)continue;
+  const tokens=story.paragraphs.flatMap(p=>p.runs.flatMap(r=>r.tokens));
+  if(tokens.some(t=>!['Content','Br'].includes(t.type)))continue;
+  const label=tokens.map(t=>t.type==='Content'?t.text:' ').join('').trim();
+  if(!/^(?:(?:대표|일반)?이미지|image\s*placeholder|photo\s*placeholder)$/i.test(label))continue;
+  const b=e.pageBounds[e.pageCandidates[0]],area=(b[2]-b[0])*(b[3]-b[1]);
+  const slots=entry.profile.imageSlots.filter(slot=>{const f=m.elements.find(f=>f.id===slot.elementId),a=f.pageBounds[e.pageCandidates[0]];return a&&f.pageCandidates.length===1&&!(f.image||[]).length&&b[0]>=a[0]&&b[1]>=a[1]&&b[2]<=a[2]&&b[3]<=a[3]&&area>0&&area*4<(a[2]-a[0])*(a[3]-a[1]);});
+  if(slots.length===1)out.push({elementId:e.id,imageElementId:slots[0].elementId,role:slots[0].role,evidence:'standalone instruction wholly inside one confirmed empty IMAGE frame'});
+ }
+ return out;
+}
 function calibration(estimate,observed){
     if(!estimate.known||!observed||typeof observed.overflows!=='boolean'||!Number.isFinite(observed.characters)||!observed.documentEvidence)throw new Error('Measured Host evidence required');
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-return {imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
 
 });
