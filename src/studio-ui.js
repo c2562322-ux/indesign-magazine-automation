@@ -14,7 +14,7 @@
     const $=id=>nodes.get(id),listeners=[];
     const state={library:[],libraryLoading:false,libraryPromise:null,designIssues:[],designFontsChecked:false,images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30,fontsLoaded:false,fontMatches:[],fontFamilyCount:0,fontByName:new Map(),selectedFont:null,openFamily:null,report:null};
     let status;
-    const api={root,disposed:false,destroy(){if(api.disposed)return;api.disposed=true;listeners.splice(0).forEach(([node,event,handler])=>{try{node.removeEventListener(event,handler);}catch(e){/* A disposed wrapper is inert even if its old DOM has gone away. */}});try{if(adapter.dispose)adapter.dispose();}catch(e){/* Disposal must not prevent a fresh mount. */}}};
+    const api={root,disposed:false,destroy(){if(api.disposed)return;api.disposed=true;if(api.registration)api.registration.destroy();listeners.splice(0).forEach(([node,event,handler])=>{try{node.removeEventListener(event,handler);}catch(e){/* A disposed wrapper is inert even if its old DOM has gone away. */}});try{if(adapter.dispose)adapter.dispose();}catch(e){/* Disposal must not prevent a fresh mount. */}}};
     const diagnostics=[],initStart=Date.now();
     function diagnostic(message){if(api.disposed)return;diagnostics.push(D.redact(message,[($('apiKey')||{}).value].concat(state.images.map(im=>im.path))));if(diagnostics.length>35)diagnostics.shift();$('studioDiagnostics').textContent=diagnostics.join('\n');}
     function on(id,event,handler){
@@ -40,6 +40,7 @@
     function fingerprint(a,s){return JSON.stringify({article:L.safeArticle(a),settings:s});}
     function fresh(){const v=read();if(!state.plans.length||state.signature!==fingerprint(v.article,v.settings))throw new Error('원고 또는 설정이 바뀌었습니다. 시안을 다시 만들어주세요.');return v;}
     function buttons(){
+        if(api.registration&&api.registration.refresh)api.registration.refresh();
         const fontAvailable=!missing.some(id=>/^font|^btnFont/.test(id));
         const aiAvailable=!missing.some(id=>/^ai|^apiKey|^btnAi|^btnAI/.test(id));
         let valid=false;try{const v=read();valid=state.plans.length>0&&state.signature===fingerprint(v.article,v.settings);}catch(e){}
@@ -87,6 +88,7 @@
     }
     function invalidateDocument(){state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
     function changed(){
+        if(api.registration)api.registration.invalidate();
         $('wordCount').textContent=($('autoBody').value||'').length.toLocaleString()+'자';
         invalidateDocument();fontCurrent();buttons();
         if(state.plans.length){let same=false;try{const v=read();same=state.signature===fingerprint(v.article,v.settings);}catch(e){}$('previewNote').textContent=same?'배치 미리보기 · 실제 줄바꿈과 페이지 수는 InDesign에서 확정됩니다.':'원고·설정이 변경되었습니다. 아래 시안은 이전 내용입니다. 다시 생성해주세요.';}
@@ -330,7 +332,7 @@
     if($('modeStudio'))on('modeStudio','click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});
     diagnostic('Events binding complete · '+listeners.length+' listeners');
     fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
-    Object.assign(api,{read,state,prepare,diagnostics});mounted=api;diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
+    Object.assign(api,{read,state,prepare,diagnostics});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
     }catch(e){diagnostic('Studio init 실패: '+e.message);api.destroy();const el=$('studioStatus');if(el)el.textContent='Studio init 실패: '+D.redact(e.message);throw e;}
  }
  return {mount,SAMPLE};

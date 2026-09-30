@@ -1,3 +1,4 @@
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.MagazineDesignModel=factory();})(typeof window!=='undefined'?window:this,function(){
 /* Design Model v2 is separate from the stable v1 magazine production plan.
  * Raw source properties are data, never blindly assigned to a Host object.
  */
@@ -62,6 +63,17 @@ function color(model,ref){
     if(!['RGB','CMYK','LAB'].includes(p.Space)||!['Process','Spot'].includes(p.Model)||!values.every(Number.isFinite)||values.length!==({RGB:3,CMYK:4,LAB:3}[p.Space]))throw new Error('Unsupported proof color: '+ref);
     return {kind:'color',name:p.Name||c.id,space:p.Space,model:p.Model,values};
 }
+function styleChildren(model,style,trail=[]){
+    if(!style)return {};
+    if(trail.includes(style.id))throw new Error('Object style inheritance cycle');
+    const ref=style.properties&&style.properties.BasedOn;
+    const parents=model.styles.object.filter(s=>s.id===ref||ref&&ref.startsWith('$ID/')&&s.id.endsWith('/'+ref));
+    if(ref&&ref!=='n'&&parents.length!==1)throw new Error('Missing or ambiguous parent Object Style');
+    const parent=parents[0];
+    const out=styleChildren(model,parent,trail.concat(style.id));
+    for(const [key,value] of Object.entries(style.children||{}))out[key]={...(out[key]||{}),...value};
+    return out;
+}
 function textProof(model,elementId,{acknowledgeApproximation=false}={}){
     assertModel(model);
     if(!acknowledgeApproximation)throw new Error('This is a text-property proof, not a complete design. Explicit approximation acknowledgement required.');
@@ -82,7 +94,7 @@ function textProof(model,elementId,{acknowledgeApproximation=false}={}){
     const objectStyle=model.styles.object.find(s=>s.id===e.objectStyleRef);
     const objectProps=objectStyle&&objectStyle.resolvedProperties||{};
     // Only explicitly enabled object-style groups participate. No document defaults invented.
-    const inherited=objectStyle&&objectStyle.children.TextFramePreference||{},prefs={};
+    const inherited=styleChildren(model,objectStyle).TextFramePreference||{},prefs={};
     const general=['TextColumnCount','TextColumnGutter','InsetSpacing','VerticalJustification'];
     const baseline=['FirstBaselineOffset','MinimumFirstBaselineOffset'];
     for(const key of general)if(objectProps.EnableTextFrameGeneralOptions===true&&inherited[key]!=null)prefs[key]=inherited[key];
@@ -106,6 +118,7 @@ function textProof(model,elementId,{acknowledgeApproximation=false}={}){
         const typography={};
         for(const [key,dest] of Object.entries({...TYPE,...PARA}))if(v[key]!=null)typography[dest]=v[key];
         if(!(typography.pointSize>0)||!(Number.isFinite(typography.leading)&&typography.leading>0||typography.leading==='Auto'))throw new Error('Unresolved point size/leading');
+        if(typography.leading==='Auto'&&!(Number.isFinite(typography.autoLeading)&&typography.autoLeading>0))throw new Error('Unresolved AutoLeading; no implicit 120% fallback');
         if(!ALIGN[v.Justification])throw new Error('Unresolved justification');
         const known=new Set([...Object.keys(TYPE),...Object.keys(PARA),'AppliedFont','FontStyle','Justification','FillColor']);
         for(const key of Object.keys(v))if(!known.has(key))ignored.add('text.'+key);
@@ -142,4 +155,6 @@ function previewHTML(plan){
     }).join('');
     return '<!doctype html><meta charset="utf-8"><title>Design text proof</title><p>Text-property proof / Preview approximation: font style, composition, paragraph spacing, baseline and advanced typography are not faithfully rendered. LAB is shown black. Full source layout is not reproduced.</p><div style="position:relative;background:white;border:1px solid #aaa;width:'+plan.page.width+'pt;height:'+plan.page.height+'pt"><div style="position:absolute;box-sizing:border-box;white-space:pre-wrap;left:'+b[1]+'pt;top:'+b[0]+'pt;width:'+(b[3]-b[1])+'pt;height:'+(b[2]-b[0])+'pt;padding:'+f.insets.map(n=>n+'pt').join(' ')+';column-count:'+f.columns+';column-gap:'+f.gap+'pt;background:'+cssColor(f.fill)+';border:'+f.strokeWeight+'pt solid '+cssColor(f.stroke)+'">'+spans+'</div></div><details><summary>Omitted properties / 미재현 항목</summary><pre>'+esc(plan.omitted.join('\n'))+'</pre></details>';
 }
-module.exports={SCHEMA,TYPE,PARA,ALIGN,VERTICAL,BASELINE,validate,compare,runtimeSession,recordAdjustment,textProof,previewHTML};
+return {styleChildren,SCHEMA,TYPE,PARA,ALIGN,VERTICAL,BASELINE,validate,compare,runtimeSession,recordAdjustment,textProof,previewHTML};
+
+});

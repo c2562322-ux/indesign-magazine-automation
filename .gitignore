@@ -17,3 +17,6 @@ assets/fonts/*
 # Offline IDML extractor bytecode; private extracted models belong in ignored working/.
 __pycache__/
 *.pyc
+
+# Registered design libraries contain private source XML and text.
+*.private.json

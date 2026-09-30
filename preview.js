@@ -1,7 +1,10 @@
 (function(){
 const Input=window.MagazineInput;
 function pick(accept){return new Promise(resolve=>{const f=document.createElement('input');f.type='file';f.accept=accept;f.style.display='none';document.body.appendChild(f);let done=false;const finish=v=>{if(done)return;done=true;f.remove();resolve(v);};f.addEventListener('change',()=>finish(f.files[0]||null));f.addEventListener('cancel',()=>finish(null));f.click();});}
-window.magazineApp=MagazineStudio.mount({designs:()=>MagazineJSONDesign.load(async name=>{const r=await fetch('designs/'+name);if(!r.ok)throw new Error('JSON 파일 읽기 실패: '+name);return r.text();}),native:false,load:async()=>{
+window.magazineApp=MagazineStudio.mount({registration:api=>MagazineRegistrationUI.mount(document.getElementById('registeredDesigns'),api,{
+ load:async()=>{const f=await pick('.json');if(!f)return null;if(f.size>32*1024*1024)throw new Error('최대 32MB');return JSON.parse(await f.text());},
+ save:async data=>{const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='registered-designs.private.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}
+}),designs:()=>MagazineJSONDesign.load(async name=>{const r=await fetch('designs/'+name);if(!r.ok)throw new Error('JSON 파일 읽기 실패: '+name);return r.text();}),native:false,load:async()=>{
  const file=await pick('.txt,.docx,.json');if(!file)return null;
  if(file.size>32*1024*1024)throw new Error('원고 파일은 최대 32MB입니다.');
  let result;

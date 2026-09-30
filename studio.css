@@ -41,3 +41,8 @@ body{margin:0;padding:0;background:#f3f1eb;color:#202724;font-family:Arial,sans-
 #studioPanel button{box-sizing:border-box}
 #studioPanel #productionStatus{margin:12px 0;line-height:1.6}
 #studioPanel #inspectionSummary{margin:12px 0;font-weight:600}
+
+.registered-card { border:1px solid #999; padding:8px; margin:8px 0; }
+.registered-map { position:relative; background:#fff; color:#222; margin:8px 0; overflow:hidden; }
+#registeredDesigns select { max-width:100%; margin:4px; }
+#registeredDesigns pre { white-space:pre-wrap; max-height:220px; overflow:auto; }

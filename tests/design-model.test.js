@@ -89,10 +89,10 @@ test('missing font stops before any document add; no Regular/Bold fallback or mo
     const mock=mockHost(),p=proof(),before=JSON.stringify(p);mock.font.fontStyleName='Regular';
     assert.throws(()=>H.create(p,mock.ID),/Missing or ambiguous font/);assert.equal(mock.adds,0);assert.equal(JSON.stringify(p),before);
 });
-test('Host failure restores global units; stable Studio never imports proof modules',()=>{
+test('Host failure restores global units; production renderer stays separate from explicit proof UI',()=>{
     const mock=mockHost();mock.ID.app.documents.add=()=>{throw new Error('host failed');};
     assert.throws(()=>H.create(proof(),mock.ID),/design-proof.document.add/);assert.equal(mock.ID.app.scriptPreferences.measurementUnit,'mm');
-    for(const file of ['studio.js','src/studio-ui.js','src/auto-indesign.js'])assert.doesNotMatch(fs.readFileSync(path.join(root,file),'utf8'),/require\(['"].*design-model/);
+    for(const file of ['src/studio-ui.js','src/auto-indesign.js'])assert.doesNotMatch(fs.readFileSync(path.join(root,file),'utf8'),/require\(['"].*design-model/);
 });
 test('comparison includes missing/extra values and image/thread/order data, not only text',()=>{
     const copy=clone(fixture);assert.equal(M.compare(fixture,copy).equal,true);

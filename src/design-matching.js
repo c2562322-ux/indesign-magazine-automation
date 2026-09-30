@@ -1,10 +1,9 @@
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-model'),require('./article-input'),require('./auto-fit'));else root.MagazineMatching=factory(root.MagazineDesignModel,root.MagazineInput,root.MagazineAutoFit);})(typeof window!=='undefined'?window:this,function(Model,Input,Fit){
 /* Phase B/C: measurable, offline analysis. Never mutates/creates a Host document.
  * Estimates are not typography metrics and cannot authorize PDF or Auto Fix.
  */
 'use strict';
-const Model=require('./design-model');
-const Input=require('./article-input');
-const Fit=require('./auto-fit');
+
 const clone=x=>JSON.parse(JSON.stringify(x));
 const ROLES=['title','subtitle','body','image1','image2','caption','header','footer','pageNumber'];
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;};
@@ -33,7 +32,7 @@ function framePreferences(model,e){
     const direct=e.textFrame&&e.textFrame.properties||{},style=model.styles.object.find(s=>s.id===e.objectStyleRef),inherited={};
     // Do not flatten inactive Object Style groups or guess unresolved parents.
     if(style&&style.resolvedProperties.EnableTextFrameGeneralOptions===true){
-        const p=style.children.TextFramePreference||{};
+        const p=Model.styleChildren(model,style).TextFramePreference||{};
         for(const key of ['TextColumnCount','TextColumnGutter','InsetSpacing','VerticalJustification'])if(p[key]!=null)inherited[key]=p[key];
     }
     return {inherited:clone(inherited),direct:clone(direct),effective:{...inherited,...direct}};
@@ -233,4 +232,6 @@ function calibration(estimate,observed){
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-module.exports={imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+
+});

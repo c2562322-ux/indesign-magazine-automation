@@ -1136,3 +1136,12 @@
 - 두 실제 IDML 원시 XML 대조: 기존 typography751개/신규784개와 페이지·객체·run·이미지 bounds14개 검증. Profile 비교도 실제 두 모델로 통과.
 - 원고 샘플 결과: 25페이지 항목 모두 role/font 확인 필요; 추측 추천 없음. 코드 수용량에 glyph 높이도 반영, immutable source/file read 공유로 반복 읽기 제거.
 - 최종 Node160(기존143+신규17), Python15(기존12+신규3) 통과. Host 재생성/전체 Preview/추천 UI 연결은 미구현.
+
+
+## 2026-09-30 등록 디자인 역할/추천 검증판 (기준 90bc2a5)
+
+- 역할 후보→확인→등록/저장→Word/사진 비교→최대3분석후보→content overlay UI 연결. 기존 무료/AI/v1 JSON 제작 유지.
+- BasedOn Object Style children 상속 보완, 미해결 AutoLeading default 방지, PNG/JPEG header 치수(unknown 정책) 추가. 원본/개인 파일 미변경.
+- 실제 IDML 두 종 raw XML 대조 통과. 기존14/신규11쪽 모두 미승인 역할로 추천 확정 안 함. 원문 불변 확인.
+- 브라우저 직접 실행: 신규14.8MB 모델 불러오기, 11개 일반 페이지, 첫 페이지 이미지 원본유지 등록, 제목/본문/폰트 확인 필요 결과, Reload/무료3안. 처리 중 메시지 잔존 수정. 파일 선택 도구 지연 관찰(플러그인 원인 미확정).
+- 전체 Node173(기존160+13)/Python15. 실제 Adobe proof/full document 미검증. 원본 재현 완료/productionReady 선언 안 함. 상세 docs/DESIGN_REGISTRATION.md.

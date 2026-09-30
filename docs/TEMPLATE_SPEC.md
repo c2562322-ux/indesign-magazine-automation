@@ -171,3 +171,7 @@
 ## 새 디자인 모드의 외부 JSON (json-design-01)
 
 기존 INDD Script Label 계약과 별개로, designs/의 IDML 추출 draft JSON을 새 문서로 생성하는 경로를 추가했다. 기존 template.js/시작페이지/목차 코드는 사용하거나 변경하지 않는다. 스키마·역할 매핑·단위·폰트·사진·overflow·추가 방법은 [JSON_DESIGNS.md](JSON_DESIGNS.md)를 따른다. 이는 INDD 직접 등록/IDML 파서 기능이 아니다.
+
+## v2 등록 디자인 검증판
+
+기존 양식 Script Label 계약은 유지한다. 새 v2 등록에서는 원본 라벨을 쓰지 않고 별도 등록 JSON의 roles/preserveElementIds에 사용자가 확인한 역할을 저장한다. 제목/부제/본문/사진1·2/캡션/헤더/푸터/페이지번호 및 원본유지를 지원한다. 등록만으로 제작 가능해지지 않으며 상세 계약은 docs/DESIGN_REGISTRATION.md를 따른다.

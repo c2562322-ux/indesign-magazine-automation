@@ -1,5 +1,15 @@
 # HANDOFF — 1.1.0
 
+## 최신 상태 — 등록 디자인 역할 확인/추천 검증판
+
+- 기준 90bc2a5. 역할 후보/확인 UI, 페이지별 등록·파일 저장/재개, API 없는 후보 최대3 및 근거, 분석용 선택/content overlay 연결.
+- Object Style BasedOn의 frame preference 상속 누락 보완, AutoLeading 미해결 시 proof 거부. PNG/일부 JPEG 치수 조회(32MB 제한, EXIF unknown).
+- 별도 원본 단일 프레임 Host proof 버튼과 readback 연결. 전체 v2 renderer/콘텐츠 교체/기존 INDD/PDF 연결은 아직 미완료. 모든 등록 디자인 productionReady=false.
+- 브라우저에서 실제 신규 모델 로드→페이지 역할→유지 등록→확인 필요 추천 표시, Reload 후 무료3안 실행. Adobe Host 미검증.
+- 두 실제 IDML XML 대조와 25페이지 미승인 역할 gate 확인. Node173/Python15 통과. 원본/개인 모델 미커밋.
+- 다음: 디자이너 역할 확인→전체 지면 Host fidelity→콘텐츠 run 교체→기존 production 연결. 자세한 한계/PC 절차: docs/DESIGN_REGISTRATION.md.
+
+
 ## 최신 상태 — Design Capability / Matching 코어
 
 - 기준 660266c에서 계속 작업. src/design-matching.js, tools/analyze-design.js, tools/match-designs.js 추가.

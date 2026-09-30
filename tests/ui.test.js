@@ -31,6 +31,11 @@ function setup(native=false,overrides={},omit=[]){
  return {app,e:elements,saved,calls,adapter,document};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
+test('optional registration init failure cannot stop stable Studio; lifecycle disposes extension',()=>{
+ const broken=setup(false,{registration(){throw new Error('optional failed');}});assert.equal(broken.app.disposed,false);assert.equal(broken.e.candidateList.children.length,3);
+ let invalidated=0,disposed=0,mounts=0;const x=setup(false,{registration(){mounts++;return {invalidate(){invalidated++;},destroy(){disposed++;}};}});
+ assert.equal(Studio.mount(x.adapter),x.app);assert.equal(mounts,1);x.e.autoTitle.value='changed';x.e.autoTitle.listeners.input();assert.equal(invalidated,1);x.app.destroy();assert.equal(disposed,1);
+});
 test('all static controller IDs exist once in both HTML entrypoints',()=>{
  const code=fs.readFileSync('src/studio-ui.js','utf8'),required=new Set([...code.matchAll(/\$\('([^']+)'\)/g)].map(x=>x[1]));
  for(const file of ['index.html','preview.html']){const ids=[...fs.readFileSync(file,'utf8').matchAll(/id="([^"]+)"/g)].map(x=>x[1]);assert.equal(ids.length,new Set(ids).size);for(const id of required){if(file==='preview.html'&&['modeStudio','legacyPanel'].includes(id))continue;assert.ok(ids.includes(id),file+': '+id);}}

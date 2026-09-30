@@ -575,3 +575,8 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 v2 source를 수정하지 않고 Library sidecar에 hash/page scope/확정 role/사진 필수 여부를 둔다. 위치/크기/style 기반 추론은 후보로만 반환한다. 원고 수용량은 font size/leading/tracking/columns/inset/문단 간격과 CJK 비중으로 추정하되 실제 glyph metric 미측정을 명시한다. unknown은 score로 감추지 않고 review로 반환한다. Hard constraint와 Soft penalty를 분리하며 selectedId=null을 유지한다.
 
 기존 auto-fit.POLICY의 한계를 재사용하되 실제 안전 조정 가능을 보장하지 않는다. v2 full renderer가 없으므로 content binding은 overlay만 만들고 productionReady=false이다. v1 변환으로 원본을 단순화하거나 별도 production generator를 추가하지 않는다. 기존 패널 안정성을 위해 Phase D UI/제작 연결은 보류한다.
+
+
+## D038 — 등록 디자인은 원본 Fidelity 승인 전 분석 후보로만 사용
+
+원본 모델과 등록 sidecar/기사 overlay를 분리한다. 역할 추론은 근거/강도를 표시하고 명시 라벨 외 콘텐츠는 사용자 확인한다. 미지정 유지 일괄 확인은 명시 동작이다. API 없는 추천 UI를 기존 무료/AI와 분리하고 파일의 productionReady 주장을 신뢰하지 않는다. 기존 단일 프레임 proof를 선택 실행하되 전체 지면 제작 승인/기존 latest로 연결하지 않는다. 전체 renderer와 mixed-run 콘텐츠 교체가 미구현이므로 우회 생성하지 않는다. 상세 docs/DESIGN_REGISTRATION.md.
