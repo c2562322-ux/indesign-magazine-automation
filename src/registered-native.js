@@ -3,7 +3,7 @@
 // Native fidelity/readback coverage is partial; do not treat this as production-ready.
 // Native IDML import preserves source constructs instead of approximating them
 // with the v1 coordinate renderer. No original file is opened or written.
-const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity');
+const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity'),Trace=require('./registered-dom-trace');
 const KEY='MagazineStudioSourceRef',local=n=>n.tag.replace(/^\{[^}]+\}/,'');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function validatePageStories(entry){
@@ -111,15 +111,26 @@ function replacementPlan(entry,article){const binding=Match.bindContent(entry,ar
 }
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
  const plan=packagePlan(entry);guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
- try{guard();ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;
-  const pages=items(doc.pages),ids=pages.map(p=>p.extractLabel(KEY));
+ let failure;
+ const operation=(name,o,p,v,fn)=>Trace.run(progress,name,o,p,v,fn);
+ progress('registered.document.acquired '+JSON.stringify(Trace.identity(doc)));
+ try{guard();operation('registered.units.set',ID.app.scriptPreferences,'measurementUnit',String(ID.MeasurementUnits.POINTS),()=>{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;});
+  const pages=operation('registered.pageReferences.acquire',doc,'pages',undefined,()=>items(doc.pages)),ids=pages.map(p=>operation('registered.pageReferences.identity',p,'extractLabel',KEY,()=>p.extractLabel(KEY)));
   if(ids.length!==plan.normalPageIds.length||new Set(ids).size!==ids.length||ids.some(id=>!plan.normalPageIds.includes(id)))throw new Error('원본 페이지 수/식별 실패');
-  progress('registered.pageReferences.beforeCleanup');const beforeTrim=F.capture(doc,plan.pageIds);
-  for(const spread of items(doc.spreads))spread.allowPageShuffle=false;
-  for(const page of pages.reverse())if(!plan.pageIds.includes(page.extractLabel(KEY)))page.remove();
-  doc.recompose();progress('registered.fidelity.original');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds);
+  progress('registered.pageReferences.beforeCleanup.start');const beforeTrim=F.capture(doc,plan.pageIds,progress);
+  progress('registered.pageReferences.beforeCleanup.success');
+  progress('registered.cleanup.start');
+  for(const spread of items(doc.spreads)){
+   const shuffle=operation('registered.cleanup.shuffle.read',spread,'allowPageShuffle',undefined,()=>spread.allowPageShuffle);
+   // Avoid a needless native setter when the imported spread already has this value.
+   if(shuffle!==false)operation('registered.cleanup.shuffle.set',spread,'allowPageShuffle',false,()=>{spread.allowPageShuffle=false;});
+  }
+  for(const page of pages.slice().reverse())if(!plan.pageIds.includes(page.extractLabel(KEY)))operation('registered.cleanup.page.remove',page,'remove()',null,()=>page.remove());
+  operation('registered.cleanup.recompose',doc,'recompose()',null,()=>doc.recompose());progress('registered.cleanup.success');
+  progress('registered.fidelity.start');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds,progress);
   const trimming=F.preservation(beforeTrim,snapshot);
   baseline.records.push({role:'page-cleanup',elementId:'references',comparison:trimming});baseline.equal=baseline.equal&&trimming.equal;
+  progress('registered.fidelity.completed '+JSON.stringify({equal:baseline.equal,originalErrors:before.errors.length}));
   const context={doc,entry,baseline,snapshot,packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
@@ -145,7 +156,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
    }
   }
   doc.recompose();context.phase='CONTENT_APPLIED';progress('registered.content.recompose');return context;
- }catch(e){e.registeredDocument=doc;throw e;}finally{ID.app.scriptPreferences.measurementUnit=old;}
+ }catch(e){failure=e;e.registeredDocument=doc;throw e;}finally{try{operation('registered.units.restore',ID.app.scriptPreferences,'measurementUnit',String(old),()=>{ID.app.scriptPreferences.measurementUnit=old;});}catch(restoreError){if(failure){failure.message+=' · restore failed: '+restoreError.message;}else{restoreError.registeredDocument=doc;throw restoreError;}}}
 }
 function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;try{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;const issues=[];
  if(!['CONTENT_APPLIED','FIDELITY_PASSED'].includes(context.phase))issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:context.failure||'원본 Fidelity 미검증',hint:'원본/생성 비교를 확인해주세요. Auto Fix는 실행하지 않습니다.'});

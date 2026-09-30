@@ -1164,3 +1164,8 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 - aid processing instruction 소실 확인 및 보존/legacy 복원, idPkg prefix, 패키지 사전검증과 UXP binary readback 도입.
 - Mock 불완전 IDML 성공 경로 제거; 실제 Adobe 성공 미확인. Node214/Python16 최종 전체 테스트 통과.
 - 개인 IDML/INDD/모델 미변경, 개발 브랜치만 작업.
+
+## 2026-09-30 — open 후 beforeCleanup 오류 추적
+- 사용자 실제 화면에 근거하여 open 반환 및 페이지 identity 검사 통과 확인. 기존 로그는 getter/setter/remove를 구분하지 못함.
+- 구조 변경 없이 DOM 경계/대상/속성 진단, 중복 shuffle setter 방지, 최초 오류 보존. 전체 Node219/Python16 통과.
+- 정확한 실제 Host 실패 속성은 미확정, 새 PC 로그 필요. 원본/개인 자료 미변경.

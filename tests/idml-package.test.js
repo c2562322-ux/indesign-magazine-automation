@@ -21,8 +21,8 @@ function adapter({corrupt=false,reject=false}={}){let saved,release;const events
  return {events,release:()=>release(),env:{format:'binary',fs:{getTemporaryFolder:async()=>({createFile:async()=>file})},app:{open:async(path,show)=>{assert.equal(path,file.nativePath);assert.equal(show,true);events.push('open');if(reject)throw new Error('Adobe rejected');return {document:true};}}}};
 }
 test('native open waits for binary write and readback, supports sliced byte buffers and exact native path',async()=>{
- const h=adapter(),zip=P.zip(entries()),backing=new Uint8Array(zip.length+20);backing.set(zip,7);
- const pending=I.open(backing.subarray(7,7+zip.length),h.env);await new Promise(r=>setImmediate(r));assert.deepEqual(h.events,['write']);h.release();assert.deepEqual(await pending,{document:true});assert.deepEqual(h.events,['write','written','read','open']);
+ const h=adapter(),trace=[];h.env.progress=s=>trace.push(s);const zip=P.zip(entries()),backing=new Uint8Array(zip.length+20);backing.set(zip,7);
+ const pending=I.open(backing.subarray(7,7+zip.length),h.env);await new Promise(r=>setImmediate(r));assert.deepEqual(h.events,['write']);h.release();assert.deepEqual(await pending,{document:true});assert.deepEqual(h.events,['write','written','read','open']);assert.ok(trace.includes('registered.package.open.start'));assert.ok(trace.some(s=>s.startsWith('registered.package.open.success')));
 });
 test('native open is never called for malformed package or corrupted UXP readback',async()=>{
  const h=adapter({corrupt:true});await assert.rejects(I.open(P.zip([['mimetype','idml']]),h.env),/IDML_PACKAGE_INVALID/);assert.deepEqual(h.events,[]);

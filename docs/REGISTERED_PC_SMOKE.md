@@ -1,3 +1,15 @@
+# open 이후 DOM 단계 재실기
+
+Reload → 원고 / 작업 불러오기 (registered-smoke.docx) → 디자인 모델 / 등록 파일 불러오기 (e2e-reference.review.json) → 등록 디자인에서 추천 → 시작 메인 · 사진 1장 / 분석 후보로 선택 → 검증용 문서 생성.
+
+정상 경계: package.open.success → document.acquired → pageReferences.beforeCleanup.success → cleanup.success → fidelity.start. fidelity.completed의 equal 값은 별도 Fidelity 판정이며 문서 열림과 구분한다.
+
+실패 시 상세 진단의 REGISTERED_DOM_FAILED 전체를 전달. operation, object.type/id/name/sourceId, owner, pageId, property, attemptedValue 및 Adobe 오류가 포함된다. snapshot.read이면 읽기 실패, cleanup.shuffle.set이면 속성 대입 실패, cleanup.page.remove이면 삭제 작업 실패다. units.restore 오류가 함께 있어도 최초 오류를 우선 확인한다. 실패한 새 문서는 기존 정리 정책에 따라 닫힐 수 있다.
+
+현재 실제 실패 속성은 이전 화면만으로 확정할 수 없다. 이번 재실기 결과를 받기 전까지 해결 완료/전체 Fidelity 성공으로 취급하지 않는다.
+
+---
+
 # IDML 열기 수정 재실기 — 먼저 이 단계만 확인
 
 1. UDT에서 현재 폴더의 플러그인을 Reload.

@@ -308,7 +308,7 @@
     }
     function production(label,action){return run(async()=>{
         const started=Date.now(),trace=[label+' 시작'];$('pdfReason').textContent='작업 중입니다. 완료 후 다음 단계가 열립니다.';status(trace[0]);$('productionStatus').textContent=label+' 중…';$('hostReport').textContent=trace[0];
-        const progress=stage=>{if(api.disposed)return;trace.push((Date.now()-started)+'ms · '+stage);if(trace.length>40)trace.splice(1,1);$('hostReport').textContent=safe(trace.join('\n'));status(label+' 중…');};
+        const progress=stage=>{if(api.disposed)return;trace.push((Date.now()-started)+'ms · '+stage);if(trace.length>160)trace.splice(1,1);$('hostReport').textContent=safe(trace.join('\n'));status(label+' 중…');};
         try{
             if(adapter.yieldUI)await adapter.yieldUI();if(api.disposed)return;
             const report=await action(progress);if(api.disposed)return;

@@ -159,3 +159,29 @@ test('synthetic self-contained Word smoke file extracts a valid internal PNG and
   const before=fs.readFileSync(file),again=spawnSync(fs.existsSync(py)?py:'python3',['tools/create-registered-smoke-docx.py',file]);assert.notEqual(again.status,0);assert.deepEqual(fs.readFileSync(file),before);
  }finally{assert.equal(path.dirname(path.resolve(tmp)),path.resolve(os.tmpdir()));assert.ok(path.basename(tmp).startsWith('registered-smoke-'));fs.rmSync(tmp,{recursive:true,force:true});}
 });
+
+test('native snapshot getter failure names exact object/property and stops before cleanup',async()=>{
+ const e=fixture(),h=host(e),trace=[];let removed=false;
+ h.frames[0].id=731;Object.defineProperty(h.frames[0],'textWrapPreferences',{get(){return Object.defineProperty({},'textWrapOffset',{get(){throw new Error('현재 상태에서 이 속성을 적용할 수 없습니다.');}});}});
+ for(const p of h.doc.pages)p.remove=()=>{removed=true;};
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)}),error=>/textWrapOffset/.test(error.message)&&/731/.test(error.message)&&error.registeredDocument===h.doc);
+ assert.ok(trace.some(s=>s==='registered.pageReferences.beforeCleanup.start'));assert.ok(!trace.includes('registered.pageReferences.beforeCleanup.success'));assert.equal(removed,false);assert.equal(h.recomposes,0);
+});
+test('native shuffle setter failure is attributed after snapshot success without deleting pages',async()=>{
+ const e=fixture(),h=host(e),trace=[];h.doc.spreads=[Object.defineProperties({id:12,name:'spread test'},{allowPageShuffle:{get:()=>true,set(){throw new Error('현재 상태에서 이 속성을 적용할 수 없습니다.');}}})];
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)}),/shuffle.set.*allowPageShuffle.*false/);
+ assert.ok(trace.includes('registered.pageReferences.beforeCleanup.success'));assert.ok(!trace.includes('registered.cleanup.success'));assert.equal(h.recomposes,0);
+});
+test('already disabled shuffle is preserved without redundant native assignment',async()=>{
+ const e=fixture(),h=host(e),trace=[];h.doc.spreads=[Object.defineProperty({},'allowPageShuffle',{get:()=>false,set(){throw new Error('redundant setter rejected');}})];
+ const result=await N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)});assert.equal(result.phase,'FIDELITY_PASSED');assert.ok(trace.includes('registered.fidelity.start'));assert.ok(!trace.some(s=>s.includes('shuffle.set')));
+});
+test('page remove failure reports page identity and stops before recompose and fidelity',async()=>{
+ const e=fixture(),h=host(e),trace=[],p=h.doc.pages.find(p=>!e.descriptor.pageIds.includes(p.extractLabel()));assert.ok(p);p.id=942;p.remove=()=>{throw new Error('page removal refused');};
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)}),/page.remove.*942.*remove/);assert.ok(!trace.includes('registered.fidelity.start'));assert.equal(h.recomposes,0);
+});
+test('unit restoration failure cannot mask the first native snapshot error',async()=>{
+ const e=fixture(),h=host(e);Object.defineProperty(h.frames[0],'geometricBounds',{get(){throw new Error('first geometry error');}});
+ Object.defineProperty(h.ID.app.scriptPreferences,'measurementUnit',{get:()=> 'mm',set(v){if(v==='mm')throw new Error('restore error');}});
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof'}),error=>/geometricBounds/.test(error.message)&&/first geometry error/.test(error.message)&&/restore error/.test(error.message)&&error.registeredDocument===h.doc);
+});

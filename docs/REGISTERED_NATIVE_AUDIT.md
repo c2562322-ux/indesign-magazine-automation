@@ -1,3 +1,18 @@
+# Adobe open 이후 DOM 실패 추적 — 2026-09-30
+
+- 사용자 첨부 실제 화면: 409ms nativeImport → 424ms validate → 601ms write → 605ms readback → 796ms open → 3800ms pageReferences.beforeCleanup → 현재 상태에서 이 속성을 적용할 수 없습니다.
+- 두 번째 화면은 Studio ready 및 Reload/파일 불러오기 이벤트이며 실패 속성을 추가로 식별하지 않는다.
+- **open은 반환했고 Document.pages 원본 수/ID 검사도 통과했다.** beforeCleanup 로그 이전에 measurementUnit=POINTS도 통과. 기존 catch가 실패한 새 문서를 닫으므로 화면에 문서가 남지 않아도 open 실패를 뜻하지 않는다.
+- 이전 beforeCleanup 표시는 capture(read-only) 시작, 이후 spread.allowPageShuffle=false, Page.remove(), recompose까지 포함한다. 따라서 기존 증거만으로 정확한 객체/속성/읽기 대 쓰기를 확정할 수 없음. Adobe 메시지 표현만으로 setter 오류라 단정하지 않음.
+- 수정: open.start/success와 반환 DOM identity; snapshot start/success; 실패 getter의 property/owner/page identity; cleanup의 shuffle read/set, page remove, recompose start/success; fidelity.start/completed 로그. snapshot 읽기 실패도 fatal. property assignment 전에 attemptedValue 기록.
+- 이미 false인 spread.shuffle 재대입 방지(기준 모델 선택 spread u3357도 false). true를 false로 바꾸는 기존 정책, 삭제 대상 및 Fidelity 비교 기준은 변경하지 않음. 이것이 실제 사용자 오류 원인이었다는 증거는 아직 없음.
+- measurementUnit 복원 오류가 최초 오류를 덮어쓰지 않게 두 오류 보존. 원본 자료/geometry/typography/content/Auto Fix 변경 없음.
+- Mock은 평범한 JS 객체로 getter/setter의 Adobe 상태 오류가 없었다. 신규5개 회귀: snapshot getter, shuffle setter, redundant setter, Page.remove 실패, 단위 복원 이중 실패. 기존 open 테스트에 성공 경계 검증 추가.
+- **전체 Node219/Python16 통과. Adobe 재실기 미실행, 정확한 실제 실패 속성 및 Fidelity 진입 성공은 미확정.** 진단 보강을 실기 해결 완료로 해석하지 말 것.
+- NEXT STEP: Reload → 기존 Smoke DOCX/등록 파일 → 추천 → 시작 메인 · 사진 1장 선택 → 검증용 문서 생성. 새 REGISTERED_DOM_FAILED 전체와 직전 start/success를 확보. 실제 원인 속성을 보고 다음 수정 범위를 확정한다.
+
+---
+
 # Adobe IDML open 실패 후 수정 감사 — 2026-09-30
 
 ## 확인한 원인과 한계

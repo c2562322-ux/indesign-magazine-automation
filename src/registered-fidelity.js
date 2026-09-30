@@ -1,7 +1,7 @@
 'use strict';
 // Native snapshots are evidence of preservation across our mutations, not a
 // replacement for Original Model -> Host comparisons or visual Adobe proof.
-const Model=require('./design-model');
+const Model=require('./design-model'),Trace=require('./registered-dom-trace');
 const KEY='MagazineStudioSourceRef';
 const list=c=>!c?[]:Array.isArray(c)?c:Array.from({length:c.length},(_,i)=>c.item(i));
 const ref=o=>o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null;
@@ -20,22 +20,23 @@ function value(v){
 const OBJECT=['fillColor','fillTint','strokeColor','strokeTint','strokeWeight','strokeType','rotationAngle','shearAngle','visible','locked','overprintFill','overprintStroke'];
 const FIT=['autoFit','leftCrop','topCrop','rightCrop','bottomCrop','fittingOnEmptyFrame','fittingAlignment'];
 function read(o,keys){const out={};for(const k of keys)out[k]=value(o&&o[k]);return out;}
-function frameSnapshot(f){
- const page=f.parentPage,p=page?Array.from(page.bounds,Number):[0,0,0,0],b=Array.from(f.geometricBounds,Number);
- const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:read(f,OBJECT),layer:value(f.itemLayer),group:ref(f.parent),objectStyle:value(f.appliedObjectStyle),
-  fitting:read(optional(f,'frameFittingOptions'),FIT),paths:list(f.paths).map(p=>value(p.entirePath)),
-  graphics:list(optional(f,'allGraphics')).map(g=>({bounds:value(g.geometricBounds),scale:read(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:g.itemLink?String(g.itemLink.filePath):null})),
-  wrap:read(f.textWrapPreferences,['textWrapMode','textWrapOffset','inverse','textWrapSide']),
-  effects:read(f.transparencySettings&&f.transparencySettings.blendingSettings,['opacity','blendMode','isolateBlending','knockoutGroup'])};
- const story=optional(f,'parentStory');if(story){result.storyRef=ref(story);result.story=String(story.contents);result.thread=list(story.textContainers).map(ref);result.previous=ref(f.previousTextFrame);result.next=ref(f.nextTextFrame);
-  result.frame=read(f.textFramePreferences,['textColumnCount','textColumnGutter','insetSpacing','verticalJustification','firstBaselineOffset','autoSizingType']);}
+function frameSnapshot(f,progress=()=>{}){
+ const get=Trace.reader(progress,f),R=(o,keys)=>Object.fromEntries(keys.map(k=>[k,value(get(o,k))]));
+ const page=get(f,'parentPage'),p=page?Array.from(get(page,'bounds'),Number):[0,0,0,0],b=Array.from(get(f,'geometricBounds'),Number);
+ const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:R(f,OBJECT),layer:value(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:value(get(f,'appliedObjectStyle')),
+  fitting:R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(p=>value(get(p,'entirePath'))),
+  graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:value(get(g,'geometricBounds')),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
+  wrap:R(get(f,'textWrapPreferences'),['textWrapMode','textWrapOffset','inverse','textWrapSide'])};
+ const transparency=get(f,'transparencySettings');result.effects=R(get(transparency,'blendingSettings'),['opacity','blendMode','isolateBlending','knockoutGroup']);
+ const story=optional(f,'parentStory');if(story){result.storyRef=ref(story);result.story=String(get(story,'contents'));result.thread=list(get(story,'textContainers')).map(ref);result.previous=ref(get(f,'previousTextFrame'));result.next=ref(get(f,'nextTextFrame'));
+  result.frame=R(get(f,'textFramePreferences'),['textColumnCount','textColumnGutter','insetSpacing','verticalJustification','firstBaselineOffset','autoSizingType']);}
  return result;
 }
-function capture(doc,pageIds){
- const pages=list(doc.pages).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(doc.masterSpreads).flatMap(s=>list(s.allPageItems));
- const candidates=pageIds?pages.flatMap(p=>list(p.allPageItems)).concat(masters):list(doc.allPageItems).concat(masters);
- const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=frameSnapshot(f);}}
- return {pages:pages.map(p=>({id:ref(p),parent:ref(p.appliedMaster),order:list(p.allPageItems).map(ref)})),objects};
+function capture(doc,pageIds,progress=()=>{}){
+ const get=Trace.reader(progress,doc),pages=list(get(doc,'pages')).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(get(doc,'masterSpreads')).flatMap(s=>list(get(s,'allPageItems')));
+ const candidates=pageIds?pages.flatMap(p=>list(get(p,'allPageItems'))).concat(masters):list(get(doc,'allPageItems')).concat(masters);
+ const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress),{before:false});}}
+ return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(ref)})),objects};
 }
 function preservation(before,after,edits=[]){
  const a=JSON.parse(JSON.stringify(before)),b=JSON.parse(JSON.stringify(after));
