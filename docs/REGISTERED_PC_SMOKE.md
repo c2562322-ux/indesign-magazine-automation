@@ -1,3 +1,27 @@
+# 등록 디자인 실제 제작 연결 보강 — 2026-09-30
+
+- 원본 검증 문서는 proofOnly로 샘플 콘텐츠 유지, PDF 금지. 일반 제작 버튼은 mode=production으로 별도 IDML 문서를 열고 원본 자동 Fidelity 통과 후 TITLE/SUBTITLE/BODY/IMAGE를 교체한다. 이 기존 경로를 재사용했으며 추천 엔진/원본 모델/페이지 geometry는 변경하지 않았다.
+- 새 제작 보고서 fidelity.contentApplied에 역할/객체ID/교체 글자수/이미지 배치 메타데이터를 포함하고 패널에 교체 역할을 표시한다. 실제 Story 내용/typography/direct override/KEEP/geometry/링크/fitting 비교가 계속 출력 gate다.
+- 사진 비율 불일치 crop/여백 확인 및 배치 bounds 기준 추정150ppi 미만 경고 추가. 경고는 warnings에만 추가하며 기존 Fidelity 오류는 모두 유지한다. 실제 배치 geometry를 변경하거나 fit 정책을 새로 만들지 않는다.
+- 원고에 caption이 없으면 확정 CAPTION도 원본 유지. caption이 있으면 기존 Story 교체/보존 검사 사용.
+- Adobe Host에서 육안 승인 후 CONTENT_APPLIED, 오류0, outputReady=true를 확인한 템플릿만 같은 패널 세션의 다음 원고에서 수동 proof를 생략할 수 있다. 원본 모델 객체와 descriptor 동일성 확인, import/역할변경/실패 시 승인 폐기. Mock 또는 저장 JSON의 productionReady 필드는 승인 불가. 매 제작의 자동 원본 Fidelity 검사는 유지.
+- 승인 영속 저장은 구현하지 않았다. Reload/재시작 시 다시 검증해야 한다. 세션 간 재사용은 향후 Host/폰트/원본/엔진 버전까지 검증하는 신뢰 저장이 필요하다.
+- Desktop magazine-fidelity.private.json은 createdAt 2026-09-30T07:52:07.365Z, KerningMethod 766건이며 제작 후 preservation 오류 없음. 최신 고정객체 진단 경로 요청했으나 아직 미수신. 이 오류의 원인이나 해결을 추측/주장하지 않는다. 실제 End-to-End 완료는 새 Adobe 제작 검사 결과 대기.
+- 테스트 Node262/Python16. 새3: Adobe 성공 후 다음 원고 바로 제작(반대로 Mock/import 재승인 차단), crop/저해상도 경고에도 geometry mismatch 차단 유지, 원고 caption 유무별 보존. 기존 다중BODY/IMAGE1..10/DOCX UXP 파일 쓰기/검사/INDD/PDF 테스트 유지.
+- NEXT STEP: 아래 PC 순서로 검증 및 제작. 오류 시 제작 직후 Fidelity 진단 JSON 저장, 전체 오류와 contentApplied 확인. 제작 전 proof JSON으로는 제작 후 오류를 진단할 수 없다.
+
+## PC 최소 순서
+
+1. UDT Reload → registered-smoke.docx(사진1장) → 기존25페이지 Library 불러오기 → 등록 디자인에서 추천 → 시작 메인 · 사진1장 선택. 사진4장 원고는1슬롯 지면에 사용 불가; 사진을 몰래 누락하지 않는다.
+2. 첫 세션: 개발자 검증용 문서 생성 → 자동 Fidelity/원본 육안 비교 → 원본과 비교 완료. 이 문서에 원본 샘플이 보이는 것은 정상.
+3. 일반 제작 영역의 선택한 등록 디자인으로 제작. 새 문서의 제목/부제/본문이 DOCX 원문이고 이미지 프레임에 실제 사진이 들어갔는지 확인. 패널 CONTENT_APPLIED 및 교체 역할 확인.
+4. 문서 검사 → 오류0 확인 → INDD 저장 → PDF 내보내기. 넘침이면 CONTENT_OVERFLOW로 처리하고 글자/프레임 자동 변경 없이 중단. 고정객체 오류가 있으면 PDF 차단 유지, Fidelity 진단 JSON 저장.
+5. 제작 검사까지 통과한 동일 템플릿의 다음 원고: DOCX → 추천 → 선택 → 제작. 같은 세션에서는 별도 수동 proof 불필요. 자동 원본 검사와 새 원고 검사는 계속 수행.
+
+Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직 미확인이다. 이번 자동 테스트 성공은 실제 출력 성공 증거가 아니다.
+
+---
+
 # 기존 25페이지 공통 등록/추천/검증 연결 — 2026-09-30
 
 - 재개 HEAD 6f71f8dc8572ba3bafa6b3989123d40e0a848cb9. 미커밋 design-matching/design-registration/registered-native 변경 보존 후 완성. 새 원본/샘플 디자인 생성 없음.

@@ -105,3 +105,12 @@ test('review and excluded designs stay bounded and excluded reasons expand on de
  const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,3);assert.ok(x.nodes().some(n=>n.textContent==='추가 후보 5개'));
  const y=setup({load:async()=>R.pack(entries)});y.studio.read=()=>({article:{...article,images:[{width:1200,height:800}]}});await y.click('디자인 모델 / 등록 파일 불러오기');await y.click('등록 디자인에서 추천');assert.equal(y.nodes().filter(n=>n.className==='registered-card').length,0);const toggle=y.nodes().find(n=>n.textContent==='제외된 디자인 8개'),parent=y.nodes().find(n=>n.children.includes(toggle));assert.equal(parent.children[0].style.display,'none');await toggle.click();assert.equal(parent.children[0].style.display,'');assert.equal(y.ui.state.entries.length,8);
 });
+
+
+test('only Adobe production with visual approval permits next manuscript without another manual proof',async()=>{
+ for(const hostKind of ['adobe','mock']){const x=setup({hostKind}),calls=[];let current=article;x.studio.read=()=>({article:current});x.studio.createRegistered=async(e,a,mode)=>{calls.push(mode);return {errors:[],issues:[],outputReady:mode==='production',fidelity:{phase:mode==='proof'?'FIDELITY_PASSED':'CONTENT_APPLIED',proofOnly:mode==='proof'}};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');await x.click('검증용 문서 생성');await x.click('원본과 비교 완료');await x.click('선택한 등록 디자인으로 제작');
+ current={...article,title:'다음 제목'};x.ui.invalidate();await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');await x.click('선택한 등록 디자인으로 제작');assert.deepEqual(calls,hostKind==='adobe'?['proof','production','production']:['proof','production']);
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');assert.equal(x.nodes().find(n=>n.textContent==='선택한 등록 디자인으로 제작').disabled,true);
+ }
+});

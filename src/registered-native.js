@@ -154,7 +154,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   const trimming=F.preservation(beforeTrim,snapshot);
   baseline.records.push({role:'page-cleanup',elementId:'references',comparison:trimming});baseline.equal=baseline.equal&&trimming.equal;
   progress('registered.fidelity.completed '+JSON.stringify({equal:baseline.equal,originalErrors:before.errors.length}));
-  const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
+  const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],contentWarnings:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
   progress('registered.content.plan.start');const edits=replacementPlan(entry,article);context.edits=edits;progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
@@ -175,6 +175,11 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
     operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));F.restore(f.frameFittingOptions,target.fitting);operation('registered.content.'+edit.role+'.fit',f,'fit()','APPLY_FRAME_FITTING_OPTIONS',()=>f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS));F.restore(f.frameFittingOptions,target.fitting);
+    const imageProfile=Match.imageProfile(edit.image),frameRatio=(bounds[3]-bounds[1])/(bounds[2]-bounds[0]);
+    if(imageProfile.known&&Math.abs(Math.log(imageProfile.aspectRatio/frameRatio))>.05)context.contentWarnings.push(edit.role+' 원고 사진과 원본 프레임 비율이 다릅니다. 원본 fitting/crop 유지 · 잘림/여백을 확인해주세요.');
+    const placed=F.frameSnapshot(f,undefined,doc,ID).graphics[0],gb=placed&&placed.bounds;
+    if(imageProfile.known&&Array.isArray(gb)&&gb[3]>gb[1]&&gb[2]>gb[0]){const ppi=Math.min(imageProfile.width*72/(gb[3]-gb[1]),imageProfile.height*72/(gb[2]-gb[0]));if(ppi<150)context.contentWarnings.push(edit.role+' 배치 bounds 기준 추정 해상도 '+Math.round(ppi)+'ppi · 인쇄 해상도 확인 필요');}
+    else context.contentWarnings.push(edit.role+' 배치 이미지 해상도 미확정 · 링크/출력 해상도를 확인해주세요.');
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
    }
   }

@@ -116,3 +116,9 @@ test('source text conflicting with estimated capacity requires calibration, neve
  const c=Match.capacity(m,m.elements.find(e=>e.id==='body'));assert.equal(c.sourceObservation.characters,1000);assert.equal(c.sourceObservation.hostFitVerified,false);assert.ok(c.estimatedCharacters.high<650);
  const linked=copy(m.elements.find(e=>e.id==='body'));linked.id='linked';m.elements.push(linked);assert.equal(Match.capacity(m,m.elements.find(e=>e.id==='body')).sourceObservation.exclusiveFrame,false);
 });
+
+
+test('caption only replaces a confirmed slot when the manuscript supplies a caption',()=>{
+ const {m,d}=design(),c=copy(m.elements.find(e=>e.id==='body')),s=copy(m.stories.find(s=>s.id==='bodyStory'));c.id='caption';c.textFrame.storyRef='captionStory';s.id='captionStory';m.elements.push(c);m.stories.push(s);d.roles.caption={role:'caption',confirmed:true};const entry=Match.libraryEntry(m,d);
+ assert.ok(!Match.bindContent(entry,article,{installedFonts:fonts}).content.some(c=>c.role==='caption'));assert.equal(Match.bindContent(entry,{...article,caption:'사진 설명'},{installedFonts:fonts}).content.find(c=>c.role==='caption').text,'사진 설명');
+});

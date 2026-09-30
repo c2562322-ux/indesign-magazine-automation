@@ -223,6 +223,7 @@ function bindContent(entry,article,options){
     if(suitability.hard.length)throw new Error('Content violates constraints: '+suitability.hard.map(x=>x.code).join(', '));
     const bindings=[];
     for(const t of entry.profile.textFrames.filter(t=>['title','subtitle','body','caption'].includes(t.role))){
+        if(t.role==='caption'&&!String(article.caption||'').trim())continue; // An absent DOCX caption does not erase fixed source text.
         const e=entry.original.elements.find(e=>e.id===t.elementId);
         if(!bindings.some(b=>b.storyId===e.textFrame.storyRef))bindings.push({storyId:e.textFrame.storyRef,role:t.role,text:String(article[t.role]||'')});
     }

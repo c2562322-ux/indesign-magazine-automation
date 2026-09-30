@@ -331,3 +331,11 @@ test('unassigned Group wholly contained by selected child pages is safe; shared 
 test('original proof can inspect unmapped pages without permitting production content writes',async()=>{
  const e=JSON.parse(JSON.stringify(fixture()));e.profile.readyForMatching=false;assert.throws(()=>N.packagePlan(e),/역할/);const h=host(e),c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_PASSED');assert.deepEqual(c.edits,[]);
 });
+
+
+test('image crop and low-resolution warnings retain source geometry and do not hide preservation errors',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),photo=e.original.elements.find(e=>e.type==='Rectangle');photo.pageCandidates=['p1'];photo.pageBounds={p1:[10,450,150,590]};photo.image=[];photo.properties={};photo.details={};e.descriptor.roles[photo.id]={role:'image1',confirmed:true};e.descriptor.images[photo.id]='required';e.descriptor.preserveElementIds=e.descriptor.preserveElementIds.filter(id=>id!==photo.id);
+ const entry=R.register(e.original,e.descriptor),h=host(entry),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[{path:'C:/smoke/photo.png',source:'docx',widthPx:100,heightPx:50}]},h.env);
+ assert.equal(c.phase,'CONTENT_APPLIED');assert.ok(c.contentWarnings.some(s=>s.includes('비율')));assert.ok(c.contentWarnings.some(s=>s.includes('해상도')));assert.equal(N.check(c,h.ID).length,0);
+ const frame=c.contentChecks.find(c=>c.imagePath).frame;frame.geometricBounds[0]+=1;assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));assert.equal(c.autoFixAllowed,false);
+});
