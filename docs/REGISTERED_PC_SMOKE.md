@@ -1,3 +1,12 @@
+# overprintFill 수정 재실기
+
+UDT Reload → registered-smoke.docx 불러오기 → e2e-reference.review.json 불러오기 → 등록 디자인에서 추천 → 시작 메인 · 사진 1장 / 분석 후보로 선택 → 검증용 문서 생성.
+
+확인 경계: registered.pageReferences.beforeCleanup.success → registered.cleanup.success → registered.fidelity.start. 이후 원본 비교 통과 여부는 별도이며 NOT_APPLICABLE은 원본 무채움/비활성 상태에 대한 진단이다. fidelity.notApplicable에 sourceId별 속성과 이유를 확인할 수 있다.
+실패 시 생성 영역에 표시된 operation/객체/sourceId/페이지/스프레드/property/Adobe error 전체를 전달. Auto Fix는 실행하지 않는다.
+
+---
+
 # 최종 실패 요약 확인
 
 동일한 Reload → DOCX → 등록 파일 → 추천 → 후보 선택 → 검증용 문서 생성 순서로 진행한다.

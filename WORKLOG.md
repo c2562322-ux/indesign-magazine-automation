@@ -1174,3 +1174,7 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 - acquire.success 이후 실제 최종 오류 행 미확보. 새 첨부 파일은 수신되지 않았으며 사용자 전사만 근거로 작업.
 - 구조화된 최초 DOM 실패와 page/spread identity를 최종 UI/로그에 보존. open 및 Fidelity 동작 유지.
 - Node222/Python16 전체 통과, Adobe 실제 원인 확정/해결은 새 최종 오류 요약 확보 후 진행.
+
+## 2026-09-30 — None fill snapshot getter 수정
+- 실제 u7caf overprintFill 오류와 source None fill/stroke 확인. paint/type/wrap 적용성에 따른 명시적 N/A 정책, 활성·필수 getter 오류 차단 유지.
+- 신규4 회귀 포함 Node226/Python16 통과. 수정 후 Adobe 실기 미검증. 원본/개인 자료 변경 없음.

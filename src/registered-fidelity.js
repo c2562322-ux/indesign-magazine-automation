@@ -17,25 +17,39 @@ function value(v,get=(o,k)=>o[k]){
  const name=get(v,'name');if(name!==undefined)return {name:String(name)};
  return String(v);
 }
-const OBJECT=['fillColor','fillTint','strokeColor','strokeTint','strokeWeight','strokeType','rotationAngle','shearAngle','visible','locked','overprintFill','overprintStroke'];
+const OBJECT=['rotationAngle','shearAngle','visible','locked'];
+const na=reason=>({status:'NOT_APPLICABLE',reason});
+function noPaint(color,doc){
+ if(!color)return false;
+ if(doc&&doc.swatches){const none=doc.swatches.item(0);return color.id!==undefined&&color.id===none.id;}
+ return ['None','[None]','$ID/None','없음','[없음]'].includes(color.name);
+}
 const FIT=['autoFit','leftCrop','topCrop','rightCrop','bottomCrop','fittingOnEmptyFrame','fittingAlignment'];
 function read(o,keys){const out={};for(const k of keys)out[k]=value(o&&o[k]);return out;}
-function frameSnapshot(f,progress=()=>{}){
+function frameSnapshot(f,progress=()=>{},doc,ID={}){
  const get=Trace.reader(progress,f),V=v=>value(v,get),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false,owner:f}),R=(o,keys)=>Object.fromEntries(keys.map(k=>[k,V(get(o,k))]));
  const page=get(f,'parentPage'),p=page?Array.from(get(page,'bounds'),Number):[0,0,0,0],b=Array.from(get(f,'geometricBounds'),Number);
- const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:R(f,OBJECT),layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),
-  fitting:R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(p=>V(get(p,'entirePath'))),
+ const fill=get(f,'fillColor'),stroke=get(f,'strokeColor'),weight=get(f,'strokeWeight'),fillAbsent=noPaint(fill,doc),strokeAbsent=noPaint(stroke,doc)||weight===0;
+ const appearance={...R(f,OBJECT),fillColor:V(fill),strokeColor:V(stroke),strokeWeight:V(weight)};
+ for(const key of ['fillTint','overprintFill'])appearance[key]=fillAbsent?na('fillColor=None'):V(get(f,key));
+ for(const key of ['strokeTint','strokeType','overprintStroke'])appearance[key]=strokeAbsent?na('strokeColor=None or strokeWeight=0'):V(get(f,key));
+ const textFrame=['TextFrame','EndnoteTextFrame'].includes(f.constructor&&f.constructor.name);
+ const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:appearance,layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),
+  fitting:textFrame?na('text frame: graphic fitting inactive'):R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(p=>V(get(p,'entirePath'))),
   graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:V(get(g,'geometricBounds')),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
-  wrap:R(get(f,'textWrapPreferences'),['textWrapMode','textWrapOffset','inverse','textWrapSide'])};
+  wrap:{}};
+ const wrap=get(f,'textWrapPreferences'),mode=get(wrap,'textWrapMode');result.wrap.textWrapMode=V(mode);
+ const noWrap=mode!==undefined&&ID.TextWrapModes&&ID.TextWrapModes.NONE!==undefined&&enumEqual(mode,ID.TextWrapModes.NONE);
+ for(const key of ['textWrapOffset','inverse','textWrapSide'])result.wrap[key]=noWrap?na('textWrapMode=NONE'):V(get(wrap,key));
  const transparency=get(f,'transparencySettings');result.effects=R(get(transparency,'blendingSettings'),['opacity','blendMode','isolateBlending','knockoutGroup']);
- const story=optional(f,'parentStory');if(story){result.storyRef=ref(story);result.story=String(get(story,'contents'));result.thread=list(get(story,'textContainers')).map(ref);result.previous=ref(get(f,'previousTextFrame'));result.next=ref(get(f,'nextTextFrame'));
+ const story=textFrame?Trace.run(progress,'registered.snapshot.read',f,'parentStory',undefined,()=>{const s=get(f,'parentStory');if(!s)throw new Error('Required TextFrame.parentStory is unavailable');return s;},{before:false}):optional(f,'parentStory');if(story){result.storyRef=ref(story);result.story=String(get(story,'contents'));result.thread=list(get(story,'textContainers')).map(ref);result.previous=ref(get(f,'previousTextFrame'));result.next=ref(get(f,'nextTextFrame'));
   result.frame=R(get(f,'textFramePreferences'),['textColumnCount','textColumnGutter','insetSpacing','verticalJustification','firstBaselineOffset','autoSizingType']);}
  return result;
 }
-function capture(doc,pageIds,progress=()=>{}){
+function capture(doc,pageIds,progress=()=>{},ID={}){
  const get=Trace.reader(progress,doc),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false}),pages=list(get(doc,'pages')).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(get(doc,'masterSpreads')).flatMap(s=>list(get(s,'allPageItems')));
  const candidates=pageIds?pages.flatMap(p=>list(get(p,'allPageItems'))).concat(masters):list(get(doc,'allPageItems')).concat(masters);
- const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress),{before:false});}}
+ const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress,doc,ID),{before:false});}}
  return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(ref)})),objects};
 }
 function preservation(before,after,edits=[]){
@@ -45,6 +59,10 @@ function preservation(before,after,edits=[]){
   const obj=state.objects[edit.elementId];if(obj&&edit.image){delete obj.graphics;delete obj.fitting;}
  }
  return Model.compare(a,b);
+}
+function applicability(snapshot){
+ const out=[];function walk(v,path){if(!v||typeof v!=='object')return;if(v.status==='NOT_APPLICABLE'){out.push({path,reason:v.reason});return;}for(const [k,x] of Object.entries(v))walk(x,path?path+'.'+k:k);}
+ walk(snapshot.objects,'objects');return out;
 }
 function colorExpected(model,ref){
  if(ref==='Swatch/None')return {none:true};
@@ -93,4 +111,4 @@ function directCompare(source,properties,ID){
  }
  return {expected,actual,comparison:Model.compare(expected,actual)};
 }
-module.exports={list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};
+module.exports={applicability,na,noPaint,list,ref,value,read,FIT,capture,preservation,frameSnapshot,colorExpected,colorActual,objectProperties,directSnapshot,directCompare,restore};

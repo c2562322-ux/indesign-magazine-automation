@@ -63,7 +63,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
   try{
    const expected={bounds:e.pageBounds[e.pageCandidates[0]],page:e.pageCandidates[0]},actual={bounds:relative(f),page:F.ref(f.parentPage)};
    const props=F.objectProperties(entry.original,e);expected.appearance={};actual.appearance={};
-   for(const [key,v] of Object.entries(props)){expected.appearance[key]=/Color$/.test(key)?F.colorExpected(entry.original,v):v;const got=f[key[0].toLowerCase()+key.slice(1)];actual.appearance[key]=/Color$/.test(key)?F.colorActual(got,ID,doc):got;}
+   for(const [key,v] of Object.entries(props)){expected.appearance[key]=/Color$/.test(key)?F.colorExpected(entry.original,v):v;const inactive=(key==='FillTint'&&props.FillColor==='Swatch/None'&&F.noPaint(f.fillColor,doc))||(key==='StrokeTint'&&(props.StrokeColor==='Swatch/None'||props.StrokeWeight===0)&&(F.noPaint(f.strokeColor,doc)||f.strokeWeight===0));if(inactive){expected.appearance[key]=F.na('source and generated paint inactive');actual.appearance[key]=F.na('source and generated paint inactive');continue;}const got=f[key[0].toLowerCase()+key.slice(1)];actual.appearance[key]=/Color$/.test(key)?F.colorActual(got,ID,doc):got;}
    // Fixed placed graphics are retained by the native importer. Unsupported
    // clipping/effects cannot be certified by bounds alone.
    expected.graphicCount=(e.image||[]).length;actual.graphicCount=F.list(f.allGraphics).length;
@@ -117,7 +117,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
  try{guard();operation('registered.units.set',ID.app.scriptPreferences,'measurementUnit',String(ID.MeasurementUnits.POINTS),()=>{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;});
   const pages=operation('registered.pageReferences.acquire',doc,'pages',undefined,()=>items(doc.pages)),ids=pages.map(p=>operation('registered.pageReferences.identity',p,'extractLabel',KEY,()=>p.extractLabel(KEY)));
   operation('registered.pageReferences.validate',doc,'page source IDs',plan.normalPageIds,()=>{if(ids.length!==plan.normalPageIds.length||new Set(ids).size!==ids.length||ids.some(id=>!plan.normalPageIds.includes(id)))throw new Error('원본 페이지 수/식별 실패: '+JSON.stringify(ids));});
-  progress('registered.pageReferences.beforeCleanup.start');const beforeTrim=F.capture(doc,plan.pageIds,progress);
+  progress('registered.pageReferences.beforeCleanup.start');const beforeTrim=F.capture(doc,plan.pageIds,progress,ID);
   progress('registered.pageReferences.beforeCleanup.success');
   progress('registered.cleanup.start');
   for(const spread of operation('registered.cleanup.spreads.acquire',doc,'spreads',undefined,()=>items(doc.spreads))){
@@ -127,11 +127,11 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   }
   for(const page of pages.slice().reverse())if(!plan.pageIds.includes(operation('registered.cleanup.page.identity',page,'extractLabel',KEY,()=>page.extractLabel(KEY))))operation('registered.cleanup.page.remove',page,'remove()',null,()=>page.remove());
   operation('registered.cleanup.recompose',doc,'recompose()',null,()=>doc.recompose());progress('registered.cleanup.success');
-  progress('registered.fidelity.start');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds,progress);
+  progress('registered.fidelity.start');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds,progress,ID);
   const trimming=F.preservation(beforeTrim,snapshot);
   baseline.records.push({role:'page-cleanup',elementId:'references',comparison:trimming});baseline.equal=baseline.equal&&trimming.equal;
   progress('registered.fidelity.completed '+JSON.stringify({equal:baseline.equal,originalErrors:before.errors.length}));
-  const context={doc,entry,baseline,snapshot,packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
+  const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
   const edits=replacementPlan(entry,article);context.edits=edits;
@@ -152,7 +152,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
     f.place(edit.image.path);F.restore(f.frameFittingOptions,target.fitting);f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS);F.restore(f.frameFittingOptions,target.fitting);
-    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f).graphics});
+    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
    }
   }
   doc.recompose();context.phase='CONTENT_APPLIED';progress('registered.content.recompose');return context;
@@ -162,7 +162,7 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  if(!['CONTENT_APPLIED','FIDELITY_PASSED'].includes(context.phase))issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:context.failure||'원본 Fidelity 미검증',hint:'원본/생성 비교를 확인해주세요. Auto Fix는 실행하지 않습니다.'});
  if(context.phase==='FIDELITY_FAILED'&&context.originalInspection)for(const message of context.originalInspection.errors)issues.push({cause:/overflow|넘칩니다|넘침/i.test(message)?'SOURCE_OVERFLOW':'SOURCE_INSPECTION',category:'BLOCKING',message:'원본 단계: '+message,hint:'원고 교체/Auto Fix로 원본 오류를 숨기지 않습니다.'});
  if(context.snapshot){
-  const current=F.capture(context.doc,context.entry.descriptor.pageIds),kept=F.preservation(context.snapshot,current,context.edits);
+  const current=F.capture(context.doc,context.entry.descriptor.pageIds,undefined,ID),kept=F.preservation(context.snapshot,current,context.edits);
   if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체/페이지/Story/레이어/쌓임 순서 보존 불일치',detail:JSON.stringify(kept.differences)});
   const live=diagnostics(context.entry,context.doc,ID,{ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
   for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,detail:JSON.stringify(r.comparison.differences)});
@@ -170,7 +170,7 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  for(const c of context.contentChecks){const f=c.frame;let comparison=Model.compare(c.bounds,relative(f));if(c.typography){const got=readType(f.parentStory.texts.item(0),ID);comparison=Model.compare({bounds:c.bounds,typography:c.typography},{bounds:relative(f),typography:got});}
   if(!comparison.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 원본 대비 속성 불일치',detail:JSON.stringify(comparison.differences)});
   if(c.overrides){const text=f.parentStory.texts.item(0),actual={};for(const k of Object.keys(c.overrides))actual[k]=F.value(text[k]);const expected=Object.fromEntries(Object.entries(c.overrides).map(([k,v])=>[k,F.value(v)]));const cmp=Model.compare(expected,actual);if(!cmp.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' direct override 보존 불일치',detail:JSON.stringify(cmp.differences)});}
-  if(c.imagePath){const graphics=F.list(f.allGraphics),path=graphics[0]&&graphics[0].itemLink&&graphics[0].itemLink.filePath;const normalize=p=>String(p||'').replace(/\\/g,'/');if(graphics.length!==1||normalize(path)!==normalize(c.imagePath))issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 이미지 place/링크 불일치'});if(!Model.compare(c.imageGeometry,F.frameSnapshot(f).graphics).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 배치 이미지 geometry/crop 변경'});if(!Model.compare(c.fitting,F.read(f.frameFittingOptions,F.FIT)).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' fitting/crop 변경'});}
+  if(c.imagePath){const graphics=F.list(f.allGraphics),path=graphics[0]&&graphics[0].itemLink&&graphics[0].itemLink.filePath;const normalize=p=>String(p||'').replace(/\\/g,'/');if(graphics.length!==1||normalize(path)!==normalize(c.imagePath))issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 이미지 place/링크 불일치'});if(!Model.compare(c.imageGeometry,F.frameSnapshot(f,undefined,context.doc,ID).graphics).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 배치 이미지 geometry/crop 변경'});if(!Model.compare(c.fitting,F.read(f.frameFittingOptions,F.FIT)).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' fitting/crop 변경'});}
   if(c.typography&&String(f.parentStory.contents)!==c.text)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 새 원고와 실제 Story 내용 불일치',hint:'콘텐츠 누락/변경을 확인해주세요. Auto Fix는 실행하지 않습니다.'});
   if(c.typography&&f.parentStory.overflows)issues.push({role:c.role,cause:'CONTENT_OVERFLOW',category:'USER_ACTION_REQUIRED',message:c.role+' 새 원고가 원본 프레임 수용량을 초과합니다.',hint:'다른 디자인을 선택하거나 원고 분량을 확인해주세요. 원본 스레드/지면은 늘리지 않습니다.'});
  }

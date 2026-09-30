@@ -1,3 +1,19 @@
+# 무채움 TextFrame snapshot 적용성 수정 — 2026-09-30
+
+- 실제 첨부 화면 확인: registered.snapshot.read / TextFrame 2692 u7caf / Page 2537 u335e / Spread 2530 u3357 / overprintFill getter가 상태 오류 반환. open 문제 아님.
+- 개인 모델 읽기 확인: u7caf는 Normal Text Frame object style에서 FillColor=Swatch/None, StrokeColor=Swatch/None, StrokeWeight=0 상속, 해당 direct override 없음. TextWrapMode=None.
+- 원인: snapshot이 paint 유무와 무관하게 overprint/tint 등 모든 속성을 읽음. overprintFill은 프레임 채움색의 overprint이며 None은 채움 없음. Adobe API 문서는 의미를 정의하지만 모든 상태의 getter 예외를 열거하지 않는다. 이번 Host의 예외 발생은 첨부 실기로 확인한 사실.
+- 명시적 적용성 정책: None fill → fillTint/overprintFill N/A; None stroke 또는 weight=0 → strokeTint/strokeType/overprintStroke N/A; TextFrame/EndnoteTextFrame의 graphic fitting N/A; native TextWrapModes.NONE → offset/inverse/side N/A. 조건 불명/활성 상태는 엄격하게 읽고 오류 차단. None 판정은 Host 문서 builtin swatch ID 기준(이름 fallback은 doc 미제공 호출에 한정).
+- N/A는 null/false 대체값이 아니라 NOT_APPLICABLE + 이유로 snapshot에 보존하고 fidelity.notApplicable에 경로와 이유를 보고. dormant 설정 원문은 IDML에 그대로 있고 수정하지 않음. 활성화 상태 변화는 paint/mode 및 snapshot 비교에서 검출.
+- fill/stroke 색상과 weight, geometry, 페이지/Story/Parent 참조, 스타일/텍스트, paths/graphics/effects 등 검증 유지. 원본과 생성본 모두 무채움일 때만 appearance tint 비교도 N/A. TextFrame.parentStory 읽기는 필수로 강화. 적용 중인 속성의 예외는 기존 상세 실패 UI로 전달.
+- 회귀4 추가: 실제 None TextFrame의 여러 getter가 예외를 내도 beforeCleanup.success → cleanup.success → fidelity.start; 활성 overprint getter 오류 차단; 활성화/overprint 변경 검출; locale-independent builtin None ID 판정. 전체 Node226/Python16 통과(최종 실행 확인).
+- **Adobe 수정 후 재실기 미실행.** Mock 진행 성공을 Adobe 성공이라 하지 않음. NEXT STEP: 기존 Reload/DOCX/등록 파일/추천/선택/검증용 문서 생성, fidelity.start 진입 확인.
+- 원본/개인 파일 변경 없음. Auto Fix/프레임/글자/페이지 변경 정책 확장 없음.
+
+참고: [Adobe TextFrame overprintFill](https://developer.adobe.com/indesign/uxp/omv/t/TextFrame/), [Adobe TextWrapPreference](https://developer.adobe.com/indesign/uxp/dom/api/t/text-wrap-preference/), [Adobe InDesign reference: None swatch](https://helpx.adobe.com/pdf/cs6/indesign_reference.pdf).
+
+---
+
 # 최종 실패 표시 — 2026-09-30
 
 - 사용자 전사 로그의 마지막 확정 성공: `registered.pageReferences.acquire.success`. 이번 메시지에는 새 이미지 파일이 전달되지 않아 이전 이미지를 새 증거로 사용하지 않았다. 실제 최종 오류 행은 아직 확보되지 않음.

@@ -195,3 +195,28 @@ test('nested snapshot captures original getter and page/spread identity without 
  const Trace=require('../src/registered-dom-trace');class Spread{}class Page{}class TextFrame{};const spread=Object.assign(new Spread(),{id:30,name:'spread'}),page=Object.assign(new Page(),{id:20,name:'2',parent:spread}),frame=Object.assign(new TextFrame(),{id:10,parentPage:page});
  assert.throws(()=>Trace.run(()=>{},'outer',frame,'snapshot',null,()=>Trace.run(()=>{},'registered.snapshot.read',{},'insetSpacing',undefined,()=>{throw new Error('denied');},{owner:frame})),e=>e.registeredFailure.operation==='registered.snapshot.read'&&e.registeredFailure.page.id===20&&e.registeredFailure.spread.id===30&&e.registeredFailure.owner.id===10&&e.registeredFailure.attemptedValue===null);
 });
+
+test('Adobe None-filled TextFrame snapshot marks inactive paint/fitting/wrap without invoking rejected getters',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));for(const item of e.original.elements)if(item.textFrame)Object.assign(item.properties,{FillColor:'Swatch/None',StrokeColor:'Swatch/None',StrokeWeight:0});
+ const h=host(e),trace=[];h.ID.TextWrapModes={NONE:17};class TextFrame{}
+ for(const f of h.frames.filter(f=>f.parentStory)){
+  Object.setPrototypeOf(f,TextFrame.prototype);f.id=2692;
+  for(const key of ['overprintFill','overprintStroke','fillTint','strokeTint','strokeType','frameFittingOptions'])Object.defineProperty(f,key,{get(){throw new Error('현재 상태에서 이 속성을 적용할 수 없습니다.');},configurable:true});
+  f.textWrapPreferences={textWrapMode:17};for(const key of ['textWrapOffset','inverse','textWrapSide'])Object.defineProperty(f.textWrapPreferences,key,{get(){throw new Error('inactive wrap rejected');}});
+ }
+ const c=await N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)});assert.equal(c.phase,'FIDELITY_PASSED');assert.ok(trace.includes('registered.pageReferences.beforeCleanup.success'));assert.ok(trace.includes('registered.cleanup.success'));assert.ok(trace.includes('registered.fidelity.start'));
+ const state=c.snapshot.objects[h.frames[0].extractLabel()];assert.equal(state.object.overprintFill.status,'NOT_APPLICABLE');assert.equal(state.wrap.inverse.status,'NOT_APPLICABLE');assert.equal(state.fitting.status,'NOT_APPLICABLE');assert.equal(N.check(c,h.ID).length,0);
+});
+test('applicable paint getter failure remains fatal with original DOM diagnostics',async()=>{
+ const e=fixture(),h=host(e),f=h.frames[0];f.fillColor={id:123,name:'Black'};Object.defineProperty(f,'overprintFill',{get(){throw new Error('active overprint rejected');}});
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof'}),e=>e.registeredFailure.property==='overprintFill'&&e.registeredFailure.adobeMessage==='active overprint rejected');assert.equal(h.recomposes,0);
+});
+test('inactive to active paint and active overprint changes are preservation failures',()=>{
+ const F=require('../src/registered-fidelity'),h=host(fixture()),f=h.frames[0];f.fillColor={id:0,name:'None'};
+ const before=F.capture(h.doc,['p1']);f.fillColor={id:12,name:'Black'};f.overprintFill=false;f.fillTint=100;
+ const active=F.capture(h.doc,['p1']);assert.equal(F.preservation(before,active).equal,false);f.overprintFill=true;assert.equal(F.preservation(active,F.capture(h.doc,['p1'])).equal,false);
+});
+test('None applicability uses builtin swatch identity, not an arbitrary named color',()=>{
+ const F=require('../src/registered-fidelity'),doc={swatches:{item:()=>({id:0,name:'localized'})}};
+ assert.equal(F.noPaint({id:0,name:'localized'},doc),true);assert.equal(F.noPaint({id:99,name:'None'},doc),false);
+});
