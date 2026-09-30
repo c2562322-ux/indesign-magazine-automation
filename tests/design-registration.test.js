@@ -36,3 +36,9 @@ test('failed proof disables production and exposes original fidelity error witho
  assert.equal(x.ui.state.proofPassed,false);assert.ok(x.nodes().some(e=>String(e.textContent).includes('원본 재현 실패')));
  assert.equal(x.nodes().find(e=>e.textContent==='선택한 등록 디자인으로 제작').disabled,true);
 });
+
+test('template setup/proof controls are separate from normal recommendation and production controls',()=>{
+ const x=setup(),dev=x.nodes().find(n=>n.className==='registered-developer');assert.ok(dev);const walk=n=>[n,...n.children.flatMap(walk)],inside=walk(dev).filter(n=>n.tagName==='button').map(n=>n.textContent);
+ for(const text of ['디자인 모델 / 등록 파일 불러오기','등록 라이브러리 저장','검증용 문서 생성','원본과 비교 완료'])assert.ok(inside.includes(text));
+ assert.ok(!inside.includes('등록 디자인에서 추천'));assert.ok(!inside.includes('선택한 등록 디자인으로 제작'));
+});

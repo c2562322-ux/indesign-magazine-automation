@@ -1,3 +1,20 @@
+# Fidelity 진단 JSON 저장 PC 테스트
+
+1. UDT Reload.
+2. 원고 / 작업 불러오기 → registered-smoke.docx.
+3. 템플릿 등록·검증 (개발자) → 디자인 모델 / 등록 파일 불러오기 → e2e-reference.review.json.
+4. 등록 디자인에서 추천 → 시작 메인 · 사진 1장 → 분석 후보로 선택.
+5. 개발자 영역의 검증용 문서 생성 → 실제 Fidelity 실패 결과 확인.
+6. `05 검사 및 출력` 영역의 검사 결과 아래, `상세 진단 펼치기` 옆 **Fidelity 진단 JSON 저장** 클릭.
+7. 저장 대화상자에서 바탕화면/문서 등 원하는 폴더 선택. 기본 파일명 **magazine-fidelity.private.json**으로 저장.
+8. 패널의 **Fidelity 진단 JSON 저장 완료** 확인 후 파일을 이 대화에 첨부.
+
+정상: 오류6건이 그대로 있다면 JSON fidelityErrorCount=6, errors가6개이고 rawReport 및 comparisons에 원본/생성 비교 데이터가 있다. 총 오류 개수와 차이 속성 수는 다를 수 있다. 집계 오류는 특정 elementId가 null일 수 있다. null은 미제공/집계 정보이며 추측한 값이 아니다. undefined는 __diagnosticType 객체로 명시 보존한다.
+취소하면 저장 취소 표시, 쓰기/검증 실패하면 실패 표시 후 재시도 가능. 원고/선택을 바꾸기 전에 저장한다. 파일에는 원문/경로 등 개인 데이터가 포함된다.
+Adobe 저장 실기는 아직 미검증이다. 실패 시 최종 오류 화면을 전달한다. Fidelity 통과나 콘텐츠 제작을 이번 단계에서 시도할 필요는 없다.
+
+---
+
 # overprintFill 수정 재실기
 
 UDT Reload → registered-smoke.docx 불러오기 → e2e-reference.review.json 불러오기 → 등록 디자인에서 추천 → 시작 메인 · 사진 1장 / 분석 후보로 선택 → 검증용 문서 생성.

@@ -54,7 +54,7 @@ function canonical(key,value){return key==='KerningMethod'&&typeof value==='stri
 function readType(range,ID){const t={};for(const key of Object.keys(fields)){const v=range[fields[key]];if(v!==undefined)t[key]=canonical(key,key==='Leading'&&sameEnum(v,ID.Leading.AUTO)?'Auto':v);}t.AppliedFont=range.appliedFont.fontFamily;t.FontStyle=range.fontStyle;t.Justification=Object.keys(Model.ALIGN).find(k=>sameEnum(range.justification,ID.Justification[Model.ALIGN[k]]));return t;}
 function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
  const records=[],frames=new Map(),pages=items(doc.pages);
- const record=(role,id,expected,actual)=>records.push({role,elementId:id,original:expected,generated:actual,comparison:Model.compare(expected,actual)});
+ const record=(role,id,expected,actual,error=null)=>records.push({role,elementId:id,original:expected,generated:actual,comparison:Model.compare(expected,actual),readbackFailure:error?{operation:'registered.fidelity.readback',property:error.registeredFailure&&error.registeredFailure.property||null,message:String(error.message),code:Number.isInteger(error.number)?error.number:null}:null});
  for(const page of pages)for(const f of items(page.allPageItems)){const id=f.extractLabel(KEY);if(id){if(frames.has(id))record('reference',id,{unique:true},{unique:false});frames.set(id,f);}}
  record('page-count','document',{count:entry.descriptor.pageIds.length},{count:pages.length});
  for(const pageId of entry.descriptor.pageIds){const expected=entry.original.pages.find(p=>p.id===pageId),page=pages.find(p=>p.extractLabel(KEY)===pageId);record('page',pageId,{width:expected.width,height:expected.height},page?{width:page.bounds[3]-page.bounds[1],height:page.bounds[2]-page.bounds[0]}:null);}
@@ -97,7 +97,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
     }
    }
    record(role,e.id,expected,actual);
-  }catch(error){record(role,e.id,{readback:'supported'},{readback:'UNSUPPORTED: '+error.message});}
+  }catch(error){record(role,e.id,{readback:'supported'},{readback:'UNSUPPORTED: '+error.message},error);}
  }
  return {frames,records,equal:records.every(r=>r.comparison.equal),fallbacks:[]};
 }
@@ -134,7 +134,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
-  const edits=replacementPlan(entry,article);context.edits=edits;
+  progress('registered.content.plan.start');const edits=replacementPlan(entry,article);context.edits=edits;progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
   // Read every destination and direct override before the first write.
   const targets=edits.map(edit=>{
    const f=baseline.frames.get(edit.elementId);if(!f)throw new Error('교체 프레임 식별 실패');if(edit.image&&!edit.image.path)throw new Error('Word 이미지 파일 위치 없음');
@@ -144,18 +144,18 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
    return target;
   });
   for(const target of targets){const {edit,f,bounds}=target;guard();
-   if(edit.storyId){const story=f.parentStory;story.contents=edit.text.replace(/\r\n?|\n/g,'\r');const text=story.texts.item(0);
+   if(edit.storyId){const story=f.parentStory;operation('registered.content.'+edit.role+'.replace',story,'contents',{characters:edit.text.length},()=>{story.contents=edit.text.replace(/\r\n?|\n/g,'\r');});const text=story.texts.item(0);
     text.appliedParagraphStyle=target.paragraphStyle;text.appliedCharacterStyle=target.characterStyle;
     // Restore only explicit source overrides, using native values captured
     // before replacement. Style inheritance is left in the imported styles.
     F.restore(text,target.paragraph);F.restore(text,target.character);
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
-    f.place(edit.image.path);F.restore(f.frameFittingOptions,target.fitting);f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS);F.restore(f.frameFittingOptions,target.fitting);
+    operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));F.restore(f.frameFittingOptions,target.fitting);operation('registered.content.'+edit.role+'.fit',f,'fit()','APPLY_FRAME_FITTING_OPTIONS',()=>f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS));F.restore(f.frameFittingOptions,target.fitting);
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
    }
   }
-  doc.recompose();context.phase='CONTENT_APPLIED';progress('registered.content.recompose');return context;
+  operation('registered.content.recompose',doc,'recompose()',null,()=>doc.recompose());context.phase='CONTENT_APPLIED';progress('registered.content.inspection.ready');return context;
  }catch(e){failure=e;e.registeredDocument=doc;throw e;}finally{try{operation('registered.units.restore',ID.app.scriptPreferences,'measurementUnit',String(old),()=>{ID.app.scriptPreferences.measurementUnit=old;});}catch(restoreError){if(failure){failure.message+=' · restore failed: '+restoreError.message;}else{restoreError.registeredDocument=doc;throw restoreError;}}}
 }
 function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;try{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;const issues=[];
@@ -165,14 +165,14 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
   const current=F.capture(context.doc,context.entry.descriptor.pageIds,undefined,ID),kept=F.preservation(context.snapshot,current,context.edits);
   if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체/페이지/Story/레이어/쌓임 순서 보존 불일치',detail:JSON.stringify(kept.differences)});
   const live=diagnostics(context.entry,context.doc,ID,{ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
-  for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,detail:JSON.stringify(r.comparison.differences)});
+  for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,elementId:r.elementId,differences:r.comparison.differences,failureOperation:r.readbackFailure&&r.readbackFailure.operation,property:r.readbackFailure&&r.readbackFailure.property,adobeError:r.readbackFailure&&r.readbackFailure.message,adobeErrorCode:r.readbackFailure&&r.readbackFailure.code,detail:JSON.stringify(r.comparison.differences)});
  }
  for(const c of context.contentChecks){const f=c.frame;let comparison=Model.compare(c.bounds,relative(f));if(c.typography){const got=readType(f.parentStory.texts.item(0),ID);comparison=Model.compare({bounds:c.bounds,typography:c.typography},{bounds:relative(f),typography:got});}
   if(!comparison.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 원본 대비 속성 불일치',detail:JSON.stringify(comparison.differences)});
   if(c.overrides){const text=f.parentStory.texts.item(0),actual={};for(const k of Object.keys(c.overrides))actual[k]=F.value(text[k]);const expected=Object.fromEntries(Object.entries(c.overrides).map(([k,v])=>[k,F.value(v)]));const cmp=Model.compare(expected,actual);if(!cmp.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' direct override 보존 불일치',detail:JSON.stringify(cmp.differences)});}
   if(c.imagePath){const graphics=F.list(f.allGraphics),path=graphics[0]&&graphics[0].itemLink&&graphics[0].itemLink.filePath;const normalize=p=>String(p||'').replace(/\\/g,'/');if(graphics.length!==1||normalize(path)!==normalize(c.imagePath))issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 이미지 place/링크 불일치'});if(!Model.compare(c.imageGeometry,F.frameSnapshot(f,undefined,context.doc,ID).graphics).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 배치 이미지 geometry/crop 변경'});if(!Model.compare(c.fitting,F.read(f.frameFittingOptions,F.FIT)).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' fitting/crop 변경'});}
   if(c.typography&&String(f.parentStory.contents)!==c.text)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 새 원고와 실제 Story 내용 불일치',hint:'콘텐츠 누락/변경을 확인해주세요. Auto Fix는 실행하지 않습니다.'});
-  if(c.typography&&f.parentStory.overflows)issues.push({role:c.role,cause:'CONTENT_OVERFLOW',category:'USER_ACTION_REQUIRED',message:c.role+' 새 원고가 원본 프레임 수용량을 초과합니다.',hint:'다른 디자인을 선택하거나 원고 분량을 확인해주세요. 원본 스레드/지면은 늘리지 않습니다.'});
+  if(c.typography&&f.parentStory.overflows)issues.push({role:c.role,cause:'CONTENT_OVERFLOW',category:'USER_ACTION_REQUIRED',message:c.role+' 새 원고가 원본 프레임 수용량을 초과합니다.',hint:'이 원고에는 다른 템플릿을 권장합니다. 원고 분량을 줄이거나 다른 등록 디자인을 선택해주세요. 원본 스레드/지면은 늘리지 않습니다.'});
  }
  return issues;
  }finally{ID.app.scriptPreferences.measurementUnit=old;}}

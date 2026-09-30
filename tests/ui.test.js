@@ -457,3 +457,52 @@ test('registered DOM failure remains visible without scrolling and ends both dia
  assert.ok(x.e.hostReport.textContent.endsWith(x.e.productionStatus.textContent));assert.ok(x.e.studioDiagnostics.textContent.includes('textWrapOffset'));
  assert.equal(x.e.btnExportPdf.disabled,true);assert.equal(x.app.state.hasDocument,false);
 });
+
+test('Fidelity report shows per-property source/host evidence and conservatively classifies failures',()=>{
+ const D=require('../src/production-diagnostics'),diffs=[{path:'$.bounds.0',expected:1,actual:2},{path:'$.runs.0.Leading',expected:20,actual:24},{path:'$.readback',expected:'supported',actual:'UNSUPPORTED: fill'},{path:'$.frame.InsetSpacing',expected:'SOURCE_UNRESOLVED',actual:0}];
+ const report={fidelity:{records:[{elementId:'u7caf',role:'subtitle',comparison:{equal:false,differences:diffs}}]},issues:[{elementId:'u7caf',role:'subtitle',differences:diffs}]};
+ const rows=D.fidelityRows(report);assert.equal(rows.length,4);assert.deepEqual(rows.map(r=>r.classification),['GEOMETRY_MISMATCH','TYPOGRAPHY_MISMATCH','READBACK_UNSUPPORTED','SOURCE_UNRESOLVED']);assert.ok(rows.every(r=>r.blocking));assert.deepEqual(rows[0].stages,['original','recheck']);assert.equal(rows[0].expected,1);assert.equal(rows[0].actual,2);
+});
+test('registered Fidelity differences are visible in inspection without opening raw diagnostics',async()=>{
+ const x=setup(true,{createRegistered:async()=>({errors:['원본 재현 실패'],warnings:[],pageCount:1,issues:[],outputReady:false,fidelity:{phase:'FIDELITY_FAILED',proofOnly:true,records:[{elementId:'u7caf',comparison:{equal:false,differences:[{path:'$.runs.0.Leading',expected:24,actual:28}]}}]}})});
+ const entry={descriptor:{id:'ref'},profile:{name:'Reference'},original:{metadata:{sourceSha256:'hash'}}};await x.app.createRegistered(entry,x.app.read().article,'proof');
+ const flatten=n=>n.textContent+' '+n.children.map(flatten).join(' '),text=flatten(x.e.inspectionIssues);assert.match(text,/u7caf/);assert.match(text,/원본: 24/);assert.match(text,/생성: 28/);assert.match(text,/TYPOGRAPHY_MISMATCH/);assert.equal(x.e.btnExportPdf.disabled,true);
+});
+
+function fidelityExportFixture(){
+ const differences=[{path:'$.runs.0.Leading',expected:24,actual:28},{path:'$.text',expected:'원문\n전체 /private/source',actual:'생성문'},{path:'$.missing',expected:undefined,actual:null}];
+ const issues=[{cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 재현 실패'},...Array.from({length:5},(_,i)=>({cause:'GENERATOR_MISMATCH',elementId:'u'+i,role:'body',message:'원본 속성 재검사 불일치',differences,adobeError:'Host error '+i,adobeErrorCode:100+i,failureOperation:'registered.fidelity.readback',property:'leading'}))];
+ const entry={descriptor:{id:'design',name:'기준',pageIds:['page']},profile:{name:'기준'},original:{metadata:{sourceSha256:'hash'},elements:Array.from({length:5},(_,i)=>({id:'u'+i,type:'TextFrame',pageCandidates:['page'],spreadId:'spread'})),pages:[]}};
+ const report={errors:issues.map(i=>i.message),warnings:[],issues,pageCount:1,outputReady:false,fidelity:{phase:'FIDELITY_FAILED',proofOnly:true,records:issues.slice(1).map(i=>({elementId:i.elementId,role:i.role,original:{text:'원문'},generated:{text:'생성문'},comparison:{equal:false,differences}}))}};return {entry,report};
+}
+test('diagnostic JSON preserves all six issues, every difference, original report and special values',()=>{
+ const D=require('../src/production-diagnostics'),{entry,report}=fidelityExportFixture();report.issues[1].differences.push({path:'$.infinite',expected:Infinity,actual:NaN});
+ const json=JSON.parse(D.diagnosticJSON(D.fidelityDiagnostic(report,entry,null,['stage'])));
+ assert.equal(json.fidelityErrorCount,6);assert.equal(json.errors.length,6);assert.equal(json.comparisons.length,5);assert.equal(json.rawReport.issues.length,6);
+ const error=json.errors[1];assert.equal(error.sourceId,'u0');assert.equal(error.objectType,'TextFrame');assert.deepEqual(error.page,['page']);assert.equal(error.spread,'spread');assert.equal(error.adobeErrorCode,100);assert.equal(error.failureOperation,'registered.fidelity.readback');assert.equal(error.property,'leading');
+ assert.equal(error.differences[1].expected,'원문\n전체 /private/source');assert.deepEqual(error.differences[2].expected,{__diagnosticType:'undefined'});assert.equal(error.differences[2].actual,null);assert.deepEqual(error.differences[3].expected,{__diagnosticType:'Infinity'});assert.deepEqual(error.differences[3].actual,{__diagnosticType:'NaN'});
+ assert.equal(json.errors[0].elementId,null);assert.equal(json.errors[0].rawIssue.message,'원본 재현 실패');
+});
+test('diagnostic export preserves structured Host exceptions and does not claim comparison differences',()=>{
+ const D=require('../src/production-diagnostics'),{entry}=fidelityExportFixture(),error=new Error('Adobe rejected');error.registeredFailure={operation:'registered.snapshot.read',object:{sourceId:'u0',type:'TextFrame'},page:{id:12},spread:{id:13},property:'overprintFill',attemptedValue:null,adobeMessage:'Adobe rejected',adobeNumber:42};
+ const out=JSON.parse(D.diagnosticJSON(D.fidelityDiagnostic(null,entry,error)));assert.equal(out.fidelityErrorCount,1);assert.equal(out.errors[0].adobeErrorCode,42);assert.deepEqual(out.errors[0].differences,[]);assert.equal(out.errors[0].page.id,12);
+});
+test('JSON button exports immutable failure snapshot, permits retry/cancel and invalidates on source edit',async()=>{
+ const {entry,report}=fidelityExportFixture(),saved=[];let mode='cancel';
+ const x=setup(true,{createRegistered:async()=>report,saveFidelityDiagnostic:async text=>{saved.push(text);if(mode==='fail')throw new Error('disk full');return mode==='ok';}});
+ assert.equal(x.e.btnSaveFidelity.disabled,true);await x.app.createRegistered(entry,x.app.read().article,'proof');assert.equal(x.e.btnSaveFidelity.disabled,false);report.issues.length=0;
+ x.e.btnSaveFidelity.click();await tick();assert.match(x.e.studioStatus.textContent,/취소/);assert.equal(JSON.parse(saved[0]).errors.length,6);assert.equal(x.e.btnExportPdf.disabled,true);
+ mode='fail';x.e.btnSaveFidelity.click();await tick();assert.match(x.e.studioStatus.textContent,/disk full/);assert.equal(x.e.btnSaveFidelity.disabled,false);
+ mode='ok';x.e.btnSaveFidelity.click();await tick();assert.match(x.e.studioStatus.textContent,/저장 완료/);assert.equal(saved[0],saved[2]);assert.equal(x.e.btnExportPdf.disabled,true);
+ x.e.autoTitle.value='changed';x.e.autoTitle.listeners.input();assert.equal(x.e.btnSaveFidelity.disabled,true);
+});
+test('UXP diagnostic file save awaits write then verifies full UTF8 text with readback',async()=>{
+ let release,stored;const events=[],text='{ "한글": "원문\\n본문" }';
+ const a=nativeAdapter({},async(name,options)=>{assert.equal(name,'magazine-fidelity.private.json');assert.deepEqual(Array.from(options.types),['json']);return {write:async v=>{events.push('write');await new Promise(r=>release=r);stored=v;events.push('written');},read:async()=>{events.push('read');return stored;}};});
+ const pending=a.saveFidelityDiagnostic(text);await tick();assert.deepEqual(events,['write']);release();assert.equal(await pending,true);assert.equal(stored,text);assert.deepEqual(events,['write','written','read']);
+});
+test('UXP diagnostic save rejects damaged readback, supports cancellation and blocks stale picker',async()=>{
+ const bad=nativeAdapter({},async()=>({write:async()=>{},read:async()=> 'damaged'}));await assert.rejects(bad.saveFidelityDiagnostic('original'),/내용 검증 실패/);
+ const cancel=nativeAdapter({},async()=>null);assert.equal(await cancel.saveFidelityDiagnostic('{}'),null);
+ let choose,writes=0;const stale=nativeAdapter({},()=>new Promise(r=>choose=r));const pending=stale.saveFidelityDiagnostic('{}');stale.dispose();choose({write:async()=>writes++,read:async()=> '{}'});await assert.rejects(pending,/다시 초기화/);assert.equal(writes,0);
+});

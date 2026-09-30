@@ -8,11 +8,11 @@
     if(mounted&&mounted.root===root&&!mounted.disposed)return mounted;
     if(mounted)mounted.destroy();
     const nodes=new Map(Array.from(doc.querySelectorAll('[id]')).map(e=>[e.id,e]));
-    const optional=['productionStatus','selectedDesign','inspectionSummary','inspectionIssues','pdfReason','btnDiagnostics','diagnosticsPanel','btnLoadDesigns','designLibraryStatus','jsonDesignList','jsonDesignInfo','btnFonts','fontBrowser','fontSearch','fontSummary','fontChoices','btnFontMore','btnFontRefresh','fontSelection','fontCurrent','btnFontBody','btnFontTitle','btnAI','btnAiSettings','aiPanel','apiKey','aiModel','studioDiagnostics'];
+    const optional=['btnSaveFidelity','productionStatus','selectedDesign','inspectionSummary','inspectionIssues','pdfReason','btnDiagnostics','diagnosticsPanel','btnLoadDesigns','designLibraryStatus','jsonDesignList','jsonDesignInfo','btnFonts','fontBrowser','fontSearch','fontSummary','fontChoices','btnFontMore','btnFontRefresh','fontSelection','fontCurrent','btnFontBody','btnFontTitle','btnAI','btnAiSettings','aiPanel','apiKey','aiModel','studioDiagnostics'];
     const missing=optional.filter(id=>!nodes.has(id));
     missing.forEach(id=>{const node=doc.createElement('div');node.value='';nodes.set(id,node);});
     const $=id=>nodes.get(id),listeners=[];
-    const state={library:[],libraryLoading:false,libraryPromise:null,designIssues:[],designFontsChecked:false,images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30,fontsLoaded:false,fontMatches:[],fontFamilyCount:0,fontByName:new Map(),selectedFont:null,openFamily:null,report:null};
+    const state={library:[],libraryLoading:false,libraryPromise:null,designIssues:[],designFontsChecked:false,images:[],plans:[],selected:0,page:0,busy:false,signature:'',cache:new Map(),hasDocument:false,documentKey:'',pdfReady:false,fonts:[],fontLimit:30,fontsLoaded:false,fontMatches:[],fontFamilyCount:0,fontByName:new Map(),selectedFont:null,openFamily:null,report:null,fidelityJSON:null};
     let status;
     const api={root,disposed:false,destroy(){if(api.disposed)return;api.disposed=true;if(api.registration)api.registration.destroy();listeners.splice(0).forEach(([node,event,handler])=>{try{node.removeEventListener(event,handler);}catch(e){/* A disposed wrapper is inert even if its old DOM has gone away. */}});try{if(adapter.dispose)adapter.dispose();}catch(e){/* Disposal must not prevent a fresh mount. */}}};
     const diagnostics=[],initStart=Date.now();
@@ -51,6 +51,7 @@
         let isCurrent=false;try{isCurrent=(state.registeredEntry||valid)&&state.documentKey===documentKey();}catch(e){}
         ['btnSaveIndd','btnExportPdf','btnCheckAuto'].forEach(id=>$(id).disabled=state.busy||!state.hasDocument||!isCurrent||!adapter.native);
         $('btnExportPdf').disabled=$('btnExportPdf').disabled||!state.pdfReady;
+        $('btnSaveFidelity').disabled=state.busy||!state.fidelityJSON||!adapter.saveFidelityDiagnostic;
         $('btnAI').disabled=state.busy||!adapter.native||!aiAvailable;
         $('btnAiSettings').disabled=state.busy||!aiAvailable;
         $('btnFonts').disabled=state.busy||!adapter.native||!fontAvailable;
@@ -88,7 +89,7 @@
         const values={autoTitle:a.title,autoSubtitle:a.subtitle||a.pointText||'',autoBody:a.body,autoKicker:a.kicker||'ARTICLE',autoAuthor:a.author||'',pageWidth:s.width,pageHeight:s.height,pageMargin:s.margin,pageBleed:s.bleed,bodySize:s.bodySize,accent:s.accent,publication:s.publication,bodyFont:s.bodyFont,titleFont:s.titleFont};
         Object.keys(values).forEach(id=>$(id).value=values[id]);state.images=a.images||[];imageList();changed();
     }
-    function invalidateDocument(){state.registeredEntry=null;state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
+    function invalidateDocument(){state.fidelityJSON=null;state.registeredEntry=null;state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
     function changed(){
         if(api.registration)api.registration.invalidate();
         $('wordCount').textContent=($('autoBody').value||'').length.toLocaleString()+'자';
@@ -289,10 +290,11 @@
         const roleNames={title:'제목',subtitle:'부제',body:'본문'};
         (report.autoFixes||[]).forEach(f=>{const text=f.result==='resolved'?'✓ 자동 수정됨 · '+(roleNames[f.role]||'텍스트'):'⚠ 자동 수정 미해결 · '+(roleNames[f.role]||'텍스트')+' · 안전 한도를 확인했습니다.';$('inspectionIssues').appendChild(element('p','brand-note',text));});
         (report.issues||report.errors.map(message=>({message,hint:'InDesign에서 해당 영역을 수정한 뒤 다시 검사해주세요.'}))).forEach(issue=>{const row=element('div','inspection-issue');row.appendChild(element('strong','',safe((issue.category==='BLOCKING'?'✕ 출력 차단 · ':issue.category==='USER_ACTION_REQUIRED'?'⚠ 사용자 확인 필요 · ':'')+issue.message)));row.appendChild(element('p','small',safe(issue.hint||'수정 후 다시 검사해주세요.')));$('inspectionIssues').appendChild(row);});
+        if(report.fidelity){const differences=D.fidelityRows(report);if(differences.length){$('inspectionIssues').appendChild(element('h3','','원본 Fidelity 차이 · '+differences.length+'개 속성 (제작 차단)'));for(const d of differences){const row=element('div','inspection-issue');row.appendChild(element('strong','',safe(d.elementId+' · '+d.classification)));row.appendChild(element('pre','small',safe('단계: '+d.stages.join(', ')+'\n속성: '+d.path+'\n원본: '+JSON.stringify(d.expected)+'\n생성: '+JSON.stringify(d.actual))));$('inspectionIssues').appendChild(row);}}}
         report.warnings.forEach(w=>$('inspectionIssues').appendChild(element('p','small',safe('참고: '+w))));
     }
     function showReport(report,label,trace){
-        state.hasDocument=true;state.report=report;
+        state.hasDocument=true;state.report=report;state.fidelityJSON=report.fidelity?D.diagnosticJSON(D.fidelityDiagnostic(report,state.registeredEntry,null,trace)):null;
         state.pdfReady=report.errors.length===0&&report.outputReady!==false;
         if(api.registration&&api.registration.report)api.registration.report(report);
         $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n')+(report.issues?'\n'+report.issues.map(i=>[i.category||'',i.cause||'',i.role||'',i.detail||''].join(' · ')).join('\n'):''):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
@@ -316,13 +318,14 @@
             else{trace.push(label+' 취소');$('hostReport').textContent=safe(trace.join('\n'));status(label+' 취소');$('productionStatus').textContent=label+' 취소 · 다시 시도할 수 있습니다.';}
             return report;
         }catch(e){
-            state.pdfReady=false;state.report=null;
+            state.pdfReady=false;state.report=null;state.fidelityJSON=state.registeredEntry?D.diagnosticJSON(D.fidelityDiagnostic(null,state.registeredEntry,e,trace)):null;
             const result=e.productionStage==='save.completed.postCheck'?'INDD 저장 완료 후 검사 실패':label+' 실패';
             const message=result+' · '+safe(e.message||e);
             const detail=D.registeredFailure(e),finalMessage=detail?result+'\n'+detail:message;
             $('hostReport').textContent=safe(trace.join('\n')+'\n'+finalMessage);status(detail?result+' · '+e.registeredFailure.operation+' · '+e.registeredFailure.property:result+' · 상세 진단에서 오류를 확인한 뒤 다시 시도해주세요.',true);$('productionStatus').textContent=safe(finalMessage);diagnostic(finalMessage);if(api.registration&&api.registration.failed)api.registration.failed(safe(finalMessage));return null;
         }
     });}
+    on('btnSaveFidelity','click',()=>run(async()=>{if(!state.fidelityJSON||!adapter.saveFidelityDiagnostic)throw new Error('저장할 Fidelity 진단이 없습니다.');const saved=await adapter.saveFidelityDiagnostic(state.fidelityJSON);if(api.disposed)return;status(saved?'Fidelity 진단 JSON 저장 완료 · 원문/경로가 포함된 개인 진단 파일입니다.':'Fidelity 진단 JSON 저장 취소');}));
     on('btnCreateAuto','click',()=>production('문서 생성',async progress=>{
         invalidateDocument();$('productionStatus').textContent='문서 생성 중…';
         const v=fresh(),key=documentKey();

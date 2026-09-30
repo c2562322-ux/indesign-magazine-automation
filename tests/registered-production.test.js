@@ -220,3 +220,23 @@ test('None applicability uses builtin swatch identity, not an arbitrary named co
  const F=require('../src/registered-fidelity'),doc={swatches:{item:()=>({id:0,name:'localized'})}};
  assert.equal(F.noPaint({id:0,name:'localized'},doc),true);assert.equal(F.noPaint({id:99,name:'None'},doc),false);
 });
+
+test('production rechecks native fidelity even after a successful separate proof, before any DOCX edits',async()=>{
+ const e=fixture(),proof=host(e);assert.equal((await N.create(e,null,{...proof.env,mode:'proof'})).phase,'FIDELITY_PASSED');
+ const production=host(e,{drift:true}),original=production.frames[0].parentStory.contents,result=await N.create(e,{title:'새 제목',body:'새 본문',images:[]},production.env);
+ assert.equal(result.phase,'FIDELITY_FAILED');assert.equal(result.edits.length,0);assert.equal(production.frames[0].parentStory.contents,original);
+});
+test('real synthetic DOCX text and internal image complete all four slots through native mock pipeline',()=>{
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'registered-e2e-')),file=path.join(tmp,'smoke.docx');
+ return (async()=>{try{
+  const generated=spawnSync(fs.existsSync(py)?py:'python3',['tools/create-registered-smoke-docx.py',file],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
+  const a=D.extract(fs.readFileSync(file)).article;const pngPath=path.join(tmp,'internal.png');fs.writeFileSync(pngPath,a.images[0].bytes);a.images[0].path=pngPath;delete a.images[0].bytes;
+  const e=JSON.parse(JSON.stringify(fixture())),base=e.original.elements.find(x=>x.textFrame),sub=JSON.parse(JSON.stringify(base)),story=JSON.parse(JSON.stringify(e.original.stories.find(s=>s.id===base.textFrame.storyRef)));sub.id='subtitle-slot';sub.textFrame.storyRef='subtitle-story';story.id='subtitle-story';e.original.elements.push(sub);e.original.stories.push(story);e.descriptor.roles[sub.id]={role:'subtitle',confirmed:true};
+  const im=JSON.parse(JSON.stringify(e.original.elements.find(x=>x.type==='Rectangle')));Object.assign(im,{id:'image-slot',pageCandidates:['p1'],pageBounds:{p1:[10,450,150,590]},properties:{},details:{},image:[],groupId:null});e.original.elements.push(im);e.descriptor.roles[im.id]={role:'image1',confirmed:true};e.descriptor.images[im.id]='required';
+  // Synthetic test layout uses body-sized type; do not relax production capacity checks.
+  for(const story of e.original.stories)for(const run of story.paragraphs.flatMap(p=>p.runs)){Object.assign(run.properties,{PointSize:13,Leading:20});Object.assign(run.resolvedProperties,{PointSize:13,Leading:20});}
+  const entry=R.register(e.original,e.descriptor),h=host(entry),trace=[],c=await N.create(entry,a,{...h.env,progress:s=>trace.push(s)});assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0);
+  for(const role of ['title','subtitle','body']){const edit=c.contentChecks.find(x=>x.role===role);assert.equal(edit.frame.parentStory.contents,a[role].replace(/\n/g,'\r'));}
+  const image=c.contentChecks.find(x=>x.role==='image1');assert.equal(image.frame.allGraphics[0].itemLink.filePath,pngPath);assert.equal(image.imageMetadata.widthPx,1200);assert.equal(image.imageMetadata.heightPx,800);assert.ok(trace.some(s=>s.startsWith('registered.content.image1.place')));assert.ok(trace.includes('registered.content.inspection.ready'));
+ }finally{assert.equal(path.dirname(path.resolve(tmp)),path.resolve(os.tmpdir()));assert.ok(path.basename(tmp).startsWith('registered-e2e-'));fs.rmSync(tmp,{recursive:true,force:true});}})();
+});

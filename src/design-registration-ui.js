@@ -9,7 +9,7 @@ function mount(root,studio,adapter){
  function el(tag,text,parent=root){const e=doc.createElement(tag);if(text!==undefined)e.textContent=text;parent.appendChild(e);return e;}
  const title=el('h2','등록 디자인에서 추천 · 검증판');
  el('p','기존 디자이너 지면을 원고와 비교합니다. API 키 불필요. 검증 제작 시 원본을 먼저 검사한 뒤 콘텐츠를 교체합니다.');
- const actions=el('div'),status=el('p','추출한 v2 모델 또는 저장한 등록 라이브러리를 불러오세요.'),summary=el('p'),fidelity=el('p','Fidelity: 검증 전'),editor=el('div'),results=el('div');status.setAttribute('role','status');fidelity.setAttribute('role','status');
+ const actions=el('div');el('p','일반 제작: DOCX 불러오기 → 추천 → 디자인 선택 → 제작 → 검사 → INDD/PDF',actions);const developer=el('div');developer.className='registered-developer';el('h3','템플릿 등록·검증 (개발자)',developer);const devActions=el('div',undefined,developer);const status=el('p','추출한 v2 모델 또는 저장한 등록 라이브러리를 불러오세요.'),summary=el('p'),fidelity=el('p','Fidelity: 검증 전'),editor=el('div',undefined,developer),results=el('div');status.setAttribute('role','status');fidelity.setAttribute('role','status');
  let proofButton,confirmButton,produceButton;
  function refresh(){
   let a;try{a=studio.read().article;}catch(e){}const selected=state.selected;
@@ -24,8 +24,8 @@ function mount(root,studio,adapter){
   if(studio.invalidateRegistered)studio.invalidateRegistered();state.proofPassed=false;state.visualConfirmed=false;state.report=null;
   if(data.schema==='magazine-registered-library/v1'){const loaded=R.unpack(data);state.entries=state.entries.filter(e=>!loaded.entries.some(n=>n.descriptor.id===e.descriptor.id)).concat(loaded.entries);state.selected=null;results.textContent='';status.textContent='등록 '+loaded.entries.length+'건 · 읽기 오류 '+loaded.errors.length+'건';editor.textContent='';if(loaded.errors.length)el('p',loaded.errors.join('\n'),editor);return;}
   const errors=Model.validate(data);if(errors.length)throw new Error(errors.join('; '));state.model=data;state.draft=null;state.selected=null;results.textContent='';showPages();status.textContent='페이지를 선택하고 기사 영역만 역할을 확인해주세요.';
- });
- button('등록 라이브러리 저장',async fresh=>{if(!state.entries.length)throw new Error('먼저 페이지를 등록해주세요.');const saved=await adapter.save(R.pack(state.entries));if(fresh())status.textContent=saved?'등록 파일 저장 완료 · 원문/개인 자료 포함, GitHub에 올리지 마세요.':'저장 취소';});
+ },devActions);
+ button('등록 라이브러리 저장',async fresh=>{if(!state.entries.length)throw new Error('먼저 페이지를 등록해주세요.');const saved=await adapter.save(R.pack(state.entries));if(fresh())status.textContent=saved?'등록 파일 저장 완료 · 원문/개인 자료 포함, GitHub에 올리지 마세요.':'저장 취소';},devActions);
  button('등록 디자인에서 추천',async fresh=>{
   if(!state.entries.length)throw new Error('등록된 디자인이 없습니다.');const article=studio.read().article;const signature=JSON.stringify(article);
   let fonts=null;try{if(adapter.fonts)fonts=await adapter.fonts(false);}catch(e){/* Keep analysis available with an explicit review gate. */}
@@ -46,8 +46,8 @@ function mount(root,studio,adapter){
   for(const row of ranked.excluded)el('p',row.name+' 제외: '+row.hard.map(r=>r.message||r.reason||r.code).join(' / '),results);
  });
  async function generate(fresh,mode){if(!state.selected)throw new Error('추천 후보를 먼저 선택해주세요.');const selected=state.selected;if(JSON.stringify(studio.read().article)!==selected.articleSignature)throw new Error('원고 변경 · 다시 추천해주세요.');if(mode==='proof'){state.proofPassed=false;state.visualConfirmed=false;}const report=await studio.createRegistered(selected.entry,selected.article,mode);if(fresh()){if(report)api.report(report);status.textContent=report?(mode==='proof'?'검증용 새 문서를 원본과 비교해주세요. 원본 파일은 변경하지 않았습니다.':'제작 결과는 아래 검사 및 출력 영역에서 확인해주세요.'):'생성 실패 · 아래 검사 및 출력 영역의 오류를 확인하고 다시 시도해주세요.';}}
- proofButton=button('검증용 문서 생성',fresh=>generate(fresh,'proof'));
- confirmButton=button('원본과 비교 완료',()=>{if(!state.proofPassed)throw new Error('원본 자동 비교를 먼저 통과해야 합니다.');state.visualConfirmed=true;status.textContent='시각 비교 확인 · 선택한 등록 디자인으로 제작할 수 있습니다. 제작 시 원본 자동 검사를 다시 실행합니다.';});
+ proofButton=button('검증용 문서 생성',fresh=>generate(fresh,'proof'),devActions);
+ confirmButton=button('원본과 비교 완료',()=>{if(!state.proofPassed)throw new Error('원본 자동 비교를 먼저 통과해야 합니다.');state.visualConfirmed=true;status.textContent='시각 비교 확인 · 선택한 등록 디자인으로 제작할 수 있습니다. 제작 시 원본 자동 검사를 다시 실행합니다.';},devActions);
  produceButton=button('선택한 등록 디자인으로 제작',fresh=>{if(!state.proofPassed||!state.visualConfirmed)throw new Error('검증용 문서 생성과 원본 비교를 먼저 완료해주세요.');return generate(fresh,'production');});
  refresh();
  function structure(model,pageId,parent){const page=model.pages.find(p=>p.id===pageId);el('p','구조 위치도 — 글꼴/이미지/조판 재현 미리보기가 아닙니다.',parent);const box=el('div',undefined,parent);box.className='registered-map';box.style.width='260px';box.style.height=260*page.height/page.width+'px';

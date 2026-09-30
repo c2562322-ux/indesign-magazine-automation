@@ -1178,3 +1178,8 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 ## 2026-09-30 — None fill snapshot getter 수정
 - 실제 u7caf overprintFill 오류와 source None fill/stroke 확인. paint/type/wrap 적용성에 따른 명시적 N/A 정책, 활성·필수 getter 오류 차단 유지.
 - 신규4 회귀 포함 Node226/Python16 통과. 수정 후 Adobe 실기 미검증. 원본/개인 자료 변경 없음.
+
+## 2026-09-30 — Fidelity 진단 JSON 내보내기
+- 중단된 미커밋 변경 보존. JSON 저장 UI/UXP 저장·readback 및 원문 진단 데이터 직렬화 완성.
+- 6건 전체/모든 differences/객체 맥락/원본 보고서/Host 오류 보존. Fidelity 로직 변경 없음.
+- Node236/Python16 전체 통과, 저장 관련 신규5 회귀. 실제 Adobe 저장은 사용자 PC 확인 대상. 원본/개인 자료 미변경.

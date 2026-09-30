@@ -1,3 +1,27 @@
+# Fidelity 진단 JSON 저장 완료 — 2026-09-30
+
+- 개발 브랜치 codex/magazine-studio-1.1, 재개 HEAD dd0c7eca1892b758e3cf8370e2c074325ea2e1a1. 기존 미커밋 UI/진단/4슬롯 회귀 작업 모두 보존하여 함께 검토.
+- 사용자 PC에서 검증 문서 생성·Fidelity 진입 성공, 오류6/콘텐츠 overflow0 보고. 실제 6건 원인 수정은 하지 않음. 비교 기준/허용오차/Fidelity gate/Auto Fix 정책 그대로 유지.
+- `05 검사 및 출력` → 검사 결과 아래, `상세 진단 펼치기` 옆 `Fidelity 진단 JSON 저장`. 등록 검증 결과 또는 등록 Host 실패가 있으면 활성화. 새 원고/선택 변경 시 이전 진단 비활성화.
+- UXP getFileForSaving으로 사용자 위치 선택, 기본명 magazine-fidelity.private.json. UTF-8 텍스트 write 완료 후 readback 문자열 완전 일치 검증. 취소/실패 시 성공 표시하지 않고 진단 재시도 가능. 클립보드 기능은 추가하지 않음.
+- schema magazine-fidelity-diagnostic/v1: fidelityErrorCount, reportedErrorCount, contentOverflowCount, errors 전부, comparisons 전부(original/generated/comparison.differences), rawReport 전체, Host 예외 및 trace. 각 오류에 sourceId/objectType/page/spread/role/operation/property/Adobe message/code 포함. 집계 오류처럼 특정 객체가 없거나 Host가 제공하지 않은 정보는 null, 원문 rawIssue도 보존. 없는 expected/actual은 __diagnosticType=undefined, 비유한 숫자도 tagged object로 보존. 화면의 redaction/truncation/dedup 결과를 저장하지 않음.
+- 파일은 원문/경로를 포함하는 개인 진단 자료. 저장만 수행하며 자동 전송 없음. 실제 개인 샘플/원본 INDD/IDML 미수정, Git 미포함.
+- 최종 Node236/Python16 통과. 신규 JSON 회귀5: 6건/차이/특수값 완전 보존, Host 예외 보존, UI 저장/취소/재시도/무효화, UXP await write/readback, 손상/취소/Reload 차단. UXP 실제 저장 대화상자는 PC에서 확인 필요.
+- NEXT STEP: Reload → DOCX → 등록 파일 → 추천 → 시작 메인 · 사진 1장 선택 → 검증용 문서 생성 → Fidelity 실패 → JSON 저장. 사용자가 저장 JSON을 전달하면 실제6건 원인을 데이터로 분석. 이번 커밋은 오류6건 해결 또는 Adobe 콘텐츠 제작 성공을 의미하지 않음.
+
+---
+
+# 진행 중 — Fidelity 6건 상세 데이터 대기 (2026-09-30)
+
+- 사용자 PC 실기에서 검증 문서 생성 및 Fidelity 진입 성공 확인. 현재 Fidelity 오류6 / 콘텐츠 overflow0. open 경로 재조사하지 않음.
+- 실제 6건의 객체별 differences 본문은 아직 수신되지 않았다. 사용자 추가 답변도 “아래는 상세 진단 로그입니다.”에서 끝나 데이터 없음. async 질문 대기. 원인/expected/actual 추측 금지, 제작 gate 유지.
+- 미커밋 진행 내용: baseline/live 차이를 객체·속성별 expected/actual 및 보수적 오류 분류로 검사 영역에 표시; 템플릿 등록/검증 제어를 일반 추천/제작 제어와 별도 그룹으로 분리; 실제 콘텐츠 교체/이미지 place/fit/recompose 경계 진단; 콘텐츠 overflow 다른 템플릿 권장 안내.
+- 실제 로컬 Smoke DOCX→기준모델 4슬롯 매핑 확인(title u7c7e/subtitle u7caf/body u7c96/image u7c78, 내부1200x800). 신규 합성 fixture의 실제 DOCX 파싱/PNG 파일화→4슬롯 교체/배치/검사 Mock 회귀 통과. Adobe 콘텐츠 제작 성공 아님.
+- Node231/Python16 통과. UI 그룹에 UXP에서 지원 여부가 불명확한 HTML details를 쓰지 않고 기존 div/h3 사용. 이 변경 후 최종 전체 재실행 필요.
+- NEXT STEP: 사용자 실제 differences 수신 → 원인별 source/readback/render mismatch 판정 및 필요 수정 → 전체 테스트/문서/diff → 개발 브랜치 commit/push. 아직 완료/commit/push하지 않았으며 기존 원본/개인 자료 미변경.
+
+---
+
 # 무채움 TextFrame snapshot 적용성 수정 — 2026-09-30
 
 - 실제 첨부 화면 확인: registered.snapshot.read / TextFrame 2692 u7caf / Page 2537 u335e / Spread 2530 u3357 / overprintFill getter가 상태 오류 반환. open 문제 아님.
