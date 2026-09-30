@@ -185,3 +185,13 @@ test('unit restoration failure cannot mask the first native snapshot error',asyn
  Object.defineProperty(h.ID.app.scriptPreferences,'measurementUnit',{get:()=> 'mm',set(v){if(v==='mm')throw new Error('restore error');}});
  await assert.rejects(N.create(e,null,{...h.env,mode:'proof'}),error=>/geometricBounds/.test(error.message)&&/first geometry error/.test(error.message)&&/restore error/.test(error.message)&&error.registeredDocument===h.doc);
 });
+
+test('post-acquire Page label method failure is exact, structured and stops before snapshot',async()=>{
+ const e=fixture(),h=host(e),trace=[];h.doc.pages[0].id=887;h.doc.pages[0].extractLabel=()=>{throw new Error('page label rejected');};
+ await assert.rejects(N.create(e,null,{...h.env,mode:'proof',progress:s=>trace.push(s)}),error=>error.registeredFailure.operation==='registered.pageReferences.identity'&&error.registeredFailure.object.id===887&&error.registeredFailure.property==='extractLabel'&&error.registeredFailure.adobeMessage==='page label rejected');
+ assert.ok(trace.includes('registered.pageReferences.acquire.success'));assert.ok(!trace.includes('registered.pageReferences.beforeCleanup.start'));assert.equal(h.recomposes,0);
+});
+test('nested snapshot captures original getter and page/spread identity without masking it',()=>{
+ const Trace=require('../src/registered-dom-trace');class Spread{}class Page{}class TextFrame{};const spread=Object.assign(new Spread(),{id:30,name:'spread'}),page=Object.assign(new Page(),{id:20,name:'2',parent:spread}),frame=Object.assign(new TextFrame(),{id:10,parentPage:page});
+ assert.throws(()=>Trace.run(()=>{},'outer',frame,'snapshot',null,()=>Trace.run(()=>{},'registered.snapshot.read',{},'insetSpacing',undefined,()=>{throw new Error('denied');},{owner:frame})),e=>e.registeredFailure.operation==='registered.snapshot.read'&&e.registeredFailure.page.id===20&&e.registeredFailure.spread.id===30&&e.registeredFailure.owner.id===10&&e.registeredFailure.attemptedValue===null);
+});

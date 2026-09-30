@@ -319,7 +319,8 @@
             state.pdfReady=false;state.report=null;
             const result=e.productionStage==='save.completed.postCheck'?'INDD 저장 완료 후 검사 실패':label+' 실패';
             const message=result+' · '+safe(e.message||e);
-            $('hostReport').textContent=safe(trace.join('\n')+'\n'+message);status(result+' · 상세 진단에서 오류를 확인한 뒤 다시 시도해주세요.',true);$('productionStatus').textContent=result+' · 상세 진단을 확인하고 다시 시도해주세요.';if(api.registration&&api.registration.failed)api.registration.failed(message);return null;
+            const detail=D.registeredFailure(e),finalMessage=detail?result+'\n'+detail:message;
+            $('hostReport').textContent=safe(trace.join('\n')+'\n'+finalMessage);status(detail?result+' · '+e.registeredFailure.operation+' · '+e.registeredFailure.property:result+' · 상세 진단에서 오류를 확인한 뒤 다시 시도해주세요.',true);$('productionStatus').textContent=safe(finalMessage);diagnostic(finalMessage);if(api.registration&&api.registration.failed)api.registration.failed(safe(finalMessage));return null;
         }
     });}
     on('btnCreateAuto','click',()=>production('문서 생성',async progress=>{

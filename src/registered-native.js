@@ -116,16 +116,16 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
  progress('registered.document.acquired '+JSON.stringify(Trace.identity(doc)));
  try{guard();operation('registered.units.set',ID.app.scriptPreferences,'measurementUnit',String(ID.MeasurementUnits.POINTS),()=>{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;});
   const pages=operation('registered.pageReferences.acquire',doc,'pages',undefined,()=>items(doc.pages)),ids=pages.map(p=>operation('registered.pageReferences.identity',p,'extractLabel',KEY,()=>p.extractLabel(KEY)));
-  if(ids.length!==plan.normalPageIds.length||new Set(ids).size!==ids.length||ids.some(id=>!plan.normalPageIds.includes(id)))throw new Error('원본 페이지 수/식별 실패');
+  operation('registered.pageReferences.validate',doc,'page source IDs',plan.normalPageIds,()=>{if(ids.length!==plan.normalPageIds.length||new Set(ids).size!==ids.length||ids.some(id=>!plan.normalPageIds.includes(id)))throw new Error('원본 페이지 수/식별 실패: '+JSON.stringify(ids));});
   progress('registered.pageReferences.beforeCleanup.start');const beforeTrim=F.capture(doc,plan.pageIds,progress);
   progress('registered.pageReferences.beforeCleanup.success');
   progress('registered.cleanup.start');
-  for(const spread of items(doc.spreads)){
+  for(const spread of operation('registered.cleanup.spreads.acquire',doc,'spreads',undefined,()=>items(doc.spreads))){
    const shuffle=operation('registered.cleanup.shuffle.read',spread,'allowPageShuffle',undefined,()=>spread.allowPageShuffle);
    // Avoid a needless native setter when the imported spread already has this value.
    if(shuffle!==false)operation('registered.cleanup.shuffle.set',spread,'allowPageShuffle',false,()=>{spread.allowPageShuffle=false;});
   }
-  for(const page of pages.slice().reverse())if(!plan.pageIds.includes(page.extractLabel(KEY)))operation('registered.cleanup.page.remove',page,'remove()',null,()=>page.remove());
+  for(const page of pages.slice().reverse())if(!plan.pageIds.includes(operation('registered.cleanup.page.identity',page,'extractLabel',KEY,()=>page.extractLabel(KEY))))operation('registered.cleanup.page.remove',page,'remove()',null,()=>page.remove());
   operation('registered.cleanup.recompose',doc,'recompose()',null,()=>doc.recompose());progress('registered.cleanup.success');
   progress('registered.fidelity.start');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds,progress);
   const trimming=F.preservation(beforeTrim,snapshot);

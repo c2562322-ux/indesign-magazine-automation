@@ -1,3 +1,11 @@
+# 최종 실패 요약 확인
+
+동일한 Reload → DOCX → 등록 파일 → 추천 → 후보 선택 → 검증용 문서 생성 순서로 진행한다.
+실패하면 생성 버튼 아래의 요약(operation, DOM/소유 객체, 페이지, 스프레드, property, attempted value, Adobe error/code) 전체를 복사하거나 화면으로 전달한다. 상세 로그를 맨 아래까지 스크롤할 필요 없이 요약이 보이며, 로그 끝에도 동일 내용이 기록된다.
+정상 최소 목표는 pageReferences.beforeCleanup.success → cleanup.success → registered.fidelity.start이며, 이후 equal 판정은 별도다. 현재 사용자 전사 로그에는 acquire.success까지만 확인되어 실제 오류 원인은 아직 미확정이다.
+
+---
+
 # open 이후 DOM 단계 재실기
 
 Reload → 원고 / 작업 불러오기 (registered-smoke.docx) → 디자인 모델 / 등록 파일 불러오기 (e2e-reference.review.json) → 등록 디자인에서 추천 → 시작 메인 · 사진 1장 / 분석 후보로 선택 → 검증용 문서 생성.

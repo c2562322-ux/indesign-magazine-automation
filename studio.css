@@ -39,7 +39,7 @@ body{margin:0;padding:0;background:#f3f1eb;color:#202724;font-family:Arial,sans-
 @media(max-width:480px){#studioPanel .row{flex-wrap:wrap}#studioPanel .candidate-list{flex-direction:column}#studioPanel .toolbar{flex-wrap:wrap}}
 
 #studioPanel button{box-sizing:border-box}
-#studioPanel #productionStatus{margin:12px 0;line-height:1.6}
+#studioPanel #productionStatus{margin:12px 0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 #studioPanel #inspectionSummary{margin:12px 0;font-weight:600}
 
 .registered-card { border:1px solid #999; padding:8px; margin:8px 0; }

@@ -1,3 +1,15 @@
+# 최종 실패 표시 — 2026-09-30
+
+- 사용자 전사 로그의 마지막 확정 성공: `registered.pageReferences.acquire.success`. 이번 메시지에는 새 이미지 파일이 전달되지 않아 이전 이미지를 새 증거로 사용하지 않았다. 실제 최종 오류 행은 아직 확보되지 않음.
+- acquire 직후 각 Page.extractLabel(KEY), ID 집합 검증, beforeCleanup snapshot 순서. 현재 정보만으로 정확한 실제 Host failure operation/객체/속성/거부 이유는 미확정. package.open은 변경하지 않음.
+- Trace 오류에 registeredFailure 구조화 정보 저장: operation/object/owner/page/spread/property/attemptedValue/Adobe message/code. 중첩 snapshot wrapper가 가장 안쪽 getter 실패를 덮지 않음.
+- 페이지 ID 검증, cleanup spread 취득/페이지 label, snapshot reference/객체 name 읽기 진단 보강. 원래 읽기·삭제 대상·Fidelity 판정 기준은 유지, 실패 무시 없음.
+- 생성 영역 productionStatus에 줄별 최종 실패 요약을 항상 표시. 상세 Host 로그 끝 및 Studio 진단 끝에도 동일 요약 기록. 일반 제작 상태의 내부 stage 비노출 기존 회귀도 유지.
+- 전체 Node222/Python16 통과. 신규3: acquire 이후 Page.extractLabel 실패, 중첩 getter/페이지·spread 정보 보존, UI 스크롤 없이 상세 실패 표시/로그 끝/출력 차단. Adobe 재실기 및 fidelity.start 진입 성공은 아직 미확정.
+- NEXT STEP: Reload → 기존 Smoke DOCX/등록 파일 → 추천 → 시작 메인 · 사진 1장 선택 → 검증용 문서 생성. 실패 시 생성 영역의 실패 operation부터 Adobe code까지 요약 전체를 전달. 이 요약 확보 후 실제 거부 속성의 수정 여부 결정.
+
+---
+
 # Adobe open 이후 DOM 실패 추적 — 2026-09-30
 
 - 사용자 첨부 실제 화면: 409ms nativeImport → 424ms validate → 601ms write → 605ms readback → 796ms open → 3800ms pageReferences.beforeCleanup → 현재 상태에서 이 속성을 적용할 수 없습니다.

@@ -10,22 +10,22 @@ const enumEqual=(a,b)=>a&&typeof a.equals==='function'?a.equals(b):a===b;
 // Some Adobe PageItem subtypes throw for inapplicable properties. Required
 // source fields still use strict reads in diagnostics/directSnapshot.
 function optional(o,key){try{return o&&o[key];}catch(e){return undefined;}}
-function value(v){
+function value(v,get=(o,k)=>o[k]){
  if(v===undefined)return null;
  if(v===null||['string','number','boolean'].includes(typeof v))return v;
- if(Array.isArray(v))return v.map(value);
- if(v.name!==undefined)return {name:String(v.name)};
+ if(Array.isArray(v))return v.map(x=>value(x,get));
+ const name=get(v,'name');if(name!==undefined)return {name:String(name)};
  return String(v);
 }
 const OBJECT=['fillColor','fillTint','strokeColor','strokeTint','strokeWeight','strokeType','rotationAngle','shearAngle','visible','locked','overprintFill','overprintStroke'];
 const FIT=['autoFit','leftCrop','topCrop','rightCrop','bottomCrop','fittingOnEmptyFrame','fittingAlignment'];
 function read(o,keys){const out={};for(const k of keys)out[k]=value(o&&o[k]);return out;}
 function frameSnapshot(f,progress=()=>{}){
- const get=Trace.reader(progress,f),R=(o,keys)=>Object.fromEntries(keys.map(k=>[k,value(get(o,k))]));
+ const get=Trace.reader(progress,f),V=v=>value(v,get),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false,owner:f}),R=(o,keys)=>Object.fromEntries(keys.map(k=>[k,V(get(o,k))]));
  const page=get(f,'parentPage'),p=page?Array.from(get(page,'bounds'),Number):[0,0,0,0],b=Array.from(get(f,'geometricBounds'),Number);
- const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:R(f,OBJECT),layer:value(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:value(get(f,'appliedObjectStyle')),
-  fitting:R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(p=>value(get(p,'entirePath'))),
-  graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:value(get(g,'geometricBounds')),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
+ const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:R(f,OBJECT),layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),
+  fitting:R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(p=>V(get(p,'entirePath'))),
+  graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:V(get(g,'geometricBounds')),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
   wrap:R(get(f,'textWrapPreferences'),['textWrapMode','textWrapOffset','inverse','textWrapSide'])};
  const transparency=get(f,'transparencySettings');result.effects=R(get(transparency,'blendingSettings'),['opacity','blendMode','isolateBlending','knockoutGroup']);
  const story=optional(f,'parentStory');if(story){result.storyRef=ref(story);result.story=String(get(story,'contents'));result.thread=list(get(story,'textContainers')).map(ref);result.previous=ref(get(f,'previousTextFrame'));result.next=ref(get(f,'nextTextFrame'));
@@ -33,7 +33,7 @@ function frameSnapshot(f,progress=()=>{}){
  return result;
 }
 function capture(doc,pageIds,progress=()=>{}){
- const get=Trace.reader(progress,doc),pages=list(get(doc,'pages')).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(get(doc,'masterSpreads')).flatMap(s=>list(get(s,'allPageItems')));
+ const get=Trace.reader(progress,doc),ref=o=>Trace.run(progress,'registered.snapshot.reference',o,'extractLabel',KEY,()=>(o&&typeof o.extractLabel==='function'?o.extractLabel(KEY)||null:null),{before:false}),pages=list(get(doc,'pages')).filter(p=>!pageIds||pageIds.includes(ref(p))),masters=list(get(doc,'masterSpreads')).flatMap(s=>list(get(s,'allPageItems')));
  const candidates=pageIds?pages.flatMap(p=>list(get(p,'allPageItems'))).concat(masters):list(get(doc,'allPageItems')).concat(masters);
  const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress),{before:false});}}
  return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(ref)})),objects};

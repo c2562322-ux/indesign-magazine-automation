@@ -447,3 +447,13 @@ test('auto-fit summary enables PDF only after final clean report, keeps unresolv
  failed=true;e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,true);assert.match(e.inspectionIssues.children[0].textContent,/미해결/);assert.match(e.inspectionIssues.children[1].children[0].textContent,/사용자 확인/);
  e.autoTitle.value+=' 수정';e.autoTitle.listeners.input();assert.equal(e.inspectionIssues.children.length,0);
 });
+
+test('registered DOM failure remains visible without scrolling and ends both diagnostic logs',async()=>{
+ const Trace=require('../src/registered-dom-trace'),entry={descriptor:{id:'ref',name:'Reference'},profile:{name:'Reference'},original:{metadata:{sourceSha256:'hash'}}};let caught;
+ const x=setup(true,{createRegistered:async(e,a,progress)=>{for(let i=0;i<180;i++)progress('prior '+i);try{Trace.run(progress,'registered.snapshot.object',{},'snapshot',null,()=>Trace.run(progress,'registered.snapshot.read',{id:73,name:'frame'},'textWrapOffset',undefined,()=>{const e=new Error('현재 상태에서 이 속성을 적용할 수 없습니다.');e.number=55;throw e;},{before:false}));}catch(e){caught=e;throw e;}}});
+ await x.app.createRegistered(entry,x.app.read().article,'proof');
+ assert.equal(caught.registeredFailure.operation,'registered.snapshot.read');
+ for(const field of ['registered.snapshot.read','id=73','textWrapOffset','attempted value','현재 상태','55'])assert.ok(x.e.productionStatus.textContent.includes(field),field);
+ assert.ok(x.e.hostReport.textContent.endsWith(x.e.productionStatus.textContent));assert.ok(x.e.studioDiagnostics.textContent.includes('textWrapOffset'));
+ assert.equal(x.e.btnExportPdf.disabled,true);assert.equal(x.app.state.hasDocument,false);
+});

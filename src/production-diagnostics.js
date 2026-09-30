@@ -30,5 +30,11 @@
         if(progress)progress(stage);
         try{const result=await fn();if(progress)progress(stage+' 완료 '+(Date.now()-start)+'ms');return result;}catch(error){throw failure(stage,error);}
     }
-    return {redact,failure,step,asyncStep};
+    function registeredFailure(error){
+        const d=error&&error.registeredFailure;if(!d)return null;
+        const val=v=>v===undefined||v===null?'해당 없음 / 미취득':typeof v==='object'?JSON.stringify(v):String(v);
+        const object=o=>o?['type='+val(o.type),'id='+val(o.id),'name='+val(o.name),'sourceId='+val(o.sourceId)].join(' · '):'해당 없음 / 미취득';
+        return ['실패 operation: '+val(d.operation),'DOM 객체: '+object(d.object),'소유 객체: '+object(d.owner),'페이지: '+object(d.page),'스프레드: '+object(d.spread),'property: '+val(d.property),'attempted value: '+(d.attemptedValue===null?'없음 (읽기 또는 인자 없는 작업)':val(d.attemptedValue)),'Adobe error: '+val(d.adobeMessage),'Adobe code: '+val(d.adobeNumber)].map(line=>redact(line)).join('\n');
+    }
+    return {redact,failure,step,asyncStep,registeredFailure};
 });

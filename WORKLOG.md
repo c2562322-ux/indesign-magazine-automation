@@ -1169,3 +1169,8 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 - 사용자 실제 화면에 근거하여 open 반환 및 페이지 identity 검사 통과 확인. 기존 로그는 getter/setter/remove를 구분하지 못함.
 - 구조 변경 없이 DOM 경계/대상/속성 진단, 중복 shuffle setter 방지, 최초 오류 보존. 전체 Node219/Python16 통과.
 - 정확한 실제 Host 실패 속성은 미확정, 새 PC 로그 필요. 원본/개인 자료 미변경.
+
+## 2026-09-30 — 실패 요약 UI 전달
+- acquire.success 이후 실제 최종 오류 행 미확보. 새 첨부 파일은 수신되지 않았으며 사용자 전사만 근거로 작업.
+- 구조화된 최초 DOM 실패와 page/spread identity를 최종 UI/로그에 보존. open 및 Fidelity 동작 유지.
+- Node222/Python16 전체 통과, Adobe 실제 원인 확정/해결은 새 최종 오류 요약 확보 후 진행.
