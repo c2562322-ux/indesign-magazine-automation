@@ -28,6 +28,11 @@ class Extraction(unittest.TestCase):
         fixture(self.path)
         self.model = extract(self.path)
 
+    def test_document_processing_instruction_preserved_outside_element_tree(self):
+        marker = '<?aid style="50" type="document" readerVersion="6.0" featureSet="257" product="21.4(7)"?>'
+        fixture(self.path, lambda name, text: text.replace("<Document", marker + "<Document", 1) if name == "designmap.xml" else text)
+        self.assertEqual(extract(self.path)["metadata"]["aidProcessingInstruction"], marker)
+
     def test_geometry_in_points_and_page_coordinate_system(self):
         m = self.model
         self.assertEqual(m["unit"], "pt")

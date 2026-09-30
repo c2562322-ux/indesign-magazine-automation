@@ -1,3 +1,30 @@
+# Adobe IDML open 실패 후 수정 감사 — 2026-09-30
+
+## 확인한 원인과 한계
+- 사용자가 실제 Host open 오류를 보고. 모델 추출기 `ET.fromstring()`은 processing instruction을 버리고, package serializer는 XML 선언+Document만 출력: `designmap.xml`의 Adobe `aid` 문서 식별 선언 누락을 확인했다.
+- ZIP은 실제 STORE ZIP이었다. 확장자만 IDML인 텍스트 파일이 아니며 mimetype 첫 항목/비압축, CRC는 이전에도 정상. 원본 IDML 파일을 직접 복사하는 경로가 아니라 모델의 sourceXml을 재조립하는 경로다.
+- 기존 UXP write는 이미 awaited binary ArrayBuffer였다. 실제 디스크 바이트 검사는 없었고 Mock은 `mimetype=idml` 한 항목도 open 성공 처리했다. 이제 불완전한 패키지/손상 저장은 Host 호출 전 거절한다.
+- 원래 nativePath 전달 유지: 보고된 오류는 파일 이름을 식별한 Host 형식 오류. 경로 변환을 원인으로 단정하지 않았다. 실제 UXP 경로/버전 호환은 재실기 대상.
+- **확인된 코드 결함을 수정한 상태이지 Adobe 최소 성공 기준 달성 보고가 아니다.** full IDML schema/렌더링 인증은 하지 않는다.
+
+## 수정
+- 신규 추출 metadata.aidProcessingInstruction에 원본 선언 보존. 이전 개인 모델에는 표준 `style=50 type=document readerVersion=6.0 featureSet=257` 선언을 보충하고 packagingNotes에 이유 기록. 원본 product 값을 추측하지 않으며 DOMVersion은 변경하지 않는다.
+- packaging namespace는 Adobe 통상 `idPkg` prefix 사용. XML namespace 동등성만으로 Host 인식을 인증하지 않음.
+- 모델 inventory의 metadata.xml 누락을 더 이상 예외로 통과시키지 않음. 원본 unknown binary는 계속 차단.
+- open 전 STORE ZIP 헤더/길이/CRC, 첫 mimetype, container rootfile, aid/Document/DOMVersion, Resources/Spreads/Stories, XML src 대상 존재 검사. Preferences 등 원본 designmap 참조 리소스도 검사. 전체 XML schema validator는 아니다.
+- await write → read(binary) → 완전 바이트 일치 → 패키지 재검증 → app.open(nativePath,true). open 거부는 원본 Adobe 오류 + 임시 경로 + 크기/CRC와 함께 fatal 보고. 임시파일을 남겨 재현 가능.
+- 새 문서/콘텐츠/Auto Fix/PDF 우회 없음. 이 패치는 열기 경로에 한정.
+
+## 검증
+- Node **214**, Python **16** 테스트(기존206/15 유지 + 새8/1). 최종 전체 실행 통과.
+- 신규: aid 누락, 원본 PI 보존, CRC/잘림/참조 누락, 저장 손상, 비동기 쓰기 완료 순서, sliced buffer, 한글 nativePath, Reload 중단, Adobe reject 진단, 누락 metadata 차단.
+- 실제 개인 모델을 메모리에서 생성 후 독립 Python zipfile/ElementTree 검증: **160항목, XML159, 1,658,609 bytes, CRC f25a74a2**, source inventory 이름 집합 동일. 개인 파일은 쓰지 않음.
+- 실제 Adobe 재실기/원본 Fidelity 비교는 아직 미검증.
+
+참고: [Adobe IDML Cookbook](https://community.adobe.com/havfw69955/attachments/havfw69955/indesign/632677/1/IDML_cookbook_9627253.pdf)의 IDML 식별·패키징 설명, [Adobe Application.open](https://developer.adobe.com/indesign/uxp/dom/api/a/application/), [UXP File operations](https://developer.adobe.com/indesign/uxp/resources/recipes/file-operation/). Cookbook 링크 원문 재접근은 404였으며 검색에 노출된 Adobe 문서 발췌만 확인했다.
+
+---
+
 # 등록 디자인 1건 PC 실기 준비 감사 — 2026-09-30
 
 상태: **첫 Adobe UXP Smoke Test를 실행할 코드/UI 준비 완료. Adobe 실기 성공 및 전체 Fidelity 인증 아님.**

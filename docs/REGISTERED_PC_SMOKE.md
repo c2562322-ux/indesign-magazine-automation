@@ -1,3 +1,21 @@
+# IDML 열기 수정 재실기 — 먼저 이 단계만 확인
+
+1. UDT에서 현재 폴더의 플러그인을 Reload.
+2. 원고 / 작업 불러오기 → 기존 `assets/templates/working/registered-smoke.docx`.
+3. 디자인 모델 / 등록 파일 불러오기 → 기존 `assets/templates/working/e2e-reference.review.json`. 재추출 불필요.
+4. 등록 디자인에서 추천 → 시작 메인 · 사진 1장 → 분석 후보로 선택.
+5. 검증용 문서 생성.
+
+정상 최소 결과: 실제 InDesign에 새 문서가 열림. 이후 Fidelity 검사가 별도로 실행되므로 문서 열림과 Fidelity 통과는 구분한다. 원본 텍스트 유지, 콘텐츠 교체 없음, 검증본 PDF 차단 유지.
+
+실패 시 `상세 진단 펼치기` 화면과 전체 오류를 전달:
+- IDML_PACKAGE_INVALID: Host 전에 패키지/참조 오류.
+- IDML_WRITE_MISMATCH: UXP 저장 후 바이트 불일치.
+- IDML_HOST_OPEN_FAILED: 패키지와 디스크 검사는 통과했으나 Adobe가 거부. 메시지의 임시 .idml 경로, bytes/CRC, Adobe 오류, InDesign 버전을 전달. 해당 임시 파일은 앱 재시작 전에 보관하면 추가 진단 가능(개인 원문 포함, 공개 업로드 금지).
+- 문서가 열렸지만 다음 검사 실패: 열린 문서와 Fidelity 상세 화면을 전달. Auto Fix로 처리하지 않음.
+
+---
+
 # 등록 디자인 PC Smoke Test
 
 이 절차는 **실제 InDesign 플러그인**에서 실행한다. `preview.html`과 `registered-ui-smoke.html`은 Adobe 제작 시험이 아니다. 원본 파일에는 저장하지 않는다.

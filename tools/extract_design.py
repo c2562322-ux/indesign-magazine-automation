@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 from pathlib import Path, PurePosixPath
 import zipfile
 import xml.etree.ElementTree as ET
@@ -155,6 +156,11 @@ def extract_package(pkg, digest):
              "pages": [], "spreads": [], "elements": [], "stories": [], "threads": [],
              "styles": {"paragraph": [], "character": [], "object": []},
              "fonts": [], "colors": [], "layers": [], "issues": [], "sourceXml": {}}
+
+    # ElementTree drops processing instructions; retain the document marker separately.
+    marker = re.search(r"<\?aid\s[^?]*\?>", pkg.zip.read("designmap.xml").decode("utf-8-sig"))
+    if marker:
+        model["metadata"]["aidProcessingInstruction"] = marker.group(0)
 
     def issue(code, ref, detail):
         model["issues"].append({"code": code, "ref": ref, "detail": detail})

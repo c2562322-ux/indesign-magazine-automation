@@ -1159,3 +1159,8 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 ## 2026-09-30 — 등록 디자인 1건 PC 실기 준비 마무리
 
 중단 당시 변경 보존 확인 후 그대로 재개. u335e 기준 proof/production 분리, direct override 보존, source/content 오류 구분, fill/stroke 및 page/Story/Parent/order 스냅샷, 이미지 fitting/링크 검사, 등록 UI 단계와 PDF gate를 완성했다. 마지막 화면 검토에서 등록 선택 중 일반 버튼의 무료 시안 오생성 가능성을 차단하고 회귀 추가. Node206/Python15, XML158/CRC, diff 검사 통과. Browser Mock으로 DOCX→추천→proof→확인→production→check/save/PDF 및 원고 변경 무효화 직접 확인. Adobe 실기 미실행. 원본/개인 자료 미변경. HANDOFF/AUDIT/PC Smoke 갱신, 사용자 지시에 따라 개발 브랜치만 commit/push 대상으로 지정.
+
+## 2026-09-30 — Adobe IDML open 실패 대응
+- aid processing instruction 소실 확인 및 보존/legacy 복원, idPkg prefix, 패키지 사전검증과 UXP binary readback 도입.
+- Mock 불완전 IDML 성공 경로 제거; 실제 Adobe 성공 미확인. Node214/Python16 최종 전체 테스트 통과.
+- 개인 IDML/INDD/모델 미변경, 개발 브랜치만 작업.

@@ -132,6 +132,12 @@ test('package keeps a single container and escapes XML attribute whitespace',()=
  const bytes=N.packagePlan(e).bytes;assert.equal(Z.utf8BytesToString(Z.readZipEntry(bytes,'META-INF/container.xml')).includes('rootfile'),true);
  const xml=P.serialize({tag:'x',attributes:{label:'a\tb\nc\rd'},children:[]});assert.match(xml,/&#9;/);assert.match(xml,/&#10;/);assert.match(xml,/&#13;/);
 });
+test('registered package validates legacy aid repair and refuses missing inventoried metadata',()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),plan=N.packagePlan(e);
+ assert.match(plan.validation.aid,/type="document"/);assert.equal(plan.packagingNotes.length,1);
+ e.original.metadata.packageInventory.push({name:'META-INF/metadata.xml'});delete e.original.sourceXml['META-INF/metadata.xml'];
+ assert.throws(()=>N.packagePlan(e),/META-INF\/metadata.xml/);
+});
 test('registered native pipeline integrates with Host check, save, proof PDF block and production PDF',async()=>{
  const vm=require('node:vm'),entry=fixture(),h=host(entry),calls=[],coll=a=>({length:a.length,item:i=>a[i]});
  Object.assign(h.ID,{FontStatus:{INSTALLED:1},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1},SaveOptions:{NO:1}});

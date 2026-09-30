@@ -3,7 +3,7 @@
 // Native fidelity/readback coverage is partial; do not treat this as production-ready.
 // Native IDML import preserves source constructs instead of approximating them
 // with the v1 coordinate renderer. No original file is opened or written.
-const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),F=require('./registered-fidelity');
+const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity');
 const KEY='MagazineStudioSourceRef',local=n=>n.tag.replace(/^\{[^}]+\}/,'');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function validatePageStories(entry){
@@ -35,10 +35,11 @@ function packagePlan(entry){
  for(const tree of Object.values(trees))tag(tree);
  // XML trees contain all design properties. Unknown binary package members
  // cannot be reconstructed from the model and therefore block this path.
- const unknown=(m.metadata.packageInventory||[]).filter(x=>!trees[x.name]&&!['mimetype','META-INF/container.xml','META-INF/metadata.xml'].includes(x.name));
+ const unknown=(m.metadata.packageInventory||[]).filter(x=>!trees[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));
  if(unknown.length)throw new Error('원본 바이너리 리소스가 모델에 없어 재현 불가: '+unknown.map(x=>x.name).join(', '));
- const entries=[['mimetype','application/vnd.adobe.indesign-idml-package'],['META-INF/container.xml','<?xml version="1.0" encoding="UTF-8"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="designmap.xml" media-type="application/vnd.adobe.indesign-idml-package"/></rootfiles></container>'],...Object.entries(trees).filter(([name])=>name!=='META-INF/container.xml'&&name!=='mimetype').map(([name,tree])=>[name,Package.serialize(tree)])];
- return {bytes:Package.zip(entries),sourceHash:m.metadata.sourceSha256,pageIds:entry.descriptor.pageIds.slice(),normalPageIds:[...normal]};
+ const entries=[['mimetype','application/vnd.adobe.indesign-idml-package'],['META-INF/container.xml','<?xml version="1.0" encoding="UTF-8"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="designmap.xml" media-type="application/vnd.adobe.indesign-idml-package"/></rootfiles></container>'],...Object.entries(trees).filter(([name])=>name!=='META-INF/container.xml'&&name!=='mimetype').map(([name,tree])=>[name,name==='designmap.xml'?IDML.designmap(tree,m.metadata.aidProcessingInstruction):Package.serialize(tree)])];
+ const bytes=Package.zip(entries),validation=IDML.validate(bytes);
+ return {bytes,validation,packagingNotes:m.metadata.aidProcessingInstruction===undefined?['Legacy model omitted processing instructions; standard IDML document aid declaration restored (not a typography fallback).']:[],sourceHash:m.metadata.sourceSha256,pageIds:entry.descriptor.pageIds.slice(),normalPageIds:[...normal]};
 }
 function items(collection){if(Array.isArray(collection))return collection;const out=[];for(let i=0;i<collection.length;i++)out.push(collection.item(i));return out;}
 function sameEnum(a,b){return a&&typeof a.equals==='function'?a.equals(b):a===b;}
@@ -119,7 +120,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   doc.recompose();progress('registered.fidelity.original');const baseline=diagnostics(entry,doc,ID),before=inspect(doc),snapshot=F.capture(doc,plan.pageIds);
   const trimming=F.preservation(beforeTrim,snapshot);
   baseline.records.push({role:'page-cleanup',elementId:'references',comparison:trimming});baseline.equal=baseline.equal&&trimming.equal;
-  const context={doc,entry,baseline,snapshot,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
+  const context={doc,entry,baseline,snapshot,packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure='원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
   const edits=replacementPlan(entry,article);context.edits=edits;

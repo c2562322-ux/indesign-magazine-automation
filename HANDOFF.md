@@ -1,3 +1,15 @@
+# HANDOFF — Adobe IDML open 실패 수정 (2026-09-30)
+
+- 사용자 실기: DOCX/추천/선택 성공, 검증 문서 `app.open()`에서 지원하지 않는 형식 오류. **이전 Mock 통과는 Adobe 성공이 아니었음.**
+- 확인한 결함: ElementTree sourceXml 보존은 `<?aid ...?>` processing instruction을 버렸고, 재직렬화도 복구하지 않았다. 기존 ZIP/CRC/XML tree 검사로는 발견할 수 없었다. 로컬 이전 재생성 IDML에도 aid 없음. 이것이 실제 Host 실패의 유일한 원인인지는 재실기 필요.
+- 새 `src/idml-package.js`: 기존 모델에는 표준 document aid 선언을 명시적으로 복원(원래 product 버전은 만들지 않음), 신규 추출은 원래 aid 보존. DOMVersion/디자인 값 유지. 복원 이유는 fidelity.packagingNotes에 기록.
+- STORE ZIP/CRC/중앙·로컬 헤더/mimetype/container/designmap/리소스·src 참조 검사 → awaited binary write → binary readback 완전 일치 → 재검사 → 기존 nativePath로 app.open. 실패 무시/빈 문서 우회 없음.
+- 독립 Python 검증: 개인 기준 160항목 inventory 일치, XML159 파싱/CRC 통과, 1,658,609 bytes. 원본/개인 파일 미변경.
+- **NEXT STEP:** UXP Reload → 기존 Smoke DOCX → 기존 등록 파일 → 추천 → 시작 메인 · 사진 1장 선택 → 검증용 문서 생성. 실제 새 문서가 열리는지 먼저 확인. 실패 시 상세 진단의 IDML_PACKAGE_INVALID / IDML_WRITE_MISMATCH / IDML_HOST_OPEN_FAILED 및 경로를 전달. 콘텐츠/Auto Fix/PDF 확장 없음.
+- 최종 자동 테스트 결과와 근거: docs/REGISTERED_NATIVE_AUDIT.md 최상단. 실제 Adobe 재실기 미실행.
+
+---
+
 # HANDOFF — 등록 디자인 1건 PC 실기 준비 (2026-09-30)
 
 - 중단된 미커밋 작업을 그대로 재개. 기준 HEAD `e7a236b97fdbfab3598e983fcc5a8c1ce2be039f`, 개발 브랜치 `codex/magazine-studio-1.1`.
