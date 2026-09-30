@@ -19,7 +19,7 @@ function host(options={}){
   function frame(page){
     let current;
     const t={pointSize:10.5,leading:16.2,tracking:900,applyParagraphStyle(style,clear){assert.equal(clear,true);this.appliedParagraphStyle=style;Object.assign(this,style);}};
-    const st={id:++counter,data:'',frames:[],texts:{item:()=>t},get contents(){return this.data;},set contents(v){this.data=v;},get overflows(){return this.data.length>this.frames.length*(options.capacity||10000);}};
+    const st={id:++counter,data:'',frames:[],get textContainers(){return this.frames;},texts:{item:()=>t},get contents(){return this.data;},set contents(v){this.data=v;},get overflows(){return this.data.length>this.frames.length*(options.capacity||10000);}};
     current=st;stories.push(st);
     const f={strokeColor:'inherited black',fillColor:'inherited fill',isValid:true,label:'',parentPage:page,textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
     st.frames=[f];doc.items.push(f);return f;
@@ -204,4 +204,11 @@ test('JSON optional body inset/gutter/paragraph spacing and contain fitting reac
  const raw=structuredClone(jsonTemplates[0]);for(const e of raw.elements.filter(e=>e.role==='body')){e.inset=[1,2,3,4];e.columns=2;e.columnGap=3;e.typography.spaceBeforeMm=1;e.typography.spaceAfterMm=2;}raw.elements[0].fit='contain';
  const input={title:'제목',subtitle:'부제',body:'본문',images:[{path:'p.jpg'}]},p=L.fromDesign(raw,input),h=host();await h.api.create(input,p);
  const f=h.docs[0].items.find(f=>f.label==='JSON_body_1'),t=f.parentStory.texts.item(0);assert.deepEqual(Array.from(f.textFramePreferences.insetSpacing),['1mm','2mm','3mm','4mm']);assert.equal(f.textFramePreferences.textColumnGutter,'3mm');assert.equal(f.textFramePreferences.textColumnCount,2);assert.equal(t.spaceBefore,'1mm');assert.equal(t.spaceAfter,'2mm');assert.deepEqual(h.docs[0].items.find(f=>f.label==='JSON_image1_0').fits,[3,2]);
+});
+
+test('overset roles come from generated frame labels, never from Story numbers; unknown remains visible and blocks PDF',async()=>{
+ const h=host();await h.api.create(a,L.candidates(a)[0]);const doc=h.docs[0];
+ const title=doc.items.find(f=>f.label==='AUTO_TITLE').parentStory;title.data='x'.repeat(10001);
+ let r=h.api.check();assert.equal(r.issues[0].role,'title');assert.match(r.errors[0],/제목/);assert.match(r.issues[0].detail,/Story/);assert.doesNotMatch(r.errors[0],/Story/);assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+ title.frames[0].label='';r=h.api.check();assert.equal(r.issues[0].role,'unknown');assert.match(r.errors[0],/텍스트 영역/);title.data='짧은 제목';assert.equal(h.api.check().errors.length,0);
 });

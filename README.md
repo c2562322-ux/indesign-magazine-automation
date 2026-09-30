@@ -96,3 +96,6 @@ RGB 강조색은 배치 시안의 출발점입니다. 색상 프로파일·오�
 - [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
 
 확인일: 2026-09-28.
+
+#### UI/UX 브라우저 검증
+`node tests/serve-ux.cjs` → `http://127.0.0.1:8766/ux-test.html`에서 실제 Studio UI와 모의 Host를 조작할 수 있습니다. 실제 InDesign 문서/파일은 생성하지 않습니다. 검증 범위와 PC 절차: [UI_UX_AUDIT](docs/UI_UX_AUDIT.md).

@@ -49,3 +49,10 @@
 - `manifest.json`: UDT로 로드.
 - 최종 ZIP에는 소스/문서/테스트/기존 자료를 포함하며 `.git`과 임시파일은 제외.
 - 사용자 승인에 따라 개발 브랜치만 commit/push한다. main에는 commit/push/merge하지 않는다.
+
+### 현재 UI/UX 상태 (2026-09-30)
+- Family 중심 선택기, 선택 디자인 요약, 역할별 검사 오류 및 PDF 차단 이유, 접힌 진단 적용.
+- Story 323/348/401의 실제 역할은 아직 미확정. 새 버전으로 재검사 시 Label 기반 역할과 상세 번호를 확보해야 함.
+- 브라우저 Mock 조작과 자동 테스트는 Adobe 실기 성공이 아님. 다음 작업: docs/UI_UX_AUDIT.md의 PC Smoke Test.
+
+- 최종 자동 검증: 기존 115개 + 신규 5개 = 120개 통과 (Node/Mock, Adobe 실기 아님).

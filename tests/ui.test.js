@@ -188,7 +188,7 @@ test('font query failure shows diagnostics and allows retry and empty results',a
 test('choosing installed replacements updates preview and creation plan, invalidates old output',async()=>{
  let received;const {app,e}=setup(true,{fonts:()=>fontRows,create:(a,p)=>{received=p;return {pageCount:1,errors:[],warnings:[]};}});
  e.btnCreateAuto.click();await tick();e.btnFonts.click();await tick();
- e.fontChoices.children[0].children[1].click();e.btnFontBody.click();await tick();e.fontChoices.children[1].children[1].click();e.btnFontTitle.click();await tick();
+ e.fontChoices.children[0].children[0].click();e.fontChoices.children[0].children[1].click();e.btnFontBody.click();await tick();e.fontChoices.children[1].children[0].click();e.fontChoices.children[1].children[1].click();e.btnFontTitle.click();await tick();
  assert.equal(e.bodyFont.value,fontRows[0].name);assert.equal(e.titleFont.value,fontRows[1].name);assert.equal(e.btnExportPdf.disabled,true);
  const sheet=e.largePreview.children[0];assert.equal(sheet.children.find(n=>n.className==='preview-title').style.fontFamily,'"Family1", sans-serif');
  e.btnCreateAuto.click();await tick();assert.equal(received.settings.bodyFont,fontRows[0].name);assert.equal(received.settings.titleFont,fontRows[1].name);
@@ -256,7 +256,7 @@ test('native load and image pickers, project write and font adapter actually con
 });
 test('preview uses catalog Medium style without requesting nonexistent styles from Host',async()=>{
  const {e}=setup(true,{fonts:()=>[{name:'Actual\tMedium',family:'Actual',style:'Medium'}]});
- e.btnFonts.click();await tick();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();
+ e.btnFonts.click();await tick();e.fontChoices.children[0].children[0].click();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();
  assert.equal(e.largePreview.children[0].children.find(n=>n.className==='preview-title').style.fontWeight,'500');
  assert.equal(e.titleFont.value,'Actual\tMedium');
 });
@@ -296,7 +296,7 @@ test('missing core DOM fails before binding; restoring it permits a clean initia
 test('font family/style grouping uses cache for reopen/search/general actions and explicit refresh only',async()=>{
  let queries=0;const faces=[{name:'Family\tBook',family:'Family',style:'Book'},{name:'Family\tMedium',family:'Family',style:'Medium'}];
  const {e}=setup(true,{fonts:refresh=>{queries++;if(queries===2)assert.equal(refresh,true);return faces;}});
- e.btnFonts.click();await tick();assert.equal(e.fontChoices.children.length,1);assert.equal(e.fontChoices.children[0].children.length,3);
+ e.btnFonts.click();await tick();assert.equal(e.fontChoices.children.length,1);assert.equal(e.fontChoices.children[0].children.length,1);e.fontChoices.children[0].children[0].click();assert.equal(e.fontChoices.children[0].children.length,3);
  e.fontChoices.children[0].children[2].click();assert.match(e.fontSelection.textContent,/Medium/);e.btnFontTitle.click();await tick();assert.match(e.fontCurrent.textContent,/Family — Medium/);
  e.btnFonts.click();await tick();e.btnSample.click();await tick();e.btnPrepare.click();await tick();e.candidateList.children[1].click();
  e.btnFonts.click();await tick();e.fontSearch.value='Book';e.fontSearch.listeners.input();assert.equal(queries,1);
@@ -354,7 +354,7 @@ for(let i=0;i<3;i++)test('JSON Layout '+(i+1)+' selection renders normalized pos
 test('broken library entry and unavailable fonts cannot kill free UI; explicit font choice changes only typography',async()=>{
  const catalog=[{name:'Available\tBook',family:'Available',style:'Book'}];const {e,app}=setup(true,{designs:async()=>{const rows=await jsonLibrary();rows[1]={id:rows[1].id,error:'bad JSON'};return rows;},validateDesignFonts:()=>[{name:'프리젠테이션\t6 SemiBold',error:'없음'}],fonts:()=>catalog});await tick();
  assert.equal(e.jsonDesignList.children[1].disabled,true);e.jsonDesignList.children[0].click();await tick();assert.match(e.jsonDesignInfo.textContent,/필요한 폰트가 없습니다/);assert.equal(app.state.busy,false);assert.equal(e.btnPrepare.disabled,false);
- const before=app.state.plans.at(-1);e.btnFonts.click();await tick();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();const after=app.state.plans[app.state.selected];assert.equal(after.origin,'json');assert.equal(after.fontOverrides.titleFont,'Available\tBook');assert.deepEqual(after.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]),before.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]));
+ const before=app.state.plans.at(-1);e.btnFonts.click();await tick();e.fontChoices.children[0].children[0].click();e.fontChoices.children[0].children[1].click();e.btnFontTitle.click();await tick();const after=app.state.plans[app.state.selected];assert.equal(after.origin,'json');assert.equal(after.fontOverrides.titleFont,'Available\tBook');assert.deepEqual(after.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]),before.pages[0].elements.map(b=>[b.x,b.y,b.width,b.height]));
  e.btnPrepare.click();await tick();assert.equal(e.candidateList.children.length,3);assert.ok(app.state.plans.every(p=>p.origin==='local'));
 });
 test('JSON loading failure can retry, and reinitialization does not duplicate listeners or accept stale results',async()=>{
@@ -376,4 +376,33 @@ test('JSON preview maps asymmetric InDesign inset order and preserves contain im
  const rows=await jsonLibrary(),raw=rows[0].design;for(const e of raw.elements.filter(e=>e.role==='body')){e.inset=[1,2,3,4];e.columns=2;e.columnGap=3;e.typography.spaceBeforeMm=1;e.typography.spaceAfterMm=2;}raw.elements[0].fit='contain';
  const {e,app}=setup(true,{designs:async()=>rows,image:async()=>({path:'p.jpg',preview:'file:/p.jpg'})});await tick();e.btnAddImage.click();await tick();e.jsonDesignList.children[0].click();await tick();
  const p=app.state.plans[app.state.selected],b=p.pages[0].elements.find(b=>b.role==='body'),sheet=e.largePreview.children[0],scale=parseFloat(sheet.style.width)/p.settings.width,node=sheet.children[1];assert.equal(node.style.left,((b.x+2)*scale)+'px');assert.equal(node.style.top,((b.y+1)*scale)+'px');assert.equal(node.style.width,((b.width-2-4-3)/2*scale)+'px');assert.equal(node.children[0].style.marginTop,scale+'px');assert.equal(node.children[0].style.marginBottom,(2*scale)+'px');assert.equal(sheet.children[0].style.backgroundColor,p.pages[0].elements[0].fill.css);assert.equal(sheet.children[0].children[0].style.objectFit,'contain');
+});
+
+test('UX selection is textual and PDF blocking gives actionable role summaries with diagnostics collapsed',async()=>{
+ const report={pageCount:1,errors:['제목 텍스트가 넘칩니다.'],warnings:[],issues:[{role:'title',message:'제목 텍스트가 넘칩니다.',hint:'프레임 높이를 확인하고 다시 검사해주세요.',detail:'Story 323'}]};
+ const {e}=setup(true,{create:async()=>report});
+ assert.match(e.candidateList.children[0].children[1].textContent,/선택됨/);assert.match(e.selectedDesign.textContent,/에디토리얼/);
+ e.btnCreateAuto.click();await tick();assert.match(e.inspectionSummary.textContent,/수정 필요 1건/);assert.match(e.pdfReason.textContent,/오류 1건/);assert.equal(e.btnExportPdf.disabled,true);
+ assert.match(e.inspectionIssues.children[0].children[0].textContent,/제목/);assert.doesNotMatch(e.inspectionIssues.children[0].children[0].textContent,/323/);assert.match(e.hostReport.textContent,/Story 323/);assert.equal(e.diagnosticsPanel.style.display,'none');
+ e.btnDiagnostics.click();assert.equal(e.diagnosticsPanel.style.display,'block');e.btnDiagnostics.click();assert.equal(e.diagnosticsPanel.style.display,'none');
+ e.candidateList.children[1].click();assert.match(e.selectedDesign.textContent,/여백 중심/);assert.equal(e.inspectionIssues.children.length,0);assert.equal(e.btnExportPdf.disabled,true);
+});
+test('UX processing, failure, retry, recheck and source edits never leave stale success',async()=>{
+ let finish;let fail=true;const {e}=setup(true,{create:()=>new Promise((resolve,reject)=>finish=()=>fail?reject(new Error('[create.Mock] error')):resolve({pageCount:1,errors:[],warnings:[]}))});
+ e.btnCreateAuto.click();assert.match(e.btnCreateAuto.textContent,/처리 중/);assert.match(e.productionStatus.textContent,/생성 중/);assert.equal(e.btnCreateAuto.disabled,true);assert.equal(e.btnDiagnostics.disabled,false);
+ finish();await tick();assert.match(e.productionStatus.textContent,/실패/);assert.equal(e.btnCreateAuto.disabled,false);assert.doesNotMatch(e.studioStatus.textContent,/create.Mock/);
+ fail=false;e.btnCreateAuto.click();finish();await tick();assert.match(e.productionStatus.textContent,/완료/);assert.equal(e.btnExportPdf.disabled,false);assert.match(e.pdfReason.textContent,/가능/);
+ e.autoBody.value+=' 변경';e.autoBody.listeners.input();assert.equal(e.productionStatus.textContent,'');assert.equal(e.btnExportPdf.disabled,true);
+});
+test('UX fonts render bounded collapsed families, exact selected style, and applied target feedback',async()=>{
+ let calls=0;const faces=Array.from({length:100},(_,i)=>['Book','Black'].map(style=>({family:'Family'+i,style,name:'Family'+i+'\t'+style}))).flat();
+ const {e}=setup(true,{fonts:async()=>{calls++;return faces;}});e.btnFonts.click();await tick();assert.equal(e.fontChoices.children.length,30);assert.ok(e.fontChoices.children.every(g=>g.children.length===1));
+ e.fontSearch.value='Family99';e.fontSearch.listeners.input();assert.equal(e.fontChoices.children.length,1);e.fontChoices.children[0].children[0].click();e.fontChoices.children[0].children[2].click();assert.match(e.fontSelection.textContent,/Black/);assert.match(e.fontChoices.children[0].children[2].textContent,/선택됨/);
+ e.btnFontBody.click();await tick();assert.match(e.btnFontBody.textContent,/적용됨/);e.btnFontTitle.click();await tick();assert.match(e.btnFontTitle.textContent,/적용됨/);assert.equal(calls,1);
+});
+
+test('narrow preview leaves room for panel padding and diagnostics toggle survives remount',async()=>{
+ const first=setup(true);first.e.largePreview.clientWidth=280;first.e.btnPrepare.click();await tick();assert.equal(parseFloat(first.e.largePreview.children[0].style.width),240);
+ first.e.btnDiagnostics.click();assert.equal(first.e.diagnosticsPanel.style.display,'block');
+ const next=setup(true);assert.equal(next.e.diagnosticsPanel.style.display,'none');assert.equal(next.e.btnDiagnostics.handlers.click.length,1);first.e.btnDiagnostics.click();assert.equal(next.e.diagnosticsPanel.style.display,'none');
 });

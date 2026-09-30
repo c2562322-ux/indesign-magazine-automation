@@ -552,3 +552,9 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 ## D034 — 외부 IDML 추출 JSON은 단일 정규화 plan으로 재현 (2026-09-29)
 
 제공 ZIP의 designs/manifest와 JSON을 파일로 보관하고 UXP pluginFolder/브라우저 fetch로 읽는다. draft $schema 기준 검증, 손상 파일 격리, 원본 first-page geometry/개별 typography 보존. 기존 무료/AI plan 경로를 유지하며 origin=json 경로가 독립 본문 flowOrder, 실제 선/이미지 모서리/색상을 지원한다. 헤더 null 크기 8pt, null 행간 120%, 글자색 검정/문단 간격·inset 0/bleed 0은 누락값 정책이며 원본값이 아니다. fontOverrides는 사용자 명시 선택만 허용. 사진 0장은 빈 원본 프레임, 초과 사진은 거부. 긴 본문은 원본 첫 페이지 이후 공통 continuation geometry+원본 body typography를 사용하며 JSON 후속 페이지에는 본문만 넣는다. 원본 프레임 넘침을 자동 축소로 감추지 않는다. 상세 계약/한계: docs/JSON_DESIGNS.md.
+
+### 2026-09-30: 사용자 상태와 내부 진단 분리
+- 새 디자인 모드만 수정. 검사 errors 배열과 PDF 차단은 유지하면서 issues에 역할/해결 안내/내부 detail을 추가.
+- Story 번호로 역할을 추측하지 않으며 생성 Label로만 식별. 모르면 일반 텍스트 영역으로 보고.
+- 폰트 목록은 캐시를 검색하고 Family를 펼칠 때 Style 렌더링. 작업 중 편집 잠금은 문서 상태 일관성을 위해 유지하되 설명/진단 접기는 허용.
+- JSON의 작은 프레임을 자동 확대하지 않음. 조판 차이는 실기 결과로 판단.

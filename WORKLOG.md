@@ -1094,3 +1094,10 @@
 - Preview/Host에 원본 좌표·실제 style·leading/tracking·정렬·색상·라운드 이미지·1.5pt 장식선 전달. 사진 없음 빈 프레임, 본문 스레드/후속 페이지, 명시 폰트 대체와 프로젝트 복원.
 - 기존90+추가25=115 Node 테스트 통과. UXP 로더는 Mock, 실제 Adobe 생성/검사/출력은 미검증. 브라우저 키보드 선택으로3안 렌더 확인; 도구의 마우스 클릭은 반응을 확인하지 못해 실제 UXP 클릭도 사용자 Smoke 대상. 고정 제목/부제에서 예시 원고 잘림 확인.
 - docs/JSON_DESIGNS.md에 schema/단위/누락값/추가 절차/Smoke/시각적 한계 기록. 기존 시작페이지/Inspector/목차/Script Label 코드는 변경하지 않음.
+
+### 2026-09-30 UI/UX 안정화
+- 선택 디자인/처리 중/검사 요약/PDF 차단 사유를 사용자 언어로 표시. 상세 진단은 기본 접힘.
+- 폰트 Family 접기/펼치기, 선택 Style/본문·제목 적용 표시. 캐시 및 lifecycle 유지.
+- 브라우저 및 명시적 Mock Host 직접 조작 완료; 실제 UDT/InDesign 미검증. 근거와 한계: docs/UI_UX_AUDIT.md.
+
+- 최종 자동 검증: 기존 115개 + 신규 5개 = 120개 통과 (Node/Mock, Adobe 실기 아님).

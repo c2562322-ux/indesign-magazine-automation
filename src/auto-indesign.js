@@ -165,9 +165,16 @@ function addPage(doc,design,s,a,styles,index){
 function check(doc,progress){
     if(!doc||!doc.isValid)throw new Error('생성한 문서가 닫혔습니다. 새 문서를 만들어주세요.');
     D.step('check.Document.recompose',()=>doc.recompose(),progress);
-    const errors=[],warnings=[];
+    const errors=[],warnings=[],issues=[];
     D.step('check.stories.overflows',()=>{for(let i=0;i<doc.stories.length;i++){
-        const st=doc.stories.item(i);if(st.overflows)errors.push('텍스트 넘침: Story '+st.id);
+        const st=doc.stories.item(i);if(st.overflows){
+            const labels=[];try{for(const frame of st.textContainers)labels.push(String(frame.label||''));}catch(e){/* Unknown containers remain unidentified. */}
+            const roles={title:'제목',subtitle:'부제',body:'본문',header:'헤더',footer:'푸터',pageNumber:'페이지 번호'};
+            const role=Object.keys(roles).find(r=>labels.some(label=>new RegExp('^(AUTO|JSON)_'+r+'(?:_|$)','i').test(label)));
+            const message=(roles[role]||'텍스트 영역')+' 텍스트가 넘칩니다.';
+            const hint=role==='body'?'InDesign에서 본문 연결과 마지막 페이지의 넘침을 확인하고 다시 검사해주세요.':'InDesign에서 해당 프레임의 높이·글자 크기·폰트를 확인하고 다시 검사해주세요.';
+            errors.push(message);issues.push({role:role||'unknown',message,hint,detail:'Story '+st.id+' · '+labels.join(', ')});
+        }
     }},progress);
     D.step('check.fonts.status',()=>{for(let i=0;i<doc.fonts.length;i++){
         const f=doc.fonts.item(i);if(!sameEnum(f.status,ID.FontStatus.INSTALLED))errors.push('폰트 확인 필요: 문서 폰트 '+(i+1));
@@ -180,7 +187,7 @@ function check(doc,progress){
     for(let i=0;i<graphics.length;i++){
         try{const g=graphics[i],ppi=g.effectivePpi;if(ppi&&Math.min(Number(ppi[0]),Number(ppi[1]))<200)warnings.push('배치 이미지 '+(i+1)+': 유효 해상도 200ppi 미만. 인쇄소 기준을 확인해주세요.');}catch(e){warnings.push('이미지 '+(i+1)+' 해상도를 읽지 못했습니다.');}
     }
-    return {pageCount:doc.pages.length,errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
+    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(errors.slice(issues.length).map(message=>({message,hint:message.includes("폰트")?"InDesign에서 누락 폰트를 교체하고 다시 검사해주세요.":"InDesign에서 이미지 링크를 복구하고 다시 검사해주세요."})))};
 }
 async function create(raw,plan,progress){
     const generation=session;

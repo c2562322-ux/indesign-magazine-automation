@@ -19,3 +19,25 @@ body{margin:0;padding:0;background:#f3f1eb;color:#202724;font-family:Arial,sans-
 .font-family{margin:8px 0;} .font-family strong{display:block;} .font-style{display:block;margin:3px 0 3px 12px;padding:5px 10px;} .font-style.selected{border:2px solid #2c493b;background:#eef3eb;}
 
 #jsonDesignInfo{white-space:pre-wrap;margin:8px 0;}
+/* Studio controls use a UI font, independently of article typography. */
+#studioPanel{font-family:"Segoe UI","Malgun Gothic",Arial,sans-serif}
+#studioPanel button,#studioPanel input,#studioPanel textarea{font-family:"Segoe UI","Malgun Gothic",Arial,sans-serif;font-size:13px}
+#studioPanel button{min-height:34px;white-space:normal;line-height:1.4}
+#studioPanel button:disabled{opacity:1;color:#777;background:#eee;border-color:#d5d5d5;cursor:default}
+#studioPanel button:focus-visible,#studioPanel input:focus-visible,#studioPanel textarea:focus-visible{outline:2px solid #225b9b;outline-offset:2px}
+#studioPanel .candidate.selected,#studioPanel .font-style.selected{border:2px solid #225b9b;background:#edf5ff;color:#12395f}
+#studioPanel .candidate:hover:not(:disabled){border-color:#225b9b}
+#studioPanel .selection-summary{padding:12px;background:#edf5ff;color:#12395f;font-weight:600}
+#studioPanel .font-family-toggle{display:block;width:100%;text-align:left;margin:0}
+#studioPanel .font-family{padding:4px 0;border-bottom:1px solid #ddd}
+#studioPanel #fontChoices{max-height:260px;overflow-y:auto}
+#studioPanel #fontCurrent,#studioPanel #fontSelection{white-space:pre-wrap;line-height:1.6}
+#studioPanel .inspection-issue{border-left:3px solid #a84a20;padding:9px;margin:8px 0;background:#fff6ee}
+#studioPanel #diagnosticsPanel{max-height:240px;overflow:auto}
+#studioPanel #diagnosticsPanel pre{white-space:pre-wrap;overflow-wrap:anywhere}
+#studioPanel #pdfReason{line-height:1.6}
+@media(max-width:480px){#studioPanel .row{flex-wrap:wrap}#studioPanel .candidate-list{flex-direction:column}#studioPanel .toolbar{flex-wrap:wrap}}
+
+#studioPanel button{box-sizing:border-box}
+#studioPanel #productionStatus{margin:12px 0;line-height:1.6}
+#studioPanel #inspectionSummary{margin:12px 0;font-weight:600}

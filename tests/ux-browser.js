@@ -1,0 +1,8 @@
+(function(){
+ const $=id=>document.getElementById(id),counts={fonts:0,create:0,check:0,save:0,pdf:0};
+ function count(k){counts[k]++;$('simCounts').textContent=JSON.stringify(counts);}
+ function report(){const issues=$('simOverflow').checked?['title','subtitle','pageNumber'].map((role,i)=>({role,message:{title:'제목 영역을 벗어났습니다.',subtitle:'부제 영역을 벗어났습니다.',pageNumber:'페이지 번호 영역을 벗어났습니다.'}[role],hint:'InDesign에서 해당 프레임의 넘침을 확인하고 수정한 뒤 다시 검사해주세요.',detail:'MOCK Story '+[323,348,401][i]})):[];return {pageCount:2,errors:issues.map(x=>x.message),issues,warnings:[]};}
+ async function action(k,progress){count(k);if(progress)progress(k+'.MockHost');await new Promise(r=>setTimeout(r,600));if($('simFail').checked){$('simFail').checked=false;throw new Error('['+k+'.MockHost] 모의 실패');}return report();}
+ const fonts=Array.from({length:146},(_,i)=>['Book','Medium','SemiBold','Bold','Black'].map(style=>({family:i?'테스트 Family '+String(i).padStart(3,'0'):'Demo Sans',style,name:(i?'테스트 Family '+String(i).padStart(3,'0'):'Demo Sans')+'\t'+style}))).flat();
+ window.magazineApp=MagazineStudio.mount({native:true,yieldUI:()=>new Promise(r=>setTimeout(r,0)),designs:()=>MagazineJSONDesign.load(async name=>(await fetch('designs/'+name)).text()),fonts:async()=>{count('fonts');await new Promise(r=>setTimeout(r,300));return fonts;},validateDesignFonts:()=>[],validateFonts:()=>[],image:async()=>({path:'mock-photo.jpg',name:'모의 사진',preview:''}),load:async()=>null,saveProject:async()=>true,create:async(a,p,progress)=>action('create',progress),check:progress=>action('check',progress),saveIndd:progress=>action('save',progress),exportPdf:progress=>action('pdf',progress)});
+})();

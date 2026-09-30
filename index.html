@@ -12,15 +12,15 @@
         <div class="card-heading" style="margin-top:16px"><label>사진 · 선택</label><span id="imageCount" class="small"></span></div><div id="autoImages"></div><button id="btnAddImage" class="full">사진 추가</button>
       </div>
       <div class="card"><h2><span class="step">02</span> 디자인 방향</h2>
-        <button id="btnSettings" class="quiet toggle">지면 · 색상 · 폰트 설정 ▾</button>
-        <div id="settingsPanel" class="settings" style="display:none">
-          <div class="row"><div class="field"><label>너비 mm</label><input id="pageWidth" type="number" /></div><div class="field"><label>높이 mm</label><input id="pageHeight" type="number" /></div><div class="field"><label>여백 mm</label><input id="pageMargin" type="number" /></div></div>
-          <div class="row"><div class="field"><label>본문 pt</label><input id="bodySize" type="number" step="0.5" /></div><div class="field"><label>재단 여백 mm</label><input id="pageBleed" type="number" /></div><div class="field"><label>강조색</label><input id="accent" /></div></div>
-          <div class="field"><label>매거진 이름</label><input id="publication" /></div>
-          <div class="field"><label>본문 폰트</label><input id="bodyFont" /></div><div class="field"><label>제목 폰트</label><input id="titleFont" /></div>
+        <button id="btnSettings" class="quiet toggle">지면 · 폰트 설정 열기/닫기</button>
+        <div id="settingsPanel" class="settings" style="display:none"><p class="small">지면 수치는 무료 자동 디자인에 적용됩니다. IDML 기반 디자인은 원본 지면 수치를 유지합니다.</p>
+          <div class="row"><div class="field"><label for="pageWidth">너비 mm</label><input id="pageWidth" type="number" /></div><div class="field"><label for="pageHeight">높이 mm</label><input id="pageHeight" type="number" /></div><div class="field"><label for="pageMargin">여백 mm</label><input id="pageMargin" type="number" /></div></div>
+          <div class="row"><div class="field"><label for="bodySize">본문 pt</label><input id="bodySize" type="number" step="0.5" /></div><div class="field"><label for="pageBleed">재단 여백 mm</label><input id="pageBleed" type="number" /></div><div class="field"><label for="accent">강조색</label><input id="accent" /></div></div>
+          <div class="field"><label for="publication">매거진 이름</label><input id="publication" /></div>
+          <div class="field"><label for="bodyFont">본문 폰트</label><input id="bodyFont" /></div><div class="field"><label for="titleFont">제목 폰트</label><input id="titleFont" /></div>
           <button id="btnFonts" class="quiet">폰트 더보기 / 닫기</button>
           <div id="fontBrowser" style="display:none"><button id="btnFontRefresh" class="quiet">설치 폰트 새로고침</button><label for="fontSearch">폰트 이름 / 스타일 검색</label><input id="fontSearch" placeholder="예: Freesentation, Medium" />
-          <p id="fontCurrent" class="small"></p><p id="fontSelection" class="small"></p><button id="btnFontBody">본문에 적용</button><button id="btnFontTitle">제목에 적용</button><p id="fontSummary" class="small"></p><div id="fontChoices"></div><button id="btnFontMore" class="quiet">목록 30개 더 표시</button>
+          <p id="fontCurrent" class="small"></p><p id="fontSelection" class="small"></p><button id="btnFontBody">본문에 적용</button><button id="btnFontTitle">제목에 적용</button><p id="fontSummary" class="small"></p><div id="fontChoices"></div><button id="btnFontMore" class="quiet">Family 30개 더 보기</button>
           <p class="small">없는 폰트는 자동 대체하지 않습니다. 아래 설치된 스타일을 본문/제목에 적용해주세요.</p></div>
         </div>
         <button id="btnPrepare" class="primary full">무료 디자인 3안 만들기</button><p class="small" style="margin-top:8px">기사 길이·사진 유무에 맞춰 새 배치를 계산합니다. API 비용 없음.</p>
@@ -39,10 +39,10 @@
       <p id="previewNote" class="small"></p>
     </div>
     <div class="card"><h2><span class="step">04</span> InDesign으로 제작</h2><p class="small" style="margin:9px 0 14px">선택한 디자인을 새 문서로 만듭니다. 긴 본문은 다음 페이지로 연결됩니다.</p>
-      <button id="btnCreateAuto" class="primary full">선택한 디자인으로 새 문서 만들기</button>
-      <div class="toolbar" style="margin-top:10px"><button id="btnSaveProject">원고·시안 저장</button><button id="btnSaveIndd">INDD 저장</button><button id="btnCheckAuto">문서 검사</button><button id="btnExportPdf">PDF 내보내기</button></div><div id="hostReport" class="report"></div>
+      <p id="selectedDesign" class="selection-summary"></p><button id="btnCreateAuto" class="primary full">선택한 디자인으로 새 문서 만들기</button>
+      <p id="productionStatus" role="status"></p><h2>05 검사 및 출력</h2><div class="toolbar" style="margin-top:10px"><button id="btnSaveProject">원고·시안 저장</button><button id="btnSaveIndd">INDD 저장</button><button id="btnCheckAuto">문서 검사</button><button id="btnExportPdf">PDF 내보내기</button></div><p id="pdfReason" class="brand-note"></p><p id="inspectionSummary" role="status"></p><div id="inspectionIssues"></div><button id="btnDiagnostics" class="quiet" aria-expanded="false">상세 진단 펼치기</button><div id="diagnosticsPanel" style="display:none"><div id="hostReport" class="report"></div><pre id="studioDiagnostics" class="small"></pre></div>
     </div></div>
-  </div><pre id="studioDiagnostics" class="small" style="white-space:pre-wrap;max-height:120px;overflow-y:auto"></pre><div id="studioStatus" class="studio-status" role="status">준비 중…</div>
+  </div><div id="studioStatus" class="studio-status" role="status">준비 중…</div>
 </div><div id="legacyPanel" class="legacy-wrap" style="display:none"><button id="modeStudio">← 새 디자인 모드</button><div class="panel">
         <sp-heading size="M">Magazine Automation</sp-heading>
 
