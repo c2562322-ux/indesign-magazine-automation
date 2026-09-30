@@ -1117,3 +1117,22 @@
 - 실제 IDML 16페이지(일반14+Parent2), 217객체, 139 text frames, 140 stories 추출. 원본 변경 없음. 결과 ignored. 원본 u1e4 proof 브라우저 표시 확인; 실제 InDesign 생성은 실기 필요.
 - 기존 Node132 회귀 없음 + 신규 Node11 =143 통과. 신규 Node 진입점에서 Python12 검사 통과. 합성 XML fixture로 geometry/type/style/local override/unsupported/security/Mock readback 검증.
 - 사용자 untracked sample INDD 보존. 원본/폰트/개인 추출 결과는 커밋 제외. 사용법/실기 범위는 DESIGN_EXTRACTION, DESIGN_FIDELITY 참고.
+
+
+## 2026-09-30 — Library/Article/Image/Matching 코어
+
+- 신규 INDD는 읽을 수 있으나 사용자 안내 경로에 IDML 미확인. 내보내기 방법 안내. 신규 구조를 추측하지 않음.
+- v2 optional details 추출 보강. 기존 IDML 추출 모델의 핵심 속성 비교 tolerance0 차이 없음.
+- 원본 불변 Library, role 후보/확인, 수용량 범위, 기존 DOCX parser 기반 기사 프로필, 알려진 이미지 치수 기반 비율, 설명 가능한 Hard/Soft ranking 구현.
+- 실제 Word와 기존 원본 실행: 14페이지 항목 모두 review-required. unknown role을 부제 미지원으로 단정하던 신규 평가 오류를 수정하고 회귀 테스트 추가.
+- 합성 fixture로 서로 다른 수용량/사진 비율/순위/이유, Auto Fix penalty, content overlay, 누락 폰트/정보, 원본 불변 검증. 기존143+추가15=Node158, Python12 통과.
+- 기존 Studio/Auto Fix/기존 양식 코드 수정 없음. 신규 IDML 분석·실제 두 디자인 비교·Host 생성 연결은 다음 작업으로 남음.
+
+
+### 같은 작업 중 실제 신규 IDML 수신 후 추가 검증
+
+- 2센트럴-눈길.idml 직접 추출: 일반11/Parent2쪽, 280객체, text161, 배치 이미지14, Polygon2, Layer3, font50. 원본 파일 미변경.
+- 축약 기본 style 참조 오탐, XML attribute 기반 GraphicBounds 누락, nested axis list 손실을 수정. raw source는 유지하며 structured 모델 개선.
+- 두 실제 IDML 원시 XML 대조: 기존 typography751개/신규784개와 페이지·객체·run·이미지 bounds14개 검증. Profile 비교도 실제 두 모델로 통과.
+- 원고 샘플 결과: 25페이지 항목 모두 role/font 확인 필요; 추측 추천 없음. 코드 수용량에 glyph 높이도 반영, immutable source/file read 공유로 반복 읽기 제거.
+- 최종 Node160(기존143+신규17), Python15(기존12+신규3) 통과. Host 재생성/전체 Preview/추천 UI 연결은 미구현.

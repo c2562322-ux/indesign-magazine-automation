@@ -35,6 +35,18 @@ def scalar(s):
         return s
 
 
+def property_value(e):
+    if e.get("type") == "list":
+        return [property_value(c) for c in e]
+    if len(e):
+        return raw(e)
+    if set(e.attrib)-{"type"}:
+        return {k: scalar(v) for k, v in e.attrib.items()}
+    if e.get("type") in ("string", "object", "enumeration"):
+        return e.text or ""
+    return scalar(e.text or "")
+
+
 def properties(e):
     """IDML property names retained; no synthetic defaults or enum coercion."""
     string_keys = {"Self", "Name", "FontFamily", "FontStyle", "FontStyleName", "FullName", "PostScriptName", "Label"}
@@ -42,10 +54,7 @@ def properties(e):
     p = e.find("Properties")
     if p is not None:
         for c in p:
-            out[tag(c)] = ([scalar(x.text or "") for x in c]
-                           if c.attrib.get("type") == "list"
-                           else (c.text or "") if c.get("type") in ("string", "object", "enumeration")
-                           else scalar(c.text or "") if not len(c) else raw(c))
+            out[tag(c)] = property_value(c)
     return out
 
 
@@ -54,6 +63,14 @@ def nums(s, count=None):
     if (count is not None and len(v) != count) or not all(math.isfinite(x) for x in v):
         raise ValueError("Invalid IDML geometry")
     return v
+
+
+def detail_properties(e):
+    out = properties(e)
+    children = [raw(c) for c in e if tag(c) != "Properties"]
+    if children:
+        out["children"] = children
+    return out
 
 
 def matrix(e):
@@ -173,6 +190,8 @@ def extract_package(pkg, digest):
             model["fonts"].append({"id": e.get("Self"), "family": e.get("FontFamily"),
                                    "style": e.get("FontStyleName"), "postscriptName": e.get("PostScriptName"),
                                    "fullName": e.get("FullName"), "properties": properties(e)})
+            if e.find("./Properties/DesignAxesRange") is not None:
+                issue("VARIABLE_FONT_AXIS_PRESERVED", e.get("Self"), "Axis ranges preserved; Host reproduction not implemented")
         for typ in ("Color", "Tint", "Gradient", "Swatch"):
             for e in root.iter(typ):
                 if e.get("Self"):
@@ -180,9 +199,14 @@ def extract_package(pkg, digest):
                     if typ == "Gradient":
                         issue("GRADIENT_PRESERVED_ONLY", e.get("Self"), "Stops preserved in sourceXml")
 
-    def resolve(ref, trail=()):
-        if not ref or ref in ("n", "$ID/[No character style]"):
+    def resolve(ref, trail=(), family=None):
+        if not ref or ref == "n":
             return {}
+        if ref not in style_map and ref.startswith("$ID/"):
+            matches = [key for key in style_map if key.endswith("/"+ref)
+                       and (family is None or key.startswith(family+"/"))]
+            if len(matches) == 1:
+                ref = matches[0]
         if ref in trail:
             issue("STYLE_CYCLE", ref, "Cyclic BasedOn reference")
             return {}
@@ -190,7 +214,7 @@ def extract_package(pkg, digest):
         if not style:
             issue("MISSING_STYLE", ref, "Reference not found; no invented defaults")
             return {}
-        return {**resolve(style["properties"].get("BasedOn"), trail+(ref,)), **style["properties"]}
+        return {**resolve(style["properties"].get("BasedOn"), trail+(ref,), ref.split("/")[0]), **style["properties"]}
 
     for style in style_map.values():
         style["resolvedProperties"] = resolve(style["id"])
@@ -247,7 +271,7 @@ def extract_package(pkg, digest):
         def visit(parent, parent_id=None, parent_transform=IDENTITY):
             for order, e in enumerate(parent):
                 if tag(e) not in ITEMS:
-                    if e.get("Self") and tag(e) != "Page":
+                    if e.get("Self") and tag(e) not in ("Page", "Image", "PDF", "EPS"):
                         issue("UNMODELED_SPREAD_OBJECT", e.get("Self"), tag(e)+" retained in sourceXml only")
                     continue
                 eid = e.get("Self")
@@ -285,7 +309,11 @@ def extract_package(pkg, digest):
                         "textFrame": {"properties": properties(pref) if pref is not None else {},
                                       "storyRef": e.get("ParentStory"), "previousRef": e.get("PreviousTextFrame"),
                                       "nextRef": e.get("NextTextFrame")} if tag(e) == "TextFrame" else None,
-                        "image": [{"type": tag(c), "properties": properties(c)} for c in e if tag(c) in ("Image", "PDF", "EPS")],
+                        "details": {tag(c): detail_properties(c) for c in e if tag(c) in
+                                    ("TextWrapPreference", "TransparencySetting", "FrameFittingOption", "AnchoredObjectSetting")},
+                        "image": [{"type": tag(c), "properties": properties(c),
+                                   "details": {tag(child): detail_properties(child) for child in c if tag(child) != "Properties"}}
+                                  for c in e if tag(c) in ("Image", "PDF", "EPS")],
                         "capability": "preserved; reproduction requires explicit projection"}
                 model["elements"].append(item)
                 if len(candidates) != 1 and tag(e) != "Group":

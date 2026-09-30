@@ -568,3 +568,10 @@ geometry plan v1을 유지하면서 typography/furniture/RENDER 기본값을 lay
 사용자가 허용한 Phase 1로 제한한다. INDD 바이너리 파서 대신 IDML XML을 Python 표준 라이브러리로 오프라인 추출한다. canonical pt, 원본 속성명/스타일 참조/그룹 transform/sourceXml을 보존한다. sourceOrder와 후보 page mapping은 확정 z-order/parentPage로 과장하지 않는다. live composition/visibleBounds는 추측하지 않는다.
 
 기존 v1과 Studio pipeline은 유지한다. v2의 미지원 속성을 v1 기본값으로 바꾸는 자동 다운그레이드는 만들지 않는다. 단일 사각 text frame의 명시적 proof만 Preview/Host 공통 plan으로 만들며 omitted를 표시하고 전체 복제로 취급하지 않는다. 설치 face를 정확히 확인하고 새 문서만 만든다. 원본 스타일 전체 재생성, 그룹/Parent/thread/이미지 renderer와 일반 사용자 import UI는 다음 단계다. Original Design과 Runtime Adjustment는 별도 보관한다.
+
+
+## D037 — 역할 확인 전 추천 보류와 source 불변 프로필 (2026-09-30)
+
+v2 source를 수정하지 않고 Library sidecar에 hash/page scope/확정 role/사진 필수 여부를 둔다. 위치/크기/style 기반 추론은 후보로만 반환한다. 원고 수용량은 font size/leading/tracking/columns/inset/문단 간격과 CJK 비중으로 추정하되 실제 glyph metric 미측정을 명시한다. unknown은 score로 감추지 않고 review로 반환한다. Hard constraint와 Soft penalty를 분리하며 selectedId=null을 유지한다.
+
+기존 auto-fit.POLICY의 한계를 재사용하되 실제 안전 조정 가능을 보장하지 않는다. v2 full renderer가 없으므로 content binding은 overlay만 만들고 productionReady=false이다. v1 변환으로 원본을 단순화하거나 별도 production generator를 추가하지 않는다. 기존 패널 안정성을 위해 Phase D UI/제작 연결은 보류한다.

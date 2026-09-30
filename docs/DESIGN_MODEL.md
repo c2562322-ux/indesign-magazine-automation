@@ -110,3 +110,8 @@ issues[] / capabilities / sourceXml
 ## 호환성
 
 v1은 `json-design.js`, v2는 `design-model.js`가 검증한다. v2를 v1 manifest에 넣어 바로 생성하는 것은 지원하지 않는다. 기존 3종·무료 3안은 그대로다. 정보 손실이 큰 자동 v2→v1 다운그레이드는 만들지 않았다.
+
+
+## 후속: 두 실제 원본과 Capability Profile
+
+신규 IDML 분석으로 optional element/image details(투명도/fitting/link/clipping), attribute-only GraphicBounds, nested variable-font axes를 보존하도록 보강했다. `$ID/…` 기본 BasedOn 참조는 해당 style 종류의 실제 Self를 찾아 해석한다. 임의 font style을 생성하지 않는다. Profile/Library/후보 평가 계약과 실제 비교 결과는 [DESIGN_MATCHING](DESIGN_MATCHING.md) 참고. 기존 Studio 제작 renderer와 v1 호환 경로에는 변경이 없다.

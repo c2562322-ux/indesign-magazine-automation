@@ -57,3 +57,8 @@ Host proof도 원본 전체를 복제하지 않는다. 한 장/한 text frame �
 - [ScriptPreference / 측정 단위](https://developer.adobe.com/indesign/uxp/dom/api/s/script-preference/)
 
 API 문서 확인은 이 PC의 InDesign/UXP 버전에서 실기 성공했다는 증거가 아니다.
+
+
+## 후속 실물 2종 검증
+
+신규 2센트럴-눈길.idml을 추가로 읽었다. tests/verify-real-idml.py로 두 원본의 XML 기반 속성을 검증하고 tests/verify-real-profiles.js로 서로 다른 수용량/이미지 특성을 검증했다. 신규 원본의 variable-font axis/GraphicBounds를 보존하고 기본 style 참조 오탐을 수정했다. 상세 counts/limitations는 DESIGN_MATCHING.md 참고. 이것은 Host 재생성/시각 round-trip 성공을 뜻하지 않는다. 현재 전체 Node160, Python15 통과.

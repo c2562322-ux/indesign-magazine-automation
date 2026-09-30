@@ -70,6 +70,8 @@ class Extraction(unittest.TestCase):
         self.assertEqual(photo["spreadTransform"], [1, 0, 0, 1, 30, -70])
         self.assertEqual(photo["pageBounds"]["p2"], [330, 30, 410, 130])
         self.assertEqual(photo["image"][0]["properties"]["ItemTransform"], "2 0 0 2 -5 -6")
+        self.assertEqual(photo["details"]["FrameFittingOption"]["LeftCrop"], 2)
+        self.assertEqual(photo["image"][0]["details"]["ClippingPathSettings"]["ClippingType"], "AlphaChannel")
         source = json.dumps(m["sourceXml"])
         self.assertIn("FillProportionally", source)
         self.assertIn("AlphaChannel", source)
@@ -112,6 +114,25 @@ class Extraction(unittest.TestCase):
         before = self.path.read_bytes()
         self.assertEqual(self.model, extract(self.path))
         self.assertEqual(before, self.path.read_bytes())
+
+    def test_builtin_style_short_reference_resolves_within_kind(self):
+        fixture(self.path, lambda n,t:t.replace('ParagraphStyle/base','ParagraphStyle/$ID/base').replace('>ParagraphStyle/$ID/base</BasedOn>', '>$ID/base</BasedOn>'))
+        m = extract(self.path)
+        self.assertFalse(any(i["code"] == "MISSING_STYLE" for i in m["issues"]))
+        self.assertEqual(m["stories"][0]["paragraphs"][0]["runs"][0]["resolvedProperties"]["SpaceAfter"], 11.338582677165356)
+
+    def test_graphic_bounds_attributes_and_image_details_are_not_empty_strings(self):
+        fixture(self.path, lambda n,t:t.replace('<Image Self="image1" ItemTransform="2 0 0 2 -5 -6">', '<Image Self="image1" ItemTransform="2 0 0 2 -5 -6"><Properties><GraphicBounds Left="0" Top="0" Right="2551" Bottom="3579"/></Properties>'))
+        m = extract(self.path)
+        image = m["elements"][2]["image"][0]
+        self.assertEqual(image["properties"]["GraphicBounds"], {"Left": 0, "Top": 0, "Right": 2551, "Bottom": 3579})
+        self.assertFalse(any(i["code"] == "UNMODELED_SPREAD_OBJECT" and i["ref"] == "image1" for i in m["issues"]))
+
+    def test_variable_font_nested_axis_lists_preserved(self):
+        fixture(self.path, lambda n,t:t.replace('Status="Substituted"/>', 'Status="Substituted"><Properties><DesignAxesRange type="list"><ListItem type="list"><ListItem type="double">200</ListItem><ListItem type="double">900</ListItem></ListItem></DesignAxesRange></Properties></Font>'))
+        m = extract(self.path)
+        self.assertEqual(m["fonts"][0]["properties"]["DesignAxesRange"], [[200, 900]])
+        self.assertTrue(any(i["code"] == "VARIABLE_FONT_AXIS_PRESERVED" for i in m["issues"]))
 
 
 if __name__ == "__main__":

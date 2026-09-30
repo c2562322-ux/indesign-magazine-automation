@@ -2,7 +2,7 @@
 
 기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
-**상태: 개발 검증판. Node 자동 테스트 143개 통과 (기존 132개 유지, 신규 진입점 하나에서 Python 12개 검사 실행).** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 안정화는 초기화/세션/폰트 캐시를 보강했으며 실제 InDesign 검증은 남아 있습니다. 먼저 [5~10분 Smoke Test](docs/STABILITY.md)를 진행해주세요. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
+**상태: 개발 검증판. Node 자동 테스트 160개 통과 (이전 143개 유지, Python 15개 검사 포함 실행).** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 안정화는 초기화/세션/폰트 캐시를 보강했으며 실제 InDesign 검증은 남아 있습니다. 먼저 [5~10분 Smoke Test](docs/STABILITY.md)를 진행해주세요. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
 
 외부 JSON 디자인 3종을 별도 **IDML 기반 디자인** 목록에서 선택할 수 있습니다. 원본 수치/누락값 정책과 새 파일 추가 방법: [JSON 디자인 안내](docs/JSON_DESIGNS.md). 최신 표시: `Studio ready [stability-01] [json-design-01]`. 실제 Adobe 재현 검증은 남아 있습니다.
 
@@ -106,3 +106,7 @@ RGB 강조색은 배치 시안의 출발점입니다. 색상 프로파일·오�
 ## 원본 디자인 추출 (Phase 1)
 
 별도 개발 도구로 IDML → Design Model v2 추출을 추가했습니다. [모델/지원표](docs/DESIGN_MODEL.md), [변환 방법](docs/DESIGN_EXTRACTION.md), [비교 기준](docs/DESIGN_FIDELITY.md). 패널 가져오기 버튼과 전체 지면 복제는 아직 없습니다. 기존 JSON 3종과 제작 경로는 그대로입니다. 오프라인 추출/신규 테스트에는 Python 3.10+가 필요합니다 (`PYTHON` 환경변수로 실행 파일 지정 가능). Python은 UXP 런타임 의존성이 아닙니다.
+
+## 디자인 수용량과 후보 평가 (Phase B·C 코어)
+
+[DESIGN_MATCHING](docs/DESIGN_MATCHING.md)에 원고/이미지 프로필, 역할 확인, 수용량 추정, Hard/Soft 평가 및 CLI 사용법을 기록했습니다. AI 호출·자동 최종 선택·새로운 제작기는 없습니다. 기존·신규 실제 IDML을 분석했으며, 원본의 역할 미확정 항목은 추천 대신 확인 필요로 반환합니다. 기존 패널에는 아직 연결하지 않았습니다.

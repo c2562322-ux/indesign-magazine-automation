@@ -1,5 +1,17 @@
 # HANDOFF — 1.1.0
 
+## 최신 상태 — Design Capability / Matching 코어
+
+- 기준 660266c에서 계속 작업. src/design-matching.js, tools/analyze-design.js, tools/match-designs.js 추가.
+- 기존 v2를 유지하고 fitting/transparency/clipping의 optional details 보존을 보강했다. 기존 실제 IDML의 geometry/type/style/thread 회귀 비교 차이 0.
+- 사용자가 제공한 실제 2센트럴-눈길.idml 분석 완료: 일반11/Parent2쪽, 280객체, 14배치 이미지. INDD 파싱/변경 없음. 기본 style 축약참조, GraphicBounds attributes, variable font nested list 해석 보강.
+- 기존 실제 디자인+Word 실행: 제목19/부제38/본문453자·7문단, 기존14+신규11=25개 페이지 분석 항목 모두 역할/폰트 확인 필요. 임의 추천하지 않음.
+- Library sidecar는 원본 hash/page 범위/확정 역할/사진 정책 필요. 객체별 수용량은 low-confidence 범위다. Fonts/image dimensions 미확인은 review 상태.
+- Original+content overlay+runtime adjustment 분리. productionReady=false. 전체 v2 renderer가 없으므로 기존 생성기에 연결하지 않았고 기존 Studio 제작·Auto Fix·PDF 코드는 변경 없음.
+- 전체 Node160 통과(이전143+추가17), Python15 검사도 통과. 두 실제 IDML의 XML 대조 및 profile 검증 통과. Adobe 실기 검증은 아직 안 됨.
+- 다음: 두 샘플 role 확인 → 조판으로 capacity 보정 → 기존 제작 adapter v2 지원/UI.
+- 문서: docs/DESIGN_MATCHING.md. 개인 모델/결과/샘플 INDD는 Git 제외.
+
 ## 최신 인수인계 — 2026-09-30 Design Model Phase 1
 
 - 기준 `630e5e557bfae1c7e8de622012241829d05c7878`의 Studio/Auto Fix 제작 경로를 변경하지 않고 별도 v2 추출/검증 코어를 추가했다.

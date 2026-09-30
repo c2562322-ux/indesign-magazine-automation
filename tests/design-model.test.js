@@ -40,7 +40,7 @@ function mockHost(){
     return {ID,get adds(){return adds;},get recomposes(){return recomposes;},font};
 }
 
-test('IDML XML extraction: 12 Python fidelity/security tests (not Host tests)',()=>{
+test('IDML XML extraction: Python fidelity/security tests (not Host tests)',()=>{
     py(['tests/test_design_extraction.py']);
 });
 test('v2 validates references/geometry while old v1 designs remain separate',()=>{
