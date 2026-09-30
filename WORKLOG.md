@@ -1150,3 +1150,12 @@
 ## 2026-09-30 — WIP handoff / user-requested stop
 
 Stopped feature development at user request. Preserved DOCX media extraction, partial native IDML reconstruction/content replacement and registered production wiring. Node184/Python15 pass; no Adobe verification, browser attempt interrupted. Source XML158 comparison passed excluding private labels/container. HANDOFF.md now documents partial status, gaps, private local files and NEXT STEP. No original samples or personal extracted models staged.
+
+## 2026-09-30 — 인수 감사와 보존 경계 보강
+
+e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지 범위 사전 검사, 교체 원고 대조, DOCX 빈 문단 인덱스 수정과 합성 회귀 3개 추가. Node187/Python15 통과. Adobe/브라우저 직접 실기 미실행. docs/REGISTERED_NATIVE_AUDIT.md에 스타일·페이지·Fidelity·UI 후속 위험 기록. 개인 원본 미변경, commit/push 없음.
+
+
+## 2026-09-30 — 등록 디자인 1건 PC 실기 준비 마무리
+
+중단 당시 변경 보존 확인 후 그대로 재개. u335e 기준 proof/production 분리, direct override 보존, source/content 오류 구분, fill/stroke 및 page/Story/Parent/order 스냅샷, 이미지 fitting/링크 검사, 등록 UI 단계와 PDF gate를 완성했다. 마지막 화면 검토에서 등록 선택 중 일반 버튼의 무료 시안 오생성 가능성을 차단하고 회귀 추가. Node206/Python15, XML158/CRC, diff 검사 통과. Browser Mock으로 DOCX→추천→proof→확인→production→check/save/PDF 및 원고 변경 무효화 직접 확인. Adobe 실기 미실행. 원본/개인 자료 미변경. HANDOFF/AUDIT/PC Smoke 갱신, 사용자 지시에 따라 개발 브랜치만 commit/push 대상으로 지정.

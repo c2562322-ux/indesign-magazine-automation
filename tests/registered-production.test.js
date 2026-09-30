@@ -14,13 +14,142 @@ test('content geometry drift classified as fidelity failure, not content fit',()
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process'),R=require('../src/design-registration'),M=require('../src/design-model');
 const py=path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe');
 const result=spawnSync(fs.existsSync(py)?py:'python3',['tests/test_design_extraction.py','--model'],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);
-function fixture(){const m=JSON.parse(result.stdout),base=m.elements[0],s=m.stories.find(s=>s.id===base.textFrame.storyRef);for(const r of s.paragraphs.flatMap(p=>p.runs))r.resolvedProperties=JSON.parse(JSON.stringify(s.paragraphs[0].runs[0].resolvedProperties));const body=JSON.parse(JSON.stringify(base)),bs=JSON.parse(JSON.stringify(s));body.id='body';body.role.confirmed=null;body.textFrame.storyRef='bodyStory';body.pageBounds.p1=[150,20,700,420];bs.id='bodyStory';m.elements.push(body);m.stories.push(bs);const d=R.draft(m,'p1');R.confirm(d,'body','body');return R.register(m,d);}
-function host(entry,{drift=false,originalOverflow=false,contentOverflow=false}={}){const ID={MeasurementUnits:{POINTS:'pt'},app:{scriptPreferences:{measurementUnit:'mm'}},Leading:{AUTO:'auto'},Justification:Object.fromEntries(Object.values(M.ALIGN).map(k=>[k,k]))},frames=[];let recomposes=0;
-const page={extractLabel:()=>entry.descriptor.pageIds[0],bounds:[0,0,entry.original.pages[0].height,entry.original.pages[0].width],allPageItems:frames};
-for(const e of entry.original.elements){if(!e.textFrame)continue;const s=entry.original.stories.find(s=>s.id===e.textFrame.storyRef),runs=s.paragraphs.flatMap(p=>p.runs);let contents=runs.flatMap(r=>r.tokens.map(t=>t.type==='Content'?t.text:t.type==='Br'?'\r':'')).join('');const props=runs[0].resolvedProperties,t={appliedFont:{fontFamily:props.AppliedFont},fontStyle:props.FontStyle,justification:M.ALIGN[props.Justification],fillColor:'black',appliedCharacterStyle:'char'};for(const [k,v] of Object.entries({...M.TYPE,...M.PARA}))if(props[k]!==undefined)t[v]=props[k];Object.defineProperty(t,'contents',{get:()=>contents});const story={get contents(){return contents;},set contents(v){contents=v;},get overflows(){return contents==='새 본문'&&contentOverflow;},characters:{item:()=>t,itemByRange:(a,b)=>({...t,contents:contents.slice(a,b+1)})},paragraphs:{item:()=>({appliedParagraphStyle:'para'})},texts:{item:()=>t}};
-const prefs=Match.framePreferences(entry.original,e).effective;frames.push({extractLabel:()=>e.id,parentPage:page,geometricBounds:e.pageBounds.p1.map((x,i)=>x+(drift&&i===0?1:0)),parentStory:story,textFramePreferences:{textColumnCount:prefs.TextColumnCount,textColumnGutter:prefs.TextColumnGutter,insetSpacing:prefs.InsetSpacing}});}
-const doc={pages:[page],spreads:[{}],recompose(){recomposes++;},allPageItems:frames};return {ID,doc,frames,env:{ID,open:async()=>doc,guard(){},inspect:()=>({errors:originalOverflow?['source overflow']:[]})},get recomposes(){return recomposes;}};}
+function fixture(){const m=JSON.parse(result.stdout),base=m.elements[0],s=m.stories.find(s=>s.id===base.textFrame.storyRef);for(const r of s.paragraphs.flatMap(p=>p.runs)){r.resolvedProperties=JSON.parse(JSON.stringify(s.paragraphs[0].runs[0].resolvedProperties));r.properties=JSON.parse(JSON.stringify(s.paragraphs[0].runs[0].properties));r.styleRef=s.paragraphs[0].runs[0].styleRef;}const body=JSON.parse(JSON.stringify(base)),bs=JSON.parse(JSON.stringify(s));body.id='body';body.role.confirmed=null;body.textFrame.storyRef='bodyStory';body.pageBounds.p1=[150,20,700,420];bs.id='bodyStory';m.elements.push(body);m.stories.push(bs);const d=R.draft(m,'p1');R.confirm(d,'body','body');return R.register(m,d);}
+function host(entry,{drift=false,originalOverflow=false,contentOverflow=false,onRemove,onPlace}={}){
+ const ID={MeasurementUnits:{POINTS:'pt'},app:{scriptPreferences:{measurementUnit:'mm'}},Leading:{AUTO:'auto'},Justification:Object.fromEntries(Object.values(M.ALIGN).map(k=>[k,k])),ColorSpace:{RGB:'RGB',CMYK:'CMYK'},FitOptions:{APPLY_FRAME_FITTING_OPTIONS:'apply'}};
+ const frames=[],pages=[];let recomposes=0;
+ const none={name:'None',id:0};
+ for(const p of entry.original.pages.filter(p=>p.kind==='Spread'))pages.push({extractLabel:()=>p.id,bounds:[0,0,p.height,p.width],allPageItems:[],remove(){if(onRemove)onRemove(frames);pages.splice(pages.indexOf(this),1);}});
+ const color=ref=>ref==='Swatch/None'?none:(()=>{const c=entry.original.colors.find(c=>c.id===ref);return c?{name:c.properties.Name,space:c.properties.Space,colorValue:c.properties.ColorValue.split(' ').map(Number)}:undefined;})();
+ for(const e of entry.original.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
+  const page=pages.find(p=>p.extractLabel()===e.pageCandidates[0]),style=entry.original.styles.object.find(s=>s.id===e.objectStyleRef),props={...(style&&style.resolvedProperties),...e.properties};
+  const f={extractLabel:()=>e.id,parentPage:page,geometricBounds:e.pageBounds[e.pageCandidates[0]].map((x,i)=>x+(drift&&i===0?1:0)),fillColor:color(props.FillColor),strokeColor:color(props.StrokeColor),strokeWeight:props.StrokeWeight,fillTint:props.FillTint,strokeTint:props.StrokeTint,allGraphics:[],itemLayer:{name:e.layerRef},appliedObjectStyle:{name:e.objectStyleRef}};
+  if(e.textFrame){
+   const s=entry.original.stories.find(s=>s.id===e.textFrame.storyRef),runs=s.paragraphs.flatMap(p=>p.runs),props=runs[0].resolvedProperties;
+   let contents=runs.flatMap(r=>r.tokens.map(t=>t.type==='Content'?t.text:t.type==='Br'?'\r':'')).join('');
+   const t={};for(const [k,v] of Object.entries(props))t[k[0].toLowerCase()+k.slice(1)]=v;
+   Object.assign(t,{appliedFont:{fontFamily:props.AppliedFont},fontStyle:props.FontStyle,justification:M.ALIGN[props.Justification],fillColor:color(props.FillColor),appliedCharacterStyle:{name:runs[0].styleRef},appliedParagraphStyle:{name:s.paragraphs[0].styleRef}});
+   Object.defineProperty(t,'contents',{enumerable:true,get:()=>contents});
+   const story={extractLabel:()=>s.id,get contents(){return contents;},set contents(v){contents=v;},get overflows(){return contents==='새 본문'&&contentOverflow;},textContainers:[f],characters:{item:()=>t,itemByRange:(a,b)=>({...t,contents:contents.slice(a,b+1)})},paragraphs:{item:()=>t},texts:{item:()=>t}};
+   f.parentStory=story;const prefs=Match.framePreferences(entry.original,e).effective;f.textFramePreferences={textColumnCount:prefs.TextColumnCount,textColumnGutter:prefs.TextColumnGutter,insetSpacing:prefs.InsetSpacing};
+  }else{
+   f.frameFittingOptions={autoFit:false,leftCrop:0,topCrop:0,rightCrop:0,bottomCrop:0,fittingOnEmptyFrame:'None',fittingAlignment:'CenterAnchor'};
+   f.place=path=>{f.allGraphics=[{itemLink:{filePath:path},geometricBounds:f.geometricBounds}];if(onPlace)onPlace(f,path);};f.fit=()=>{};
+  }
+  frames.push(f);page.allPageItems.push(f);
+ }
+ const doc={pages,spreads:[{}],recompose(){recomposes++;},allPageItems:frames,swatches:{item:()=>none}};
+ return {ID,doc,frames,env:{ID,open:async()=>doc,guard(){},inspect:()=>({errors:originalOverflow?['source overflow']:[],warnings:[],issues:[]})},get recomposes(){return recomposes;}};
+}
 test('native pipeline compares original first, replaces uniform text, retains original model and bounds',async()=>{const entry=fixture(),before=JSON.stringify(entry.original),h=host(entry),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(h.recomposes,2);assert.equal(N.check(c,h.ID).length,0);assert.equal(JSON.stringify(entry.original),before);assert.equal(h.frames.find(f=>f.extractLabel()==='body').parentStory.contents,'새 본문');});
 test('source mismatch or original overflow leaves content untouched and blocks output',async()=>{for(const option of [{drift:true},{originalOverflow:true}]){const entry=fixture(),h=host(entry,option),text=h.frames[0].parentStory.contents,c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'FIDELITY_FAILED');assert.equal(c.autoFixAllowed,false);assert.equal(h.frames[0].parentStory.contents,text);assert.ok(N.check(c,h.ID).length);}});
 test('post replacement overflow is content issue, never silently auto-fitted',async()=>{const entry=fixture(),h=host(entry,{contentOverflow:true}),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID)[0].cause,'CONTENT_OVERFLOW');assert.equal(c.autoFixAllowed,false);});
 test('stale open identifies only newly opened document for cleanup',async()=>{const entry=fixture(),h=host(entry);let calls=0;h.env.guard=()=>{if(++calls>1)throw new Error('reload');};await assert.rejects(()=>N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env),e=>e.registeredDocument===h.doc);});
+test('fixed story crossing page selection is rejected before import',async()=>{
+ const entry=JSON.parse(JSON.stringify(fixture())),fixed=JSON.parse(JSON.stringify(entry.original.elements[0]));
+ fixed.id='fixed';fixed.textFrame.storyRef='fixedStory';
+ const outside=JSON.parse(JSON.stringify(fixed));outside.id='outside';outside.pageCandidates=['otherPage'];
+ entry.original.elements.push(fixed,outside);
+ let opened=false;
+ await assert.rejects(()=>N.create(entry,{title:'새 제목',body:'새 본문',images:[]},{open:async()=>{opened=true;},guard(){}}),/선택 페이지 밖 Story 연결/);
+ assert.equal(opened,false);
+ outside.pageCandidates=['p1'];assert.doesNotThrow(()=>N.packagePlan(entry));
+ outside.pageCandidates=['p1','otherPage'];assert.throws(()=>N.packagePlan(entry),/페이지 귀속|선택 페이지 밖 Story 연결/);
+});
+test('content loss blocks output even with matching typography and simultaneous overflow',async()=>{
+ const entry=fixture(),h=host(entry,{contentOverflow:true}),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);
+ const body=c.contentChecks.find(x=>x.role==='body');body.text='새 본문 누락 부분';
+ const issues=N.check(c,h.ID);
+ assert.ok(issues.some(i=>i.cause==='GENERATOR_MISMATCH'&&i.category==='BLOCKING'));
+ assert.ok(issues.some(i=>i.cause==='CONTENT_OVERFLOW'));
+ assert.equal(c.autoFixAllowed,false);
+});
+test('self-closing empty Word paragraphs preserve subtitle and image paragraph indices',()=>{
+ const out=D.extract(word(`<w:p/><w:p><w:pPr><w:pStyle w:val="Subtitle"/></w:pPr><w:r><w:t>부제 문장</w:t></w:r></w:p><w:p /> <w:p>${drawing('a')}</w:p>`,rel('a','a.png')));
+ assert.equal(out.article.title,'제목');assert.equal(out.article.subtitle,'부제 문장');
+ assert.doesNotMatch(out.article.body,/부제 문장/);assert.match(out.article.body,/본문입니다/);
+ assert.equal(out.article.images[0].paragraphIndex,4);
+});
+test('proof-only native import preserves source text and records page cleanup without replacement',async()=>{
+ const entry=fixture(),h=host(entry),before=h.frames[0].parentStory.contents;
+ const c=await N.create(entry,null,{...h.env,mode:'proof'});
+ assert.equal(c.phase,'FIDELITY_PASSED');assert.equal(c.proofOnly,true);assert.equal(c.contentChecks.length,0);
+ assert.equal(h.frames[0].parentStory.contents,before);assert.equal(h.doc.pages.length,1);
+ assert.ok(c.baseline.records.some(r=>r.role==='page-count'&&r.comparison.equal));assert.ok(c.baseline.records.some(r=>r.role==='page-cleanup'&&r.comparison.equal));assert.deepEqual(c.baseline.fallbacks,[]);
+});
+test('page removal mutation of selected frame, parent or order fails before content writes',async()=>{
+ for(const change of [frames=>{frames[0].geometricBounds[0]++;},frames=>{frames[0].parentPage.allPageItems.reverse();},frames=>{frames[0].parentPage.appliedMaster={extractLabel:()=> 'changed-master'};}]){
+  const entry=fixture(),h=host(entry,{onRemove:change}),before=h.frames[0].parentStory.contents;
+  const c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);
+  assert.equal(c.phase,'FIDELITY_FAILED');assert.equal(h.frames[0].parentStory.contents,before);assert.equal(c.autoFixAllowed,false);
+ }
+});
+test('fill and stroke mismatch block original fidelity',async()=>{
+ for(const change of [f=>{f.fillColor={name:'wrong',space:'RGB',colorValue:[255,0,0]};},f=>{f.strokeWeight=3;}]){
+  const e=fixture(),h=host(e);change(h.frames[0]);const c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_FAILED');
+  assert.ok(c.baseline.records.some(r=>r.comparison.differences.some(d=>JSON.stringify(d).includes('appearance'))));
+ }
+});
+test('paragraph inheritance, direct keep/rule overrides and nonstandard leading survive replacement',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));for(const s of e.original.stories)for(const p of s.paragraphs){Object.assign(p.properties,{KeepWithNext:2,RuleAbove:true,RuleAboveLineWeight:7.25});for(const r of p.runs)Object.assign(r.resolvedProperties,{KeepWithNext:2,RuleAbove:true,RuleAboveLineWeight:7.25});}
+ const h=host(e),c=await N.create(e,{title:'새 제목',body:'새 본문',images:[]},h.env);
+ assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0);const t=h.frames[0].parentStory.texts.item(0);
+ assert.equal(t.leading,54);assert.notEqual(t.leading,t.pointSize*1.2);assert.equal(t.keepWithNext,2);assert.equal(t.ruleAboveLineWeight,7.25);
+ t.keepWithNext=0;assert.ok(N.check(c,h.ID).some(i=>/override|속성/.test(i.message)));
+});
+test('unresolved leading never receives a point-size fallback',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));for(const s of e.original.stories)for(const r of s.paragraphs.flatMap(p=>p.runs))delete r.resolvedProperties.Leading;
+ const h=host(e),c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_FAILED');assert.deepEqual(c.baseline.fallbacks,[]);
+ assert.ok(c.baseline.records.some(r=>JSON.stringify(r.original).includes('SOURCE_UNRESOLVED')));
+});
+test('blank and break-only mixed overrides cannot escape uniform replacement gate',()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),s=e.original.stories.find(s=>s.id===e.original.elements[0].textFrame.storyRef),p=s.paragraphs[0],r=JSON.parse(JSON.stringify(p.runs[0]));r.tokens=[{type:'Br'}];r.properties.KeepWithNext=9;p.runs.push(r);
+ assert.throws(()=>N.replacementPlan(e,{title:'제목',body:'본문',images:[]}),/혼합/);
+});
+test('KEEP_AS_IS text and decoration mutations are caught on subsequent checks',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),fixed=JSON.parse(JSON.stringify(e.original.elements[0]));fixed.id='fixed';fixed.role.confirmed=null;fixed.textFrame.storyRef='fixed-story';
+ const story=JSON.parse(JSON.stringify(e.original.stories.find(s=>s.id===e.original.elements[0].textFrame.storyRef)));story.id='fixed-story';e.original.elements.push(fixed);e.original.stories.push(story);
+ const decoration={id:'decoration',type:'GraphicLine',pageCandidates:['p1'],pageBounds:{p1:[20,20,20,420]},properties:{StrokeWeight:1,StrokeColor:'Swatch/None'},image:[]};e.original.elements.push(decoration);
+ const h=host(e),c=await N.create(e,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0);
+ h.frames.find(f=>f.extractLabel()==='fixed').parentStory.contents='unexpected';h.frames.find(f=>f.extractLabel()==='decoration').strokeWeight=2;
+ assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
+});
+test('DOCX relationship metadata binds to IMAGE slot and reaches native place; wrong link is blocked',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),im={...JSON.parse(JSON.stringify(e.original.elements.find(e=>e.type==='Rectangle'))),id:'slot-photo',pageCandidates:['p1'],pageBounds:{p1:[10,450,150,590]},properties:{},details:{},image:[],groupId:null};e.original.elements.push(im);e.descriptor.roles['slot-photo']={role:'image1',confirmed:true};e.descriptor.images['slot-photo']='required';
+ // Rebuild the profile with the additional confirmed slot.
+ const entry=R.register(e.original,e.descriptor),out=D.extract(word(`<w:p>${drawing('a')}</w:p>`,rel('a','a.png')));out.article.images[0].path='C:/smoke/word-image.png';
+ const h=host(entry),c=await N.create(entry,out.article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');const check=c.contentChecks.find(c=>c.role==='image1');
+ assert.equal(check.imageMetadata.widthPx,1200);assert.equal(check.imageMetadata.aspectRatio,1.5);assert.equal(check.imageMetadata.documentOrder,1);
+ assert.equal(h.frames.find(f=>f.extractLabel()==='slot-photo').allGraphics[0].itemLink.filePath,'C:/smoke/word-image.png');assert.equal(N.check(c,h.ID).length,0);
+ h.frames.find(f=>f.extractLabel()==='slot-photo').allGraphics[0].itemLink.filePath='C:/wrong.png';assert.ok(N.check(c,h.ID).some(i=>/place/.test(i.message)));
+});
+test('original overflow and replacement overflow have separate causes, neither permits Auto Fix',async()=>{
+ const e=fixture(),source=host(e,{originalOverflow:true}),c=await N.create(e,null,{...source.env,mode:'proof'});assert.ok(N.check(c,source.ID).some(i=>i.cause==='SOURCE_OVERFLOW'));assert.equal(c.autoFixAllowed,false);
+ const target=host(e,{contentOverflow:true}),made=await N.create(e,{title:'새 제목',body:'새 본문',images:[]},target.env);assert.ok(N.check(made,target.ID).some(i=>i.cause==='CONTENT_OVERFLOW'));assert.equal(made.autoFixAllowed,false);
+});
+test('package keeps a single container and escapes XML attribute whitespace',()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));e.original.sourceXml['META-INF/container.xml']={tag:'container',attributes:{},children:[]};
+ const bytes=N.packagePlan(e).bytes;assert.equal(Z.utf8BytesToString(Z.readZipEntry(bytes,'META-INF/container.xml')).includes('rootfile'),true);
+ const xml=P.serialize({tag:'x',attributes:{label:'a\tb\nc\rd'},children:[]});assert.match(xml,/&#9;/);assert.match(xml,/&#10;/);assert.match(xml,/&#13;/);
+});
+test('registered native pipeline integrates with Host check, save, proof PDF block and production PDF',async()=>{
+ const vm=require('node:vm'),entry=fixture(),h=host(entry),calls=[],coll=a=>({length:a.length,item:i=>a[i]});
+ Object.assign(h.ID,{FontStatus:{INSTALLED:1},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1},SaveOptions:{NO:1}});
+ function productionDoc(){const x=host(entry),doc=x.doc;let exported;Object.assign(doc,{isValid:true,stories:coll(x.frames.filter(f=>f.parentStory).map((f,i)=>{f.parentStory.id=i+1;return f.parentStory;})),fonts:coll([{status:1}]),links:coll([]),allGraphics:[],save(){calls.push('save');return doc;},exportFile(){calls.push('pdf');exported();},addEventListener(n,fn){exported=fn;},removeEventListener(){},close(){doc.isValid=false;}});return doc;}
+ const module={exports:{}};vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{module,require:n=>n==='indesign'?h.ID:n==='fs'?fs:require('../src/'+n.replace('./','')),console});const api=module.exports;
+ const proof=await api.createRegistered(entry,null,async()=>productionDoc(),undefined,'proof');assert.equal(proof.fidelity.phase,'FIDELITY_PASSED');assert.equal(proof.outputReady,false);
+ assert.throws(()=>api.exportPdf('proof.pdf'),/검증용/);assert.equal(calls.length,0);
+ const made=await api.createRegistered(entry,{title:'새 제목',body:'새 본문',images:[]},async()=>productionDoc());assert.equal(made.outputReady,true);assert.equal(api.check().errors.length,0);assert.equal(api.save('new.indd').errors.length,0);assert.equal(api.exportPdf('new.pdf').outcome,'exported');assert.deepEqual(calls,['save','pdf']);
+ api.resetSession();assert.throws(()=>api.check(),/먼저/);
+});
+test('unsupported graphic effects and changed Story references cannot pass source fidelity',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture()));e.original.elements[0].details={TransparencySetting:{opacity:50}};
+ const h=host(e),c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_FAILED');assert.ok(JSON.stringify(c.baseline.records).includes('UNSUPPORTED'));
+ const simple=fixture(),other=host(simple);other.frames[0].parentStory.extractLabel=()=> 'wrong-story';const bad=await N.create(simple,null,{...other.env,mode:'proof'});assert.equal(bad.phase,'FIDELITY_FAILED');
+});
+test('synthetic self-contained Word smoke file extracts a valid internal PNG and never overwrites input',()=>{
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'registered-smoke-')),file=path.join(tmp,'smoke.docx');
+ try{const generated=spawnSync(fs.existsSync(py)?py:'python3',['tools/create-registered-smoke-docx.py',file],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);const out=D.extract(fs.readFileSync(file));assert.equal(out.article.title,'작은 발견');assert.equal(out.article.images.length,1);assert.equal(out.article.images[0].widthPx,1200);assert.equal(out.article.images[0].heightPx,800);assert.equal(out.article.images[0].paragraphIndex,5);assert.match(out.article.subtitle,/일상/);
+  const before=fs.readFileSync(file),again=spawnSync(fs.existsSync(py)?py:'python3',['tools/create-registered-smoke-docx.py',file]);assert.notEqual(again.status,0);assert.deepEqual(fs.readFileSync(file),before);
+ }finally{assert.equal(path.dirname(path.resolve(tmp)),path.resolve(os.tmpdir()));assert.ok(path.basename(tmp).startsWith('registered-smoke-'));fs.rmSync(tmp,{recursive:true,force:true});}
+});

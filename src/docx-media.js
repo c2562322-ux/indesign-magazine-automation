@@ -10,7 +10,7 @@ function extract(buffer){
  // Existing Word parser deliberately rejects complex text. Only conventional
  // main-document DrawingML is supported; no header/footer/media-directory scan.
  let paragraphIndex=-1,documentOrder=0;const seen=new Map();
- const blocks=[...xml.matchAll(/<w:p(?=[\s>])[^>]*>[\s\S]*?<\/w:p>/g)];
+ const blocks=[...xml.matchAll(/<w:p(?=[\s/>])[^>]*?(?:\/\s*>|>[\s\S]*?<\/w:p>)/g)];
  const subtitleIndex=blocks.findIndex(m=>/<w:pStyle\b[^>]*w:val=["'](?:Subtitle|부제)["']/.test(m[0]));
  if(subtitleIndex>=0&&!/^\s*\[TITLE\]/m.test(paragraphs.join('\n'))){const first=paragraphs.findIndex(p=>p.trim());if(subtitleIndex>first)article=Input.textArticle('[TITLE]\n'+paragraphs[first]+'\n[SUBTITLE]\n'+paragraphs[subtitleIndex]+'\n[BODY]\n'+paragraphs.slice(first+1).filter((_,i)=>i+first+1!==subtitleIndex).join('\n'));}
  for(const block of blocks){paragraphIndex++;for(const drawing of block[0].matchAll(/<w:drawing\b[^>]*>[\s\S]*?<\/w:drawing>/g)){

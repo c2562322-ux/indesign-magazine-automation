@@ -31,6 +31,25 @@ function setup(native=false,overrides={},omit=[]){
  return {app,e:elements,saved,calls,adapter,document};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
+test('registered proof/production uses common check-save-PDF state and proof cannot enable PDF',async()=>{
+ const calls=[],entry={descriptor:{id:'ref',name:'Reference'},profile:{name:'Reference'},original:{metadata:{sourceSha256:'hash'}}};
+ const x=setup(true,{createRegistered:async(e,a,p,mode)=>{calls.push(mode);return {pageCount:1,errors:[],warnings:[],outputReady:mode!=='proof',fidelity:{phase:mode==='proof'?'FIDELITY_PASSED':'CONTENT_APPLIED',proofOnly:mode==='proof'}};}});
+ const proof=await x.app.createRegistered(entry,x.app.read().article,'proof');assert.equal(proof.fidelity.phase,'FIDELITY_PASSED');assert.equal(x.e.btnExportPdf.disabled,true);assert.equal(x.e.btnCheckAuto.disabled,false);
+ const made=await x.app.createRegistered(entry,x.app.read().article);assert.equal(made.fidelity.phase,'CONTENT_APPLIED');assert.equal(x.e.btnExportPdf.disabled,false);
+ x.e.btnCheckAuto.click();await tick();x.e.btnSaveIndd.click();await tick();x.e.btnExportPdf.click();await tick();assert.deepEqual(x.calls,['check','save','pdf']);assert.deepEqual(calls,['proof','production']);
+ x.e.autoTitle.value='changed';x.e.autoTitle.listeners.input();assert.equal(x.e.btnExportPdf.disabled,true);
+});
+test('loading DOCX with more than two images clears old previews and retains all image metadata',async()=>{
+ const images=[1,2,3].map(n=>({source:'docx',path:'image'+n+'.png',widthPx:1200,heightPx:800,aspectRatio:1.5,orientation:'landscape',documentOrder:n,paragraphIndex:n}));
+ const x=setup(true,{load:async()=>({article:{title:'DOCX',body:'본문',images}})});x.e.btnLoadAuto.click();await tick();
+ assert.equal(x.app.read().article.images.length,3);assert.equal(x.app.read().article.images[2].documentOrder,3);assert.equal(x.app.read().article.images[2].widthPx,1200);
+ assert.equal(x.e.candidateList.children.length,0);assert.match(x.e.largePreview.textContent,/등록 디자인/);assert.equal(x.e.btnCreateAuto.disabled,true);
+});
+test('registered selection cannot accidentally create a leftover free plan from the generic button',()=>{
+ const x=setup(true),entry={descriptor:{id:'ref'},profile:{name:'Reference'},original:{metadata:{sourceSha256:'hash'}}};
+ x.app.invalidateRegistered(entry);assert.equal(x.e.btnCreateAuto.disabled,true);assert.match(x.e.btnCreateAuto.textContent,/위의 검증/);assert.match(x.e.selectedDesign.textContent,/Reference/);
+ x.e.candidateList.children[0].click();assert.equal(x.e.btnCreateAuto.disabled,false);assert.equal(x.app.state.registeredEntry,null);
+});
 test('optional registration init failure cannot stop stable Studio; lifecycle disposes extension',()=>{
  const broken=setup(false,{registration(){throw new Error('optional failed');}});assert.equal(broken.app.disposed,false);assert.equal(broken.e.candidateList.children.length,3);
  let invalidated=0,disposed=0,mounts=0;const x=setup(false,{registration(){mounts++;return {invalidate(){invalidated++;},destroy(){disposed++;}};}});
@@ -101,16 +120,25 @@ test('save failure leaves check and retry available, and successful check re-ena
  e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);
 });
 
-function nativeAdapter(host,picker,opening,pluginFolder){
+function nativeAdapter(host,picker,opening,pluginFolder,extraFS={},indesign){
  const vm=require('node:vm');let adapter;
  vm.runInNewContext(fs.readFileSync('studio.js','utf8'),{require:n=>{
-  if(n==='uxp')return {storage:{formats:{binary:'binary'},localFileSystem:{getFileForSaving:picker,getFileForOpening:opening,getPluginFolder:pluginFolder}}};
+  if(n==='uxp')return {storage:{formats:{binary:'binary'},localFileSystem:{getFileForSaving:picker,getFileForOpening:opening,getPluginFolder:pluginFolder,...extraFS}}};
+  if(n==='indesign')return indesign;
   if(n==='./src/auto-indesign.js')return host;
   if(n==='./src/studio-ui.js')return {mount:a=>{adapter=a;}};
   return require('../'+n);
  },document:{getElementById:()=>({})}});
  assert.ok(adapter);return adapter;
 }
+test('UXP Word extraction writes internal bytes and retains metadata through registered adapter import',async()=>{
+ const P=require('../src/package-xml'),png=Buffer.alloc(24);Buffer.from([137,80,78,71,13,10,26,10]).copy(png);png.writeUInt32BE(13,8);png.write('IHDR',12);png.writeUInt32BE(1200,16);png.writeUInt32BE(800,20);
+ const bytes=P.zip([['word/document.xml','<w:document><w:body><w:p><w:r><w:t>제목</w:t></w:r></w:p><w:p><w:r><w:t>본문</w:t></w:r></w:p><w:p><w:drawing><wp:inline><a:blip r:embed="im"/></wp:inline></w:drawing></w:p></w:body></w:document>'],['word/_rels/document.xml.rels','<Relationships><Relationship Id="im" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/a.png"/></Relationships>'],['word/media/a.png',png]]);
+ const writes=[],folder={createFile:async name=>({nativePath:'C:/private/'+name,write:async data=>writes.push({name,bytes:new Uint8Array(data)})})};let received,opened;
+ const adapter=nativeAdapter({createRegistered:async(e,a,open,p,mode)=>{received={a,mode};return open(P.zip([['mimetype','idml']]));}},null,async()=>({name:'article.docx',nativePath:'C:/private/article.docx',read:async()=>bytes}),null,{getDataFolder:async()=>({createFolder:async()=>folder}),getTemporaryFolder:async()=>folder},{app:{open:(path,show)=>{opened={path,show};return 'new-doc';}}});
+ const loaded=await adapter.load();assert.equal(writes.length,1);assert.deepEqual(Buffer.from(writes[0].bytes),png);assert.equal(loaded.article.images[0].bytes,undefined);assert.equal(loaded.article.images[0].documentOrder,1);assert.equal(loaded.article.images[0].widthPx,1200);
+ assert.equal(await adapter.createRegistered({},loaded.article,undefined,'proof'),'new-doc');assert.equal(received.mode,'proof');assert.equal(received.a.images[0].path,'C:/private/image-1.png');assert.equal(opened.show,true);assert.match(opened.path,/registered-.*\.idml$/);
+});
 test('real native adapter passes the selected path and progress to the correct host method',async()=>{
  const calls=[],steps=[],progress=s=>steps.push(s),report={pageCount:1,errors:[],warnings:[]};
  const host={save:(p,cb)=>{calls.push(['save',p]);cb('save.Document.save');return report;},exportPdf:(p,cb)=>{calls.push(['pdf',p]);cb('pdf.Document.exportFile');return report;}};

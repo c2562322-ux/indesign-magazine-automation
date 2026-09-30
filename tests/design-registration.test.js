@@ -22,3 +22,17 @@ test('stale async import cannot populate disposed UI and failed import retries',
 test('library stores shared original once across pages and invalid confirmation is atomic',()=>{const e=registered(),e2=R.register(e.original,{...e.descriptor,id:'other'}),data=R.pack([e,e2]);assert.equal(Object.keys(data.models).length,1);const loaded=R.unpack(copy(data));assert.equal(loaded.entries[0].original,loaded.entries[1].original);const d=copy(e.descriptor),before=JSON.stringify(d);assert.throws(()=>R.confirm(d,'title','image1','unknown'));assert.equal(JSON.stringify(d),before);});
 test('Auto leading without a resolved percentage cannot silently use Host default',()=>{const m=model();for(const r of m.stories[0].paragraphs.flatMap(p=>p.runs)){r.resolvedProperties.Leading='Auto';delete r.resolvedProperties.AutoLeading;}assert.throws(()=>M.textProof(m,'title',{acknowledgeApproximation:true}),/AutoLeading/);});
 test('raw model role screen -> explicit body confirmation -> preserve -> registration',async()=>{const x=setup({load:async()=>model()});await x.click('디자인 모델 / 등록 파일 불러오기');x.nodes().find(e=>e.tagName==='select').value='p1';await x.click('이 페이지 역할 확인');const row=x.nodes().find(e=>e.children.some(c=>c.tagName==='p'&&String(c.textContent).startsWith('body ·')));const bodySelect=row.children.find(e=>e.tagName==='select');bodySelect.value='body';bodySelect.handlers.change();await x.click('미지정 영역은 모두 원본 유지');await x.click('이 페이지 등록');assert.equal(x.ui.state.entries[0].profile.readyForMatching,true);});
+test('registered UI requires proof and visual comparison before production; source changes revoke proof',async()=>{
+ const x=setup(),calls=[];x.studio.createRegistered=async(e,a,mode)=>{calls.push(mode);return {errors:[],fidelity:{phase:mode==='proof'?'FIDELITY_PASSED':'CONTENT_APPLIED',proofOnly:mode==='proof'}};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');
+ await x.click('선택한 등록 디자인으로 제작');assert.deepEqual(calls,[]);
+ await x.click('검증용 문서 생성');assert.equal(x.ui.state.proofPassed,true);await x.click('선택한 등록 디자인으로 제작');assert.deepEqual(calls,['proof']);
+ await x.click('원본과 비교 완료');await x.click('선택한 등록 디자인으로 제작');assert.deepEqual(calls,['proof','production']);
+ x.ui.invalidate();assert.equal(x.ui.state.proofPassed,false);assert.equal(x.ui.state.visualConfirmed,false);
+});
+test('failed proof disables production and exposes original fidelity error without developer tools',async()=>{
+ const x=setup();x.studio.createRegistered=async()=>({errors:['원본 overflow'],fidelity:{phase:'FIDELITY_FAILED',proofOnly:true}});
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('분석 후보로 선택');await x.click('검증용 문서 생성');
+ assert.equal(x.ui.state.proofPassed,false);assert.ok(x.nodes().some(e=>String(e.textContent).includes('원본 재현 실패')));
+ assert.equal(x.nodes().find(e=>e.textContent==='선택한 등록 디자인으로 제작').disabled,true);
+});

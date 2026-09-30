@@ -172,17 +172,18 @@ function addPage(doc,design,s,a,styles,index){
 function check(doc,progress,repair=false){
     if(!doc||!doc.isValid)throw new Error('생성한 문서가 닫혔습니다. 새 문서를 만들어주세요.');
     D.step('check.Document.recompose',()=>doc.recompose(),progress);
-    const context=fitContexts.get(doc);
+    const context=fitContexts.get(doc),registered=registeredContexts.get(doc);
     if(context)context.recompose=()=>D.step('autoFix.Document.recompose',()=>doc.recompose(),progress);
     const errors=[],warnings=[],issues=[];
     D.step('check.stories.overflows',()=>{for(let i=0;i<doc.stories.length;i++){
         const st=doc.stories.item(i);if(st.overflows){
             const labels=[];try{for(const frame of st.textContainers)labels.push(String(frame.label||''));}catch(e){/* Unknown containers remain unidentified. */}
             const roles={title:'제목',subtitle:'부제',body:'본문',header:'헤더',footer:'푸터',pageNumber:'페이지 번호'};
-            const role=Object.keys(roles).find(r=>labels.some(label=>new RegExp('^(AUTO|JSON)_'+r+'(?:_|$)','i').test(label)));
+            const registeredRole=registered&&registered.contentChecks.find(c=>c.typography&&c.frame.parentStory.id===st.id);
+            const role=registeredRole?registeredRole.role:Object.keys(roles).find(r=>labels.some(label=>new RegExp('^(AUTO|JSON)_'+r+'(?:_|$)','i').test(label)));
             const message=(roles[role]||'텍스트 영역')+' 텍스트가 넘칩니다.';
             const hint=role==='body'?'InDesign에서 본문 연결과 마지막 페이지의 넘침을 확인하고 다시 검사해주세요.':'InDesign에서 해당 프레임의 높이·글자 크기·폰트를 확인하고 다시 검사해주세요.';
-            errors.push(message);issues.push({storyId:st.id,category:'USER_ACTION_REQUIRED',cause:role==='body'?'CONTENT_OVERFLOW':'UNKNOWN',role:role||'unknown',message,hint,detail:'Story '+st.id+' · '+labels.join(', ')});
+            errors.push(message);issues.push({storyId:st.id,category:registered?'BLOCKING':'USER_ACTION_REQUIRED',cause:registered?(registered.phase==='CONTENT_APPLIED'&&registeredRole?'CONTENT_OVERFLOW':'SOURCE_OVERFLOW'):role==='body'?'CONTENT_OVERFLOW':'UNKNOWN',role:role||'unknown',message,hint:registered?'원본 Fidelity 오류에는 Auto Fix를 적용하지 않습니다. 원본/새 원고 단계를 확인해주세요.':hint,detail:'Story '+st.id+' · '+labels.join(', ')});
         }
     }},progress);
     D.step('check.fonts.status',()=>{for(let i=0;i<doc.fonts.length;i++){
@@ -223,15 +224,15 @@ function check(doc,progress,repair=false){
     if(context&&context.records.some(r=>r.poisoned)){const message='자동 수정 원복 확인 실패: 새 문서를 만들어주세요.';errors.push(message);other.push({message,category:'BLOCKING',cause:'UNKNOWN',hint:message});}
     if(changed){D.step('check.autoFix.recompose',()=>doc.recompose(),progress);return check(doc,progress,false);}
     if(context)context.records.forEach(r=>r.initial=false);
-    const registered=registeredContexts.get(doc);
-    if(registered){const extra=require('./registered-native').check(registered,ID);errors.push(...extra.map(i=>i.message));other.push(...extra);}
-    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),fidelity:registered?{phase:registered.phase,records:registered.baseline.records}:undefined,autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
+    if(registered){const extra=require('./registered-native').check(registered,ID).filter(i=>!['SOURCE_OVERFLOW','CONTENT_OVERFLOW'].includes(i.cause)||!issues.some(existing=>existing.cause===i.cause&&(!i.role||existing.role===i.role)));errors.push(...extra.map(i=>i.message));other.push(...extra);}
+    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),outputReady:registered?!registered.proofOnly&&errors.length===0:errors.length===0,fidelity:registered?{phase:registered.phase,proofOnly:registered.proofOnly,design:registered.entry.descriptor.name,pages:registered.entry.descriptor.pageIds,records:registered.baseline.records,originalErrors:registered.originalInspection.errors,fallbacks:registered.baseline.fallbacks,autoFixAllowed:false,visualReviewRequired:['Parent/페이지 번호 표시','그룹/쌓임 순서와 장식','사진 fitting/crop 및 인쇄 색상']}:undefined,autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
 }
-async function createRegistered(entry,article,open,progress){
+async function createRegistered(entry,article,open,progress,mode='production'){
  const generation=session;latest=null;
  const guard=()=>{if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 다시 제작해주세요.');};
- try{const context=await require('./registered-native').create(entry,article,{ID,open,guard,inspect:doc=>check(doc,progress,false),progress});guard();registeredContexts.set(context.doc,context);latest=context.doc;return check(latest,progress,false);}
- catch(e){if(e.registeredDocument&&e.registeredDocument.isValid)try{e.registeredDocument.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}throw e;}
+ let created;
+ try{const context=await require('./registered-native').create(entry,article,{ID,open,guard,inspect:doc=>check(doc,progress,false),progress,mode});created=context.doc;guard();registeredContexts.set(context.doc,context);latest=context.doc;return check(latest,progress,false);}
+ catch(e){const doc=e.registeredDocument||created;if(doc&&doc.isValid)try{doc.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}latest=null;throw e;}
 }
 async function create(raw,plan,progress){
     const generation=session;
@@ -302,7 +303,7 @@ function save(path,progress){
 }
 function exportPdf(path,progress){
     const doc=D.step('pdf.latest',current,progress),report=D.step('pdf.preflight',()=>check(doc,progress),progress);
-    if(report.errors.length)throw D.failure('pdf.preflight',new Error('PDF 출력 전 오류를 해결해주세요: '+report.errors.join(' / ')));
+    if(report.outputReady===false||report.errors.length)throw D.failure('pdf.preflight',new Error(report.fidelity&&report.fidelity.proofOnly?'원본 검증용 문서입니다. 선택 디자인으로 제작한 뒤 PDF를 출력해주세요.':'PDF 출력 전 오류를 해결해주세요: '+report.errors.join(' / ')));
     let completed=false,listener;
     const onComplete=()=>{completed=true;};
     // exportFile has no documented success return value. A silent dialog cancel

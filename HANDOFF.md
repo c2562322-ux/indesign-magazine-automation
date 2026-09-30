@@ -1,3 +1,25 @@
+# HANDOFF — 등록 디자인 1건 PC 실기 준비 (2026-09-30)
+
+- 중단된 미커밋 작업을 그대로 재개. 기준 HEAD `e7a236b97fdbfab3598e983fcc5a8c1ce2be039f`, 개발 브랜치 `codex/magazine-studio-1.1`.
+- **Adobe UXP/InDesign 실기 미실행.** 코드/UI/Mock 준비이며 전체 Fidelity 인증·제작 완료판이 아니다.
+- 기준: `e2e-reference.review.json`의 **시작 메인 · 사진 1장**, `u335e`(원본 표시 2쪽), 216×303 mm. TITLE `u7c7e`, SUBTITLE `u7caf`, BODY `u7c96`, IMAGE1 `u7c78`, KEEP `u7dba`.
+- 원본 검증 문서 → 자동 비교 → 사용자 시각 확인 → 새 문서의 원본 재검사 → 콘텐츠 교체/recompose → 검사/INDD/PDF 연결. proof PDF는 Host/UI 차단. 원본 오류와 콘텐츠 overflow 분리, 등록 Auto Fix는 비활성 유지.
+- style/direct override, fill/stroke, 페이지 삭제 전후/Story/Parent/쌓임 순서 보존 및 이미지 fitting/링크 검사 보강. 지원 불가 항목은 명시적으로 차단하며 leading fallback 없음.
+- 최종 **Node206/Python15 통과**, diff 검사 통과. 개인 기준 XML158 재직렬화 대조/CRC 정상. 실제 브라우저 Mock 버튼 흐름 완료(Adobe 응답/파일 쓰기는 모의). 기본 파일 chooser 자동화는 미완료.
+- 로컬 합성 `assets/templates/working/registered-smoke.docx`: 제목/부제/본문 + 내부 PNG 1200×800 1장. 기존 샘플/원본/개인 모델 미변경. 원래 미추적 `sample/magazine-design.indd` 유지.
+- **NEXT STEP:** [PC Smoke](docs/REGISTERED_PC_SMOKE.md)의 버튼 순서대로 실제 Adobe에서 검증. 오류는 화면/상세 진단을 받아 수정하며 Auto Fix로 숨기지 않는다. [최신 감사/범위](docs/REGISTERED_NATIVE_AUDIT.md).
+- 아래 절은 이전 시점의 기록이다. 최신 검사 수/완료 범위는 이 최상단을 따른다. 커밋/원격 SHA는 `git log -1`과 최종 보고에서 확인한다.
+
+---
+
+# HANDOFF — 인수 검토 및 제한적 보강 (2026-09-30)
+
+- 인수 HEAD `e7a236b97fdbfab3598e983fcc5a8c1ce2be039f`, 브랜치 일치 확인. 여전히 WIP이며 Adobe 실기 미검증.
+- 개인 로컬 모델 2종/검토용 IDML/역할 파일 존재 확인. 원본/개인 자료 수정 없음.
+- 고정 Story의 선택 페이지 밖 연결 사전 거부, 교체 후 실제 원고 대조, DOCX self-closing 빈 문단 인덱스 수정. Node187/Python15 통과(Mock/오프라인).
+- 이번 인수 감사와 남은 위험: [REGISTERED_NATIVE_AUDIT](docs/REGISTERED_NATIVE_AUDIT.md).
+- **NEXT STEP:** 스타일 override/빈 문단 run 보존, 페이지 삭제 전후 및 그래픽 Fidelity 범위 보강 → >2장 DOCX/UI 전환·등록 출력 통합 검증 → 사용자 역할 확인 후 Adobe 원본 재현 실기. 아래 이전 NEXT STEP도 계속 유효하다.
+
 # HANDOFF — 중간 작업 보존 (2026-09-30)
 
 > **WIP / 미완성. 사용자 요청으로 개발 중단. 새 계정에서는 이 절을 먼저 읽으세요.**
