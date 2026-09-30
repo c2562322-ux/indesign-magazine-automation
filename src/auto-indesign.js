@@ -5,9 +5,11 @@ const app = ID.app;
 const L = require('./layout-engine.js');
 const fs = require('fs');
 const D = require('./production-diagnostics.js');
+const Fit = require('./auto-fit.js');
+let fitContexts=new WeakMap();
 let latest = null;
 let fontCatalog = null, session = 0;
-function resetSession(){latest=null;fontCatalog=null;session++;}
+function resetSession(){latest=null;fitContexts=new WeakMap();fontCatalog=null;session++;}
 // UXP DOM enum values may be distinct wrappers for the same value.
 function sameEnum(value,expected){return value!=null&&typeof value.equals==='function'?value.equals(expected):value===expected;}
 function mm(n) { return n + 'mm'; }
@@ -85,6 +87,8 @@ function createJSONPages(doc,a,plan,fonts,progress){
     if(story.overflows)throw new Error('본문이 40페이지를 초과했습니다. 원고를 나눠주세요.');
     // Never delete an original first-page body frame, even if it remains empty.
     while(pages.length>1&&pages[pages.length-1].bodies.every(f=>f.contents.length===0)){pages.pop().page.remove();doc.recompose();}
+    allBodies.splice(0,allBodies.length,...pages.flatMap(p=>p.bodies));
+    const context=fitContexts.get(doc);context.body={story,frames:pages.flatMap(p=>p.bodies),append(nextProgress){progress=nextProgress;add(L.continuationFor(plan,a),doc.pages.length);this.frames=pages.flatMap(p=>p.bodies);}};
 }
 function rgb(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));}
 function createStyles(doc,s,bodyFont,titleFont,progress){
@@ -135,6 +139,8 @@ function textFrame(page,doc,b,label,style,text){
     textRange.appliedCharacterStyle=doc.characterStyles.item(0);
     if(b.fontSize){const t=L.typography(b,{});textRange.pointSize=t.size;textRange.leading=t.leading;}
     });
+    const context=fitContexts.get(doc);
+    if(context){const type=L.typography(b,{});context.records.push({frame:f,label,role:b.role,initial:true,inset:b.inset||[0,0,0,0],expected:{bounds:[b.y,b.x,b.y+b.height,b.x+b.width],fontSize:b.fontSize||style.pointSize,leading:b.fontSize?type.leading:style.leading,tracking:type.tracking,spaceBefore:type.spaceBefore||0,spaceAfter:type.spaceAfter||0,font:style.appliedFont.name,fontStyle:style.fontStyle}});}
     return f;
 }
 function furniture(page,doc,s,a,styles,pageNumber){
@@ -162,9 +168,11 @@ function addPage(doc,design,s,a,styles,index){
     });
     return body;
 }
-function check(doc,progress){
+function check(doc,progress,repair=false){
     if(!doc||!doc.isValid)throw new Error('생성한 문서가 닫혔습니다. 새 문서를 만들어주세요.');
     D.step('check.Document.recompose',()=>doc.recompose(),progress);
+    const context=fitContexts.get(doc);
+    if(context)context.recompose=()=>D.step('autoFix.Document.recompose',()=>doc.recompose(),progress);
     const errors=[],warnings=[],issues=[];
     D.step('check.stories.overflows',()=>{for(let i=0;i<doc.stories.length;i++){
         const st=doc.stories.item(i);if(st.overflows){
@@ -173,7 +181,7 @@ function check(doc,progress){
             const role=Object.keys(roles).find(r=>labels.some(label=>new RegExp('^(AUTO|JSON)_'+r+'(?:_|$)','i').test(label)));
             const message=(roles[role]||'텍스트 영역')+' 텍스트가 넘칩니다.';
             const hint=role==='body'?'InDesign에서 본문 연결과 마지막 페이지의 넘침을 확인하고 다시 검사해주세요.':'InDesign에서 해당 프레임의 높이·글자 크기·폰트를 확인하고 다시 검사해주세요.';
-            errors.push(message);issues.push({role:role||'unknown',message,hint,detail:'Story '+st.id+' · '+labels.join(', ')});
+            errors.push(message);issues.push({storyId:st.id,category:'USER_ACTION_REQUIRED',cause:role==='body'?'CONTENT_OVERFLOW':'UNKNOWN',role:role||'unknown',message,hint,detail:'Story '+st.id+' · '+labels.join(', ')});
         }
     }},progress);
     D.step('check.fonts.status',()=>{for(let i=0;i<doc.fonts.length;i++){
@@ -187,7 +195,34 @@ function check(doc,progress){
     for(let i=0;i<graphics.length;i++){
         try{const g=graphics[i],ppi=g.effectivePpi;if(ppi&&Math.min(Number(ppi[0]),Number(ppi[1]))<200)warnings.push('배치 이미지 '+(i+1)+': 유효 해상도 200ppi 미만. 인쇄소 기준을 확인해주세요.');}catch(e){warnings.push('이미지 '+(i+1)+' 해상도를 읽지 못했습니다.');}
     }
-    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(errors.slice(issues.length).map(message=>({message,hint:message.includes("폰트")?"InDesign에서 누락 폰트를 교체하고 다시 검사해주세요.":"InDesign에서 이미지 링크를 복구하고 다시 검사해주세요."})))};
+    const other=errors.slice(issues.length).map(message=>({category:'BLOCKING',cause:message.includes('폰트')?'MISSING_FONT':'MISSING_LINK',message,hint:message.includes('폰트')?'InDesign에서 누락 폰트를 교체하고 다시 검사해주세요.':'InDesign에서 이미지 링크를 복구하고 다시 검사해주세요.'}));
+    let changed=false;
+    for(const issue of issues){
+        const record=context&&context.records.find(r=>r.frame.isValid&&r.frame.parentStory.id===issue.storyId);
+        if(!record)continue;
+        if(issue.role==='body'){
+            if(!context.unitsOK()){issue.category='BLOCKING';issue.cause='DOCUMENT_CHANGED';issue.hint='문서 단위 또는 원점이 바뀌었습니다. 새 문서를 만들어주세요.';continue;}
+            const body=context.body,containers=Array.from(record.frame.parentStory.textContainers);
+            const intact=body&&body.story.id===issue.storyId&&body.frames.length===containers.length&&body.frames.every((f,i)=>f.isValid&&(f===containers[i]||f.id!==undefined&&f.id===containers[i].id));
+            issue.cause=intact?'CONTENT_OVERFLOW':'BROKEN_THREAD';issue.category=intact?'AUTO_FIXABLE':'BLOCKING';
+            if(!intact){issue.hint='본문 연결이 변경되거나 끊겼습니다. 원본 문서와 비교해 연결을 확인해주세요.';continue;}
+            if(!Fit.same(Fit.snapshot(record.frame),record.expected)){issue.cause='DOCUMENT_CHANGED';issue.category='USER_ACTION_REQUIRED';issue.hint='본문 속성이 변경되어 자동 연결을 중단했습니다. 직접 확인해주세요.';continue;}
+            if(other.some(i=>i.cause==='MISSING_FONT')){issue.cause='MISSING_FONT';issue.category='BLOCKING';continue;}
+            if(repair&&!context.bodyAttempt){
+                const before=doc.pages.length;context.bodyAttempt={role:'body',before:{pages:before},after:{pages:before},reason:'CONTENT_OVERFLOW',result:'unresolved'};
+                D.step('check.autoFix.body',()=>{try{while(body.story.overflows&&doc.pages.length<L.MAX_PAGES){body.append(progress);doc.recompose();}context.bodyAttempt.result=body.story.overflows?'unresolved':'resolved';}catch(e){context.bodyAttempt.reason='HOST_FAILURE';context.bodyAttempt.detail=D.redact(e.message);throw e;}finally{context.bodyAttempt.after.pages=doc.pages.length;}},progress);changed=true;
+            }else if(context.bodyAttempt){issue.category='USER_ACTION_REQUIRED';issue.hint='본문 후속 페이지 한도 안에서 해결하지 못했습니다. 원고를 나누거나 연결을 확인해주세요.';}
+            continue;
+        }
+        const diagnosis=other.some(i=>i.cause==='MISSING_FONT')?{cause:'MISSING_FONT',category:'BLOCKING',hint:'누락 폰트를 먼저 해결해주세요. 글자 축소로 숨기지 않습니다.'}:Fit.diagnose(record,context);
+        Object.assign(issue,diagnosis);delete issue.growth;
+        if(record.attempt&&diagnosis.category!=='BLOCKING'){issue.category='USER_ACTION_REQUIRED';issue.hint=record.attempt.result==='resolved'?'이미 자동 조정한 영역이 다시 넘칩니다. 추가 축소 없이 직접 확인이 필요합니다.':'안전 한도에서 해결되지 않아 원복했습니다. 다른 디자인·제목 길이를 확인하거나 InDesign에서 직접 조정해주세요.';}
+        if(repair&&diagnosis.category==='AUTO_FIXABLE'&&!record.attempt){D.step('check.autoFix.'+record.role,()=>Fit.fit(record,context,diagnosis),progress);changed=true;}
+    }
+    if(context&&context.records.some(r=>r.poisoned)){const message='자동 수정 원복 확인 실패: 새 문서를 만들어주세요.';errors.push(message);other.push({message,category:'BLOCKING',cause:'UNKNOWN',hint:message});}
+    if(changed){D.step('check.autoFix.recompose',()=>doc.recompose(),progress);return check(doc,progress,false);}
+    if(context)context.records.forEach(r=>r.initial=false);
+    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
 }
 async function create(raw,plan,progress){
     const generation=session;
@@ -204,6 +239,7 @@ async function create(raw,plan,progress){
         await D.asyncStep('create.app.doScript',()=>app.doScript(()=>{
             if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 현재 패널에서 다시 생성해주세요.');
             doc=D.step('create.app.documents.add',()=>app.documents.add(),progress);
+            fitContexts.set(doc,{records:[],describeError:e=>D.redact(e.message),unitsOK:()=>sameEnum(doc.viewPreferences.horizontalMeasurementUnits,ID.MeasurementUnits.MILLIMETERS)&&sameEnum(doc.viewPreferences.verticalMeasurementUnits,ID.MeasurementUnits.MILLIMETERS)&&sameEnum(doc.viewPreferences.rulerOrigin,ID.RulerOrigin.PAGE_ORIGIN)&&doc.zeroPoint.every(v=>Number(v)===0),topAligned:value=>sameEnum(value,ID.VerticalJustification.TOP_ALIGN),recompose:()=>D.step('autoFix.Document.recompose',()=>doc.recompose(),progress)});
             D.step('create.documentPreferences',()=>{
             doc.documentPreferences.facingPages=false;doc.documentPreferences.pagesPerDocument=1;
             doc.documentPreferences.pageWidth=mm(s.width);doc.documentPreferences.pageHeight=mm(s.height);
@@ -236,8 +272,9 @@ async function create(raw,plan,progress){
                 if(last.contents.length!==0)break;
                 const page=last.parentPage;bodyFrames.pop();page.remove();doc.recompose();
             }},progress);
+            fitContexts.get(doc).body={story,frames:bodyFrames,append(){const next=addPage(doc,L.continuation(s,a),s,a,styles,doc.pages.length);this.frames[this.frames.length-1].nextTextFrame=next;this.frames.push(next);}};
         },ID.ScriptLanguage.JAVASCRIPT,[],ID.UndoModes.ENTIRE_SCRIPT,'Create original magazine design'),progress);
-        const report=D.step('create.initialCheck',()=>check(doc,progress),progress);
+        const report=D.step('create.initialCheck',()=>check(doc,progress,true),progress);
         if(plan.origin==='json'){report.warnings.push(...plan.warnings);if(a.images.length<plan.design.contentSlots.images.min)report.warnings.push('사진 없음: 원본 이미지 프레임을 비워 두었습니다.');}
         if(generation===session)latest=doc;
         return report;
@@ -270,4 +307,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress),progress),save,exportPdf};
+module.exports={create,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress,true),progress),save,exportPdf};

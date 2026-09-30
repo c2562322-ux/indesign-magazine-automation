@@ -406,3 +406,11 @@ test('narrow preview leaves room for panel padding and diagnostics toggle surviv
  first.e.btnDiagnostics.click();assert.equal(first.e.diagnosticsPanel.style.display,'block');
  const next=setup(true);assert.equal(next.e.diagnosticsPanel.style.display,'none');assert.equal(next.e.btnDiagnostics.handlers.click.length,1);first.e.btnDiagnostics.click();assert.equal(next.e.diagnosticsPanel.style.display,'none');
 });
+
+test('auto-fit summary enables PDF only after final clean report, keeps unresolved errors and resets on source change',async()=>{
+ let failed=false;const fixed={role:'title',before:{fontSize:36},after:{fontSize:35},reason:'CONTENT_OVERFLOW',result:'resolved'};
+ const {e}=setup(true,{create:async()=>({pageCount:1,errors:[],issues:[],warnings:[],autoFixes:[fixed]}),check:()=>({pageCount:1,errors:failed?['제목 넘침']:[],issues:failed?[{message:'제목 넘침',category:'USER_ACTION_REQUIRED',hint:'직접 조정 필요'}]:[],warnings:[],autoFixes:[{...fixed,result:failed?'unresolved':'resolved'}]})});
+ e.btnCreateAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,false);assert.match(e.inspectionIssues.children[0].textContent,/자동 수정됨/);assert.match(e.hostReport.textContent,/fontSize/);
+ failed=true;e.btnCheckAuto.click();await tick();assert.equal(e.btnExportPdf.disabled,true);assert.match(e.inspectionIssues.children[0].textContent,/미해결/);assert.match(e.inspectionIssues.children[1].children[0].textContent,/사용자 확인/);
+ e.autoTitle.value+=' 수정';e.autoTitle.listeners.input();assert.equal(e.inspectionIssues.children.length,0);
+});

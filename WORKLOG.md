@@ -1101,3 +1101,9 @@
 - 브라우저 및 명시적 Mock Host 직접 조작 완료; 실제 UDT/InDesign 미검증. 근거와 한계: docs/UI_UX_AUDIT.md.
 
 - 최종 자동 검증: 기존 115개 + 신규 5개 = 120개 통과 (Node/Mock, Adobe 실기 아님).
+
+### 2026-09-30 자동 진단/안전 수정
+- 생성 직후/문서 검사에서 제목·부제 제한 조정 및 실제 재검사. 실패 원복, 문서별 시도 기록, PDF 안전 차단 유지.
+- 본문 재검사 시 안전한 기존 thread만 continuation 재사용. header/pageNumber는 자동 축소하지 않음.
+- 기존 120 + 신규 12 = 132개 통과. 브라우저 공유정책 Mock 조작 확인; 실제 Adobe 미검증.
+- docs/AUTO_FIX.md에 정책·실기 순서·runtime Preview 차이·기록 수명 문서화.

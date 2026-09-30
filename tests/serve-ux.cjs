@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 http.createServer((req,res)=>{
  const url=req.url.split('?')[0];
  if(url==='/ux-test.html'){
-  const html=fs.readFileSync(path.join(root,'preview.html'),'utf8').replace('src="preview.js"','src="tests/ux-browser.js"').replace('<div id="studioPanel">','<div style="padding:12px;background:#fff1bf;color:#222">브라우저 모의 검증 — 실제 InDesign/저장/폰트가 아닙니다. <label><input id="simOverflow" type="checkbox" checked>검사 오류 재현</label><label><input id="simFail" type="checkbox">다음 제작 작업 실패</label><span id="simCounts"></span></div><div id="studioPanel">');
+  const html=fs.readFileSync(path.join(root,'preview.html'),'utf8').replace('src="preview.js"','src="src/auto-fit.js"></script><script src="tests/ux-browser.js"').replace('<div id="studioPanel">','<div style="padding:12px;background:#fff1bf;color:#222">브라우저 모의 검증 — 실제 InDesign/저장/폰트가 아닙니다. <label><input id="simOverflow" type="checkbox" checked>자동 수정 가능한 넘침 재현</label><label><input id="simUnresolved" type="checkbox">안전 한도 초과 모사</label><label><input id="simFail" type="checkbox">다음 제작 작업 실패</label><span id="simCounts"></span></div><div id="studioPanel">');
   res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(html);
  }
  if(!/^\/(preview\.html|preview\.js|studio\.css|src\/[a-z0-9-]+\.js|designs\/[a-z0-9-]+\.json|tests\/ux-browser\.js)$/.test(url)){res.writeHead(404);return res.end();}

@@ -15,16 +15,16 @@ function host(options={}){
    if('fontStyle' in p)throw new Error('요청한 글꼴 스타일은 사용할 수 없습니다.');
    let face;Object.defineProperty(p,'appliedFont',{enumerable:true,get:()=>face,set:f=>{face=f;}});
    let style;Object.defineProperty(p,'fontStyle',{enumerable:true,get:()=>style,set:v=>{if(options.rejectStyle||!face||face.fontStyleName!==v)throw new Error('요청한 글꼴 스타일은 사용할 수 없습니다.');style=v;}});return p;
-  }},swatches:{itemByName:()=>options.localizedNone?{isValid:false}:none,item:()=>none},recompose(){if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
+  }},swatches:{itemByName:()=>options.localizedNone?{isValid:false}:none,item:()=>none},recompose(){if(options.onRecompose)options.onRecompose(doc);if(options.failCheck)throw new Error('recompose failed');},save(p){calls.push(['save',doc.id,p]);if(options.saveError)throw options.saveError;if(options.saveAsNew){doc.isValid=false;return document();}return doc;},exportFile(format,p,showingOptions){calls.push(['pdf',doc.id,p]);assert.equal(showingOptions,true);if(options.exportError)throw options.exportError;if(!options.silentExport&&events.afterExport)events.afterExport();},addEventListener(name,fn){events[name]=fn;},removeEventListener(name){delete events[name];},close(){doc.isValid=false;calls.push(['close',doc.id]);}};
   function frame(page){
     let current;
     const t={pointSize:10.5,leading:16.2,tracking:900,applyParagraphStyle(style,clear){assert.equal(clear,true);this.appliedParagraphStyle=style;Object.assign(this,style);}};
-    const st={id:++counter,data:'',frames:[],get textContainers(){return this.frames;},texts:{item:()=>t},get contents(){return this.data;},set contents(v){this.data=v;},get overflows(){return this.data.length>this.frames.length*(options.capacity||10000);}};
+    const st={id:++counter,data:'',frames:[],get textContainers(){return this.frames;},texts:{item:()=>t},get contents(){return this.data;},set contents(v){this.data=v;},get overflows(){if(options.overset){const result=options.overset(this,t);if(result!==undefined)return result;}return this.data.length>this.frames.length*(options.capacity||10000);}};
     current=st;stories.push(st);
-    const f={strokeColor:'inherited black',fillColor:'inherited fill',isValid:true,label:'',parentPage:page,textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
+    const f={strokeColor:'inherited black',fillColor:'inherited fill',isValid:true,id:++counter,label:'',parentPage:page,rotationAngle:0,shearAngle:0,locked:false,get overflows(){return current.overflows;},get visibleBounds(){return this.geometricBounds;},textFramePreferences:{},get parentStory(){return current;},get contents(){const idx=current.frames.indexOf(f);return current.data.slice(idx*(options.capacity||10000),(idx+1)*(options.capacity||10000));},set contents(v){current.data=v;},set nextTextFrame(next){const old=next.parentStory;for(const it of old.frames)it._setStory(current);current.frames.push(...old.frames);const ix=stories.indexOf(old);if(ix>=0)stories.splice(ix,1);},_setStory:s=>current=s};
     st.frames=[f];doc.items.push(f);return f;
   }
-  function page(){const p={marginPreferences:{},graphicLines:{add:()=>{const path={},line={paths:{item:()=>path}};doc.items.push(line);return line;}},textFrames:{add:()=>frame(p)},rectangles:{add:()=>{const r={strokeColor:'inherited black',fillColor:'inherited fill',fits:[],place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(option){this.fits.push(option);}};doc.items.push(r);return r;}},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
+  function page(){const p={get bounds(){return [0,0,parseFloat(doc.documentPreferences.pageHeight),parseFloat(doc.documentPreferences.pageWidth)];},get allPageItems(){return doc.items.filter(f=>f.parentPage===p);},marginPreferences:{},graphicLines:{add:()=>{const path={},line={parentPage:p,get visibleBounds(){const points=path.entirePath;return [points[0][1],points[0][0],points[1][1],points[1][0]];},paths:{item:()=>path}};doc.items.push(line);return line;}},textFrames:{add:()=>frame(p)},rectangles:{add:()=>{const r={parentPage:p,get visibleBounds(){return this.geometricBounds;},strokeColor:'inherited black',fillColor:'inherited fill',fits:[],place(){if(options.failImage)throw new Error('place failed at C:\\Users\\private\\photo.jpg');},fit(option){this.fits.push(option);}};doc.items.push(r);return r;}},remove(){pages.splice(pages.indexOf(p),1);}};return p;}
   pages.push(page());doc.pages={...coll(pages),get length(){return pages.length;},add(){const p=page();pages.push(p);return p;}};doc.stories=coll(stories);docs.push(doc);return doc;
  }
  const enums={VerticalJustification:{TOP_ALIGN:1},FirstBaseline:{ASCENT_OFFSET:1},FontStatus:{INSTALLED:1},ColorModel:{PROCESS:1},ColorSpace:{RGB:1,CMYK:2},Justification:{LEFT_ALIGN:1,LEFT_JUSTIFIED:2,RIGHT_ALIGN:3,CENTER_ALIGN:4},EndCap:{ROUND_END_CAP:1,BUTT_END_CAP:2,PROJECTING_END_CAP:3},ArrowHead:{NONE:0},CornerOptions:{ROUNDED_CORNER:1,NONE:0},AutoSizingTypeEnum:{OFF:0},LocationOptions:{AT_END:1},FitOptions:{FILL_PROPORTIONALLY:1,CENTER_CONTENT:2,PROPORTIONALLY:3},MeasurementUnits:{MILLIMETERS:1},RulerOrigin:{PAGE_ORIGIN:1},ScriptLanguage:{JAVASCRIPT:1},UndoModes:{ENTIRE_SCRIPT:1},SaveOptions:{NO:0},LinkStatus:{NORMAL:1},ExportFormat:{PDF_TYPE:1}};
@@ -211,4 +211,56 @@ test('overset roles come from generated frame labels, never from Story numbers; 
  const title=doc.items.find(f=>f.label==='AUTO_TITLE').parentStory;title.data='x'.repeat(10001);
  let r=h.api.check();assert.equal(r.issues[0].role,'title');assert.match(r.errors[0],/제목/);assert.match(r.issues[0].detail,/Story/);assert.doesNotMatch(r.errors[0],/Story/);assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
  title.frames[0].label='';r=h.api.check();assert.equal(r.issues[0].role,'unknown');assert.match(r.errors[0],/텍스트 영역/);title.data='짧은 제목';assert.equal(h.api.check().errors.length,0);
+});
+
+test('auto-fit title and subtitle grow safely, recompose and verify real mock overset, without mutating plan',async()=>{
+ const input={...a,subtitle:'부제'},p=L.candidates(input)[0],original=JSON.stringify(p);let recomposes=0;
+ const heights=Object.fromEntries(p.pages[0].elements.filter(b=>['title','subtitle'].includes(b.role)).map(b=>['AUTO_'+b.role.toUpperCase(),b.height]));
+ const h=host({onRecompose:()=>recomposes++,overset:(st)=>{const f=st.frames[0];if(heights[f.label])return parseFloat(f.geometricBounds[2])-parseFloat(f.geometricBounds[0])<heights[f.label]+1-1e-6;}});
+ const r=await h.api.create(input,p);assert.equal(r.errors.length,0);assert.equal(r.autoFixes.length,2);assert.ok(r.autoFixes.every(f=>f.result==='resolved'));assert.ok(recomposes>=5);assert.equal(JSON.stringify(p),original);
+ for(const f of r.autoFixes){assert.equal(f.before.fontSize,f.after.fontSize);assert.equal(f.after.bounds[2]-f.before.bounds[2],1);assert.equal(f.after.bounds[1],f.before.bounds[1]);}
+ const count=recomposes;const again=h.api.check();assert.equal(again.autoFixes.length,2);assert.equal(recomposes,count+1);assert.equal(h.docs[0].items.find(f=>f.label==='AUTO_TITLE').overflows,false);
+});
+test('auto-fit shrinks title within original budget, preserves leading ratio and never overlaps an obstacle',async()=>{
+ const p=L.candidates(a)[0],b=p.pages[0].elements.find(b=>b.role==='title');
+ const h=host({overset:(st,t)=>st.frames[0].label==='AUTO_TITLE'?t.pointSize>b.fontSize-1:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(f&&!doc.obstacle){doc.obstacle=true;doc.items.push({parentPage:f.parentPage,visibleBounds:[b.y+b.height+.1,b.x,b.y+b.height+3,b.x+b.width]});}}});
+ const r=await h.api.create(a,p),fix=r.autoFixes[0];assert.equal(fix.result,'resolved');assert.equal(fix.after.fontSize,b.fontSize-1);assert.equal(fix.after.bounds[2],fix.before.bounds[2]);assert.ok(Math.abs(fix.after.leading/fix.after.fontSize-fix.before.leading/fix.before.fontSize)<1e-9);
+});
+test('unresolvable title restores original size and height, blocks PDF and cannot shrink on repeat check',async()=>{
+ const h=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?true:undefined}),p=L.candidates(a)[0];const r=await h.api.create(a,p),fix=r.autoFixes[0];assert.equal(fix.result,'unresolved');assert.equal(fix.reason,'SAFE_LIMIT_REACHED');assert.deepEqual(fix.after,fix.before);assert.ok(fix.steps<100);assert.equal(r.issues[0].category,'USER_ACTION_REQUIRED');assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+ const f=h.docs[0].items.find(f=>f.label==='AUTO_TITLE'),before=JSON.stringify(f.geometricBounds),steps=fix.steps;h.api.check();h.api.check();assert.equal(JSON.stringify(f.geometricBounds),before);assert.equal(fix.steps,steps);assert.equal(f.parentStory.texts.item(0).pointSize,fix.before.fontSize);
+});
+test('generator mismatch and missing fonts cannot be concealed by automatic shrink',async()=>{
+ const mismatch=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?true:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(f)f.parentStory.texts.item(0).leading=123;}});
+ const r=await mismatch.api.create(a,L.candidates(a)[0]);assert.equal(r.autoFixes.length,0);assert.equal(r.issues[0].cause,'GENERATOR_MISMATCH');
+ let overflow=false;const missing=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?overflow:undefined});await missing.api.create(a,L.candidates(a)[0]);overflow=true;missing.docs[0].fonts.item(0).status=99;const mr=missing.api.check();assert.equal(mr.autoFixes.length,0);assert.equal(mr.issues[0].cause,'MISSING_FONT');assert.throws(()=>missing.api.exportPdf('/out/test.pdf'));
+});
+test('body edits use continuation on recheck, not font shrink; broken threads stay blocked',async()=>{
+ const h=host();await h.api.create(a,L.candidates(a)[0]);const f=h.docs[0].items.find(f=>f.label==='AUTO_BODY_1'),st=f.parentStory,size=st.texts.item(0).pointSize;st.data='x'.repeat(21000);const r=h.api.check();assert.equal(r.errors.length,0);assert.equal(r.autoFixes[0].role,'body');assert.ok(r.pageCount>=3);assert.equal(st.texts.item(0).pointSize,size);
+ const other=host();await other.api.create(a,L.candidates(a)[0]);const bf=other.docs[0].items.find(f=>f.label==='AUTO_BODY_1'),bs=bf.parentStory;bs.data='x'.repeat(21000);bs.frames.push({label:'manually added'});const br=other.api.check();assert.equal(br.issues[0].cause,'BROKEN_THREAD');assert.equal(br.autoFixes.length,0);assert.throws(()=>other.api.exportPdf('/out/test.pdf'));
+});
+test('auto-fit records belong only to current generated document and vanish on reset or recreation',async()=>{
+ const h=host({overset:(st,t)=>st.frames[0].label==='AUTO_TITLE'?t.pointSize>30:undefined});const p=L.candidates(a)[0];await h.api.create(a,p);h.api.invalidateDocument();assert.throws(()=>h.api.check());await h.api.create(a,p);assert.equal(h.api.check().autoFixes.length,1);h.api.resetSession();assert.throws(()=>h.api.check());
+});
+
+test('JSON auto-fit uses original geometry and never edits source template or unrelated small frames',async()=>{
+ const raw=JSON.parse(fs.readFileSync('designs/layout-01-wide-image-2col.json','utf8')),p=L.fromDesign(raw,a),saved=JSON.stringify(raw);
+ const b=p.pages[0].elements.find(b=>b.role==='subtitle');const h=host({overset:st=>{const f=st.frames[0];if(f.label.startsWith('JSON_subtitle_'))return parseFloat(f.geometricBounds[2])<b.y+b.height+1-1e-6;if(f.label.startsWith('JSON_pageNumber_'))return true;}});
+ const r=await h.api.create(a,p);assert.equal(r.autoFixes.length,1);assert.equal(r.autoFixes[0].role,'subtitle');assert.equal(r.autoFixes[0].result,'resolved');assert.equal(r.issues[0].role,'pageNumber');assert.equal(r.issues[0].category,'USER_ACTION_REQUIRED');assert.equal(JSON.stringify(raw),saved);assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+});
+test('existing collision and unknown geometry prevent any title fit',async()=>{
+ const h=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?true:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(f&&!doc.obstacle){doc.obstacle=true;doc.items.push({parentPage:f.parentPage,visibleBounds:f.geometricBounds});}}});const r=await h.api.create(a,L.candidates(a)[0]);assert.equal(r.autoFixes.length,0);assert.equal(r.issues[0].cause,'FRAME_COLLISION');
+ const unknown=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?true:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(f)f.rotationAngle=15;}});assert.equal((await unknown.api.create(a,L.candidates(a)[0])).autoFixes.length,0);
+});
+test('Host failure during fitting restores before values and keeps PDF blocked',async()=>{
+ let armed=false;const h=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?armed:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(armed&&f&&parseFloat(f.geometricBounds[2])>doc.originalBottom)throw new Error('mock composition failure');}});
+ await h.api.create(a,L.candidates(a)[0]);const doc=h.docs[0],f=doc.items.find(f=>f.label==='AUTO_TITLE');doc.originalBottom=parseFloat(f.geometricBounds[2]);armed=true;const r=h.api.check();assert.equal(r.autoFixes[0].reason,'HOST_FAILURE');assert.equal(parseFloat(f.geometricBounds[2]),doc.originalBottom);assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+});
+
+test('body repair stops at forty pages and remains blocked without repeated appends',async()=>{
+ const h=host();await h.api.create(a,L.candidates(a)[0]);h.docs[0].items.find(f=>f.label==='AUTO_BODY_1').parentStory.data='x'.repeat(410000);const r=h.api.check();assert.equal(r.pageCount,40);assert.equal(r.autoFixes[0].result,'unresolved');assert.ok(r.errors.length);assert.equal(h.api.check().pageCount,40);assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+});
+test('rollback failure poisons the generated document even if later overset becomes false',async()=>{
+ let armed=false;const h=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?armed:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(armed&&f&&parseFloat(f.geometricBounds[2])>doc.bottom){const value=f.geometricBounds;Object.defineProperty(f,'geometricBounds',{get:()=>value,set:()=>{throw new Error('mock write denied');}});throw new Error('mock compose denied');}}});
+ await h.api.create(a,L.candidates(a)[0]);h.docs[0].bottom=parseFloat(h.docs[0].items.find(f=>f.label==='AUTO_TITLE').geometricBounds[2]);armed=true;assert.throws(()=>h.api.check(),/원복 실패/);armed=false;assert.ok(h.api.check().errors.some(e=>e.includes('원복')));assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
 });

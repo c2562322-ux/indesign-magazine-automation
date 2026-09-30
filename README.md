@@ -99,3 +99,6 @@ RGB 강조색은 배치 시안의 출발점입니다. 색상 프로파일·오�
 
 #### UI/UX 브라우저 검증
 `node tests/serve-ux.cjs` → `http://127.0.0.1:8766/ux-test.html`에서 실제 Studio UI와 모의 Host를 조작할 수 있습니다. 실제 InDesign 문서/파일은 생성하지 않습니다. 검증 범위와 PC 절차: [UI_UX_AUDIT](docs/UI_UX_AUDIT.md).
+
+#### 안전한 자동 수정
+문서 생성 직후와 문서 검사에서 제목·부제를 제한적으로 조정하고 다시 검사합니다. 미해결 오류는 PDF를 계속 차단합니다. 원본 JSON은 바뀌지 않습니다. 정책/한계/실기 순서: [AUTO_FIX](docs/AUTO_FIX.md). 자동 테스트는 132개이며 Adobe 실기 성공을 의미하지 않습니다.

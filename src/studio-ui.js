@@ -282,13 +282,16 @@
         if(!report){$('inspectionSummary').textContent='현재 디자인으로 문서를 만들고 검사해주세요.';$('inspectionIssues').textContent='';return;}
         $('inspectionSummary').textContent=report.errors.length?'⚠ 문서 검사 · 수정 필요 '+report.errors.length+'건':'✓ 문서 검사 통과';
         $('inspectionIssues').textContent='';
-        (report.issues||report.errors.map(message=>({message,hint:'InDesign에서 해당 영역을 수정한 뒤 다시 검사해주세요.'}))).forEach(issue=>{const row=element('div','inspection-issue');row.appendChild(element('strong','',safe(issue.message)));row.appendChild(element('p','small',safe(issue.hint||'수정 후 다시 검사해주세요.')));$('inspectionIssues').appendChild(row);});
+        const roleNames={title:'제목',subtitle:'부제',body:'본문'};
+        (report.autoFixes||[]).forEach(f=>{const text=f.result==='resolved'?'✓ 자동 수정됨 · '+(roleNames[f.role]||'텍스트'):'⚠ 자동 수정 미해결 · '+(roleNames[f.role]||'텍스트')+' · 안전 한도를 확인했습니다.';$('inspectionIssues').appendChild(element('p','brand-note',text));});
+        (report.issues||report.errors.map(message=>({message,hint:'InDesign에서 해당 영역을 수정한 뒤 다시 검사해주세요.'}))).forEach(issue=>{const row=element('div','inspection-issue');row.appendChild(element('strong','',safe((issue.category==='BLOCKING'?'✕ 출력 차단 · ':issue.category==='USER_ACTION_REQUIRED'?'⚠ 사용자 확인 필요 · ':'')+issue.message)));row.appendChild(element('p','small',safe(issue.hint||'수정 후 다시 검사해주세요.')));$('inspectionIssues').appendChild(row);});
         report.warnings.forEach(w=>$('inspectionIssues').appendChild(element('p','small',safe('참고: '+w))));
     }
     function showReport(report,label,trace){
         state.hasDocument=true;state.report=report;
         state.pdfReady=report.errors.length===0;
-        $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n')+(report.issues?'\n'+report.issues.map(i=>i.detail||'').join('\n'):''):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
+        $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n')+(report.issues?'\n'+report.issues.map(i=>[i.category||'',i.cause||'',i.role||'',i.detail||''].join(' · ')).join('\n'):''):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
+        if(report.autoFixes&&report.autoFixes.length)$('hostReport').textContent+='\n자동 수정 기록\n'+safe(JSON.stringify(report.autoFixes,null,2));
         if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
         else status(label+(report.errors.length?' 완료 · 검사 오류가 있어 PDF를 차단했습니다. 수정 후 문서 검사를 다시 실행해주세요.':' 성공'),!!report.errors.length);
     }
