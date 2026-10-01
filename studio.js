@@ -36,6 +36,8 @@ async function saveProduction(name,types,write,progress){
  return write(path,progress);
 }
 Studio.mount({registration:api=>require('./src/design-registration-ui').mount(document.getElementById('registeredDesigns'),api,{
+ loadDefault:async()=>{const expected=token;guard(expected);const folder=await fs.getPluginFolder();let entry;try{entry=await folder.getEntry('assets/templates/working/active-library.private.json');}catch(error){const data=await fs.getDataFolder();try{entry=await data.getEntry('registered-library.private.json');}catch(missing){return null;}}guard(expected);const text=await entry.read();guard(expected);return JSON.parse(text);},
+ rememberLibrary:async data=>{const expected=token,folder=await fs.getDataFolder();guard(expected);const file=await folder.createFile('registered-library.private.json',{overwrite:true}),text=JSON.stringify(data);await file.write(text);guard(expected);if(await file.read()!==text)throw new Error('등록 Library 저장 내용 불일치');},
  hostKind:'adobe',capability:entry=>require('./src/registered-native').support(entry),
  saveBatch:data=>{const expected=token;guard(expected);return saveAs('registered-page-verification.private.json',['json'],async f=>{const text=require('./src/production-diagnostics').diagnosticJSON(data);await f.write(text);guard(expected);if(await f.read()!==text)throw new Error('검증 결과 저장 후 내용 불일치');guard(expected);return true;});},
  load:async()=>{const requestToken=token;const f=await fs.getFileForOpening({types:['json']});guard(requestToken);if(!f)return null;const text=await f.read();guard(requestToken);if(text.length>32*1024*1024)throw new Error('최대 32MB');return JSON.parse(text);},

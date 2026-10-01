@@ -354,3 +354,8 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 ## 특수 마커 모델 갱신 (2026-10-01)
 
 PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기존 모델은 원본에서 재추출해야 하며 과거 Fidelity 승인을 승계하지 않습니다. 기존 Library/역할/검증 기록은 보존됩니다. 새 Library 및 Parent 자동 번호 확인 절차: [특수 마커 안내](SPECIAL_MARKERS.md). Node282/Python18 통과, 새 모델 Adobe 재검증 필요.
+
+
+## 일반 사용자 직접 제작 (2026-10-01)
+
+DOCX 로드 후 자동 추천 → «이 디자인으로 제작». 원본 Fidelity/콘텐츠 검사는 내부에서 유지됩니다. 최신 BODY 언어 패턴/PNG 검사 지원 범위와 누락 원본 PNG 실기 blocker는 [일반 제작 안내](USER_PRODUCTION.md)를 확인하세요. Node291/Python18 자동 통과이며 실제 Adobe 성공은 아직 미확인입니다.

@@ -53,7 +53,7 @@
         const original=entry&&entry.original,descriptor=entry&&entry.descriptor;
         function context(id){const object=original&&(original.elements||[]).find(e=>e.id===id),page=original&&(original.pages||[]).find(p=>p.id===id);
             return {elementId:id||null,sourceId:id||null,objectType:object?object.type:page?'Page':null,page:object?object.pageCandidates:page?[page.id]:null,spread:object?object.spreadId:page?page.spreadId:null};}
-        const issues=report&&report.issues||[],fidelityIssues=issues.filter(i=>['GENERATOR_MISMATCH','SOURCE_OVERFLOW','SOURCE_INSPECTION'].includes(i.cause));
+        const issues=report&&report.issues||[],fidelityIssues=issues.filter(i=>['GENERATOR_MISMATCH','SOURCE_OVERFLOW','SOURCE_INSPECTION','EXTERNAL_ASSET_UNAVAILABLE','EXTERNAL_ASSET_UNVERIFIED'].includes(i.cause));
         const failure=hostFailure&&hostFailure.registeredFailure;
         const errors=fidelityIssues.map(i=>{let differences=i.differences;if(!differences&&i.detail){try{const parsed=JSON.parse(i.detail);if(Array.isArray(parsed))differences=parsed;}catch(e){/* Preserve the unparsed detail in rawIssue. */}}
             return {...context(i.elementId),role:i.role||null,differences:differences||[],failureOperation:i.failureOperation||null,property:i.property||null,adobeError:i.adobeError||null,adobeErrorCode:i.adobeErrorCode===undefined?null:i.adobeErrorCode,rawIssue:i};});

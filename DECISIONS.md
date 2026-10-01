@@ -585,3 +585,10 @@ v2 source를 수정하지 않고 Library sidecar에 hash/page scope/확정 role/
 ## D039 — 특수 마커 증거와 명시적 Parent 복원 분리 (2026-10-01)
 
 PI는 일반 XML 노드로 보존하고 원본 ZIP의 독립 파서 증거와 비교한다. 구형 손실 모델 간 비교로 거짓 통과시키지 않는다. Host는 Current Page Number의 enum identity를 검사하고 미지 Story 마커를 미지원으로 차단한다. 원본에 없는 마커 추가는 자동 추론하지 않는다. 사용자가 승인한 최신 수정본 복원만 donor source hash/Story 및 고유 source label 관계를 가진 sidecar로 표현한다. 기존 Parent의 빈 단일 스타일 Story에만 적용하며 모델 원문/원본 파일은 불변이다. 재추출은 정확한 source hash와 신규 design ID를 요구하고 과거 검증 승인을 이전하지 않는다.
+
+
+## D040 — 직접 제작과 안전 검사 분리, 제한된 혼합 언어 정책
+
+사용자가 선택한 추천 카드에서 production을 바로 실행하되 기존 registered-native 원본 비교를 매번 수행한다. 개발자 수동 proof/시각 확인을 일반 제작의 필수 클릭으로 두지 않는다. 자동/Mock 결과를 사람이 Adobe에서 검증한 결과로 저장하지 않는다.
+
+혼합 텍스트는 원고 길이에 비례해 임의 스타일을 배분하지 않는다. 원본 문단/문자 스타일과 언어 외 속성이 균일하며 문자 종류별 원본 언어 대응이 유일한 경우만 지원한다. 새로운 문자 종류/모호한 원본 구조는 차단한다. 원고 텍스트·모든 문자 속성·overflow를 제작 후 검사한다. 배치 비트맵은 원본 affine transform/geometry/link/clipping/color를 대조하며 누락 링크를 대체 이미지로 숨기지 않는다.

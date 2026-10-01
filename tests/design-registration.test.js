@@ -148,3 +148,14 @@ test('marker-aware library migration requires exact source hashes and preserves 
  const result=upgrade(library,[entry.original]);assert.equal(JSON.stringify(library),before);assert.deepEqual(result.designs[0].descriptor.roles,entry.descriptor.roles);assert.notEqual(result.designs[0].descriptor.id,entry.descriptor.id);assert.equal(R.unpack(result).entries[0].fidelity.productionReady,false);
  assert.throws(()=>upgrade(library,[]),/Missing exact/);const bad=copy(entry.original);delete bad.metadata.markerPreservationVersion;assert.throws(()=>upgrade(library,[bad]),/REEXTRACTION/);
 });
+
+test('direct user action runs production without manual proof and retains failure evidence',async()=>{
+ const x=setup({hostKind:'adobe',loadDefault:async()=>R.pack([registered()])}),calls=[];
+ x.studio.createRegistered=async(e,a,mode)=>{calls.push(mode);return {errors:['원본 차이'],issues:[{cause:'GENERATOR_MISMATCH'}],fidelity:{phase:'FIDELITY_FAILED',proofOnly:false,records:[]}};};
+ await x.ui.articleLoaded();assert.equal(x.ui.state.entries.length,1);assert.equal(x.nodes().find(n=>n.className==='registered-developer').style.display,'none');
+ await x.click('이 디자인으로 제작');assert.deepEqual(calls,['production']);assert.equal(x.ui.state.report.fidelity.phase,'FIDELITY_FAILED');assert.equal(Object.keys(x.ui.state.readyTemplates).length,0);
+});
+test('direct user action blocks unsupported capability and ignores late default import',async()=>{
+ const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['ambiguous style'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});let calls=0;x.studio.createRegistered=async()=>{calls++;};await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.equal(calls,0);
+ let resolve;const y=setup({loadDefault:()=>new Promise(r=>resolve=r)});await y.click('디자인 모델 / 등록 파일 불러오기');const before=y.ui.state.entries[0];resolve(R.pack([blocked]));await y.ui.ready;assert.equal(y.ui.state.entries[0],before);
+});

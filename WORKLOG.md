@@ -1215,3 +1215,20 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+
+## 일반 사용자 제작 흐름과 디자이너 피드백 — 2026-10-01
+
+- 일반 흐름: DOCX 로드 후 자동 추천 → 카드의 «이 디자인으로 제작». 수동 proof/육안 승인 버튼을 요구하지 않지만 매 제작 새 문서의 동일 원본 Fidelity/페이지 보존 검사를 통과한 뒤에만 치환한다. 개발자 수동 절차/일괄검증/JSON은 접힌 영역에 유지. 자동 제작은 mock/파일의 승인을 신뢰하지 않는다.
+- plugin의 assets/templates/working/active-library.private.json을 자동 로드(이번 PC에 준비). 없으면 UXP data folder의 이전 수동 등록 Library를 읽음. 개인 Library는 Git 제외. 현재26버전 유지, revisionOf가 가리키는 이전 버전은 일반 추천에서 제외하고 개발자 목록/과거 증거는 보존. 모델 값은 최신 designer 추출본 그대로.
+- 페이지 번호: 이전 PI/ACE18 공통 보존과 원본 증거/Host 마커 검사 유지. 최신 수정본 기존 A/B Parent의 명시 복원 sidecar 유지. 시작번호/제외정책 신규 숫자 지정 없음.
+- 이미지: 원본 FittingOnEmptyFrame enum 대조 추가; 기존 APPLY_FRAME_FITTING_OPTIONS 사용. FillProportionally일 때 배치 후 비율/프레임 채움 확인. 프레임/원본 crop 값 변경 안 함. 이미지 snapshot bounds를 page-relative로 기록해 페이지 정리로 생긴 원점 이동과 실제 이동을 구분.
+- POINT_TEXT는 기존 DOCX subtitle alias/role 경로를 사용. 최신 원본 프레임/typography 유지, Recompose 후 CONTENT_OVERFLOW 진단. 크기 축소/프레임 확대 없음.
+- BODY: 최신 수정본의428 runs는 resolved 값 중 AppliedLanguage만 두 종류(Korean / No Language). 원본 문단/문자 스타일 및 언어 외 override가 모두 동일하고 문자 종류별 언어 대응이 유일한 경우에만 공통 교체 지원. source native language 값을 캡처해 새 원고의 해당 문자 종류별로 재적용하고 모든 문자의 typography/style/language/override를 재검사. 혼합 폰트/크기/문단 구조, 모호한 패턴, 원본에 없는 문자 종류는 UNSUPPORTED. 일반 mixed typography 전체 해결은 아님.
+- PNG: 공통 Image Fidelity에서 source GraphicBounds + ItemTransform으로 계산한 page-relative bounds, parent transform 행렬, 링크 경로/정상상태, None clipping, 색공간/profile/rendering intent/visible/type 비교. 활성 clipping, 효과, 별도 graphic paint/custom color management는 지원 범위를 넘어 차단. 검사를 제외하지 않음.
+- 중요한 실기 blocker: 최신 수정본이 참조하는 UXP 임시 PNG는 현재 파일이 없음. 현재 source hash는 유지하고 임의 대체/재연결하지 않았음. 일반 제작에 PNG 경로 입력을 추가하지 않음. 사용자 추가 지시에 따라 패키지 정보 검사는 수행하고 외부 자원 미확인은 EXTERNAL_ASSET_UNAVAILABLE/UNVERIFIED로 별도 기록. 코드상 정적 지원 가능과 실제 링크 정상/Fidelity 통과는 별개.
+- Node291/Python18 전체 통과(최종값 확인). 신규9건: 자동 추천/직접제작 차단·증거, stale import, 언어정책/모호성, PNG mismatch, page-relative graphics, FillProportionally 결과, native 혼합 BODY/overflow, POINT_TEXT overset, 외부 자원 상태 분리. 기존282/18 테스트 삭제/완화 없음. Adobe 미실행, 새 모델 Production Ready 미부여.
+- NEXT STEP: UDT Reload → DOCX(디자인 사진 슬롯 수에 맞는 원고) 로드 → 자동 추천의 수정본 «이 디자인으로 제작» → 결과 검사 → INDD 저장/PDF. 실패 시 기존 Fidelity JSON 저장으로 전체 진단 전달. 기존 u335e/u3d6도 같은 버튼으로 재검증. 자세한 범위 docs/USER_PRODUCTION.md.
+
+---
+

@@ -52,7 +52,7 @@ function frameSnapshot(f,progress=()=>{},doc,ID={}){
  const textFrame=['TextFrame','EndnoteTextFrame'].includes(f.constructor&&f.constructor.name);
  const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:appearance,layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),
   fitting:textFrame?na('text frame: graphic fitting inactive'):R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(path=>pagePath(V(get(path,'entirePath')),p)),
-  graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:V(get(g,'geometricBounds')),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
+  graphics:list(get(f,'allGraphics')).map(g=>{const link=get(g,'itemLink');return {bounds:(()=>{const b=V(get(g,'geometricBounds'));return Array.isArray(b)&&p?[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]]:b;})(),scale:R(g,['horizontalScale','verticalScale','rotationAngle','shearAngle']),link:link?String(get(link,'filePath')):null};}),
   wrap:{}};
  const wrap=get(f,'textWrapPreferences'),mode=get(wrap,'textWrapMode');result.wrap.textWrapMode=V(mode);
  const noWrap=mode!==undefined&&ID.TextWrapModes&&ID.TextWrapModes.NONE!==undefined&&enumEqual(mode,ID.TextWrapModes.NONE);

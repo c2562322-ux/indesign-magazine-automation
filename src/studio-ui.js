@@ -211,6 +211,7 @@
         const issues=result.plan&&result.plan.origin==='json'&&adapter.validateDesignFonts?await adapter.validateDesignFonts(result.plan):adapter.validateFonts?await adapter.validateFonts(s):[];if(api.disposed)return;
         const missing=issues.filter(f=>f.error);if(result.plan&&result.plan.origin==='json'){state.designIssues=missing;state.designFontsChecked=!!adapter.validateDesignFonts;designInfo(result.plan);}
         status(missing.length?'원고 불러오기 완료 · '+missing.map(f=>(f.name?f.name.replace(/\t/g,' — ')+': ':f.role==='bodyFont'?'본문: ':'제목: ')+f.error).join('\n'):'원고를 불러왔습니다. '+(result.article.images||[]).filter(im=>im.source==='docx').length+'장 Word 이미지 감지 · '+(result.warnings||[]).join(' / '),!!missing.length);
+        if(api.registration?.articleLoaded)await api.registration.articleLoaded();
     }));
     function readSettingsOnly(){try{return L.settings({width:$('pageWidth').value,height:$('pageHeight').value,margin:$('pageMargin').value,bleed:$('pageBleed').value,bodySize:$('bodySize').value,accent:$('accent').value,publication:$('publication').value,bodyFont:$('bodyFont').value,titleFont:$('titleFont').value});}catch(e){return L.DEFAULTS;}}
     on('btnAddImage','click',()=>run(async()=>{const im=await adapter.image();if(api.disposed)return;if(im){state.images.push(im);imageList();changed();status('사진을 추가했습니다. 시안을 다시 만들어주세요.');}else status('사진 선택을 취소했습니다.');}));

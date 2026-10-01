@@ -68,7 +68,7 @@ function lifecycle(entry,evidence){
  const unsupported=entry.descriptor.capability?.fidelityReasons||[],production=entry.descriptor.capability?.productionReasons||[],mappingState=entry.profile.readyForMatching?'MAPPED':'ROLE_MAPPING_REQUIRED';
  let fidelityState=unsupported.length?'UNSUPPORTED':'FIDELITY_TEST_REQUIRED',productionReady=false,reasons=[...unsupported,...entry.profile.issues,...production];
  if(!unsupported.length&&evidence?.host==='adobe'&&evidence.report){const r=evidence.report,f=r.fidelity,issues=r.issues||[];
-  const failed=!f||f.phase==='FIDELITY_FAILED'||issues.some(i=>['GENERATOR_MISMATCH','SOURCE_OVERFLOW','SOURCE_INSPECTION'].includes(i.cause))||(f.proofOnly&&(r.errors||[]).length);
+  const failed=!f||f.phase==='FIDELITY_FAILED'||issues.some(i=>['GENERATOR_MISMATCH','SOURCE_OVERFLOW','SOURCE_INSPECTION','EXTERNAL_ASSET_UNAVAILABLE','EXTERNAL_ASSET_UNVERIFIED'].includes(i.cause))||(f.proofOnly&&(r.errors||[]).length);
   fidelityState=failed?'FIDELITY_FAILED':['FIDELITY_PASSED','CONTENT_APPLIED'].includes(f.phase)?'FIDELITY_VERIFIED':'FIDELITY_TEST_REQUIRED';
   productionReady=entry.profile.readyForMatching&&!production.length&&!failed&&f.phase==='CONTENT_APPLIED'&&!(r.errors||[]).length&&r.outputReady===true;
   reasons=reasons.concat(r.errors||[]);

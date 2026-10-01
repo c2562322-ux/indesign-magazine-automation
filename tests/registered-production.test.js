@@ -476,3 +476,49 @@ test('explicit page number restoration only fills an empty single-style Story an
  const M=require('../src/idml-markers'),tree={tag:'Story',attributes:{Self:'s'},children:[{tag:'ParagraphStyleRange',attributes:{AppliedParagraphStyle:'p'},children:[{tag:'CharacterStyleRange',attributes:{PointSize:10},children:[]}]}]},trees={'Stories/s.xml':tree},request=[{kind:'RESTORE_CURRENT_PAGE_NUMBER',storyId:'s',donorSourceSha256:'source',donorStoryId:'old'}];
  M.applyRestorations(trees,request);assert.equal(tree.children[0].children[0].attributes.PointSize,10);assert.equal(M.inventory(tree)[0].data,'18');assert.throws(()=>M.applyRestorations(trees,request),/EMPTY/);
 });
+
+test('mixed language policy preserves source character classes, rejects unseen or ambiguous structure',()=>{
+ const T=require('../src/registered-text-policy'),make=(text,lang)=>({styleRef:'same',properties:{PointSize:13,...(lang==='Korean'?{AppliedLanguage:lang}:{})},resolvedProperties:{PointSize:13,AppliedLanguage:lang},tokens:[{type:'Content',text}]}),s={paragraphs:[{styleRef:'p',properties:{},runs:[make('한글','Korean'),make(' .','[No Language]')]}]};
+ const p=T.policy(s);assert.equal(p.mode,'language-by-source-character-class');assert.deepEqual(T.assignments(p,'글. '),['Korean','[No Language]','[No Language]']);assert.throws(()=>T.assignments(p,'English'),/UNSUPPORTED/);
+ const chars=Array.from('글. ',()=>({})),story={characters:{itemByRange:(a,b)=>({set appliedLanguage(v){for(let i=a;i<=b;i++)chars[i].appliedLanguage=v;}})}};T.apply(story,T.assignments(p,'글. '),{Korean:'native-ko','[No Language]':'native-none'});assert.deepEqual(chars.map(c=>c.appliedLanguage),['native-ko','native-none','native-none']);
+ const ambiguous=structuredClone(s);ambiguous.paragraphs[0].runs.push(make('글','[No Language]'));assert.throws(()=>T.policy(ambiguous),/UNSUPPORTED/);
+ const styled=structuredClone(s);styled.paragraphs[0].runs[1].resolvedProperties.PointSize=12;assert.throws(()=>T.policy(styled),/UNSUPPORTED/);
+});
+test('PNG Fidelity compares source transform, bounds, link state, clipping and color management',()=>{
+ const G=require('../src/registered-graphics'),F=require('../src/registered-fidelity'),ID={CoordinateSpaces:{PARENT_COORDINATES:1},LinkStatus:{NORMAL:2},ClippingPathType:{NONE:3},Profile:{NO_CMS:4},RenderingIntent:{USE_COLOR_SETTINGS:5}};
+ const source={type:'Image',properties:{ItemTransform:'2 0 0 2 10 20',GraphicBounds:{Left:0,Top:0,Right:100,Bottom:50},ImageTypeName:'PNG',Space:'$ID/#Links_RGB',Profile:'$ID/None',ImageRenderingIntent:'UseColorSettings',Visible:true},details:{Link:{StoredState:'Normal',LinkResourceURI:'file:C:/a.png'},ClippingPathSettings:{ClippingType:'None'},TextWrapPreference:{TextWrapMode:'None'}}};
+ const e={pageCandidates:['p'],spreadTransform:[1,0,0,1,0,0],image:[source]},model={pages:[{id:'p',transform:[1,0,0,1,0,0],bounds:[0,0,500,500]}]},g={constructor:{name:'Image'},transformValuesOf:()=>[{matrixValues:[2,0,0,2,10,20]}],geometricBounds:[20,10,120,210],itemLink:{filePath:'C:/a.png',status:2},clippingPath:{clippingType:3},space:'RGB',profile:4,imageRenderingIntent:5,visible:true},frame={parentPage:{bounds:[0,0,500,500]},allGraphics:[g]};
+ const check=()=>{const c=G.compare(model,e,frame,ID);return F.compare(c.expected,c.actual,ID).equal;};assert.equal(check(),true);
+ for(const mutate of [()=>g.itemLink.status=99,()=>g.geometricBounds[0]++,()=>g.clippingPath.clippingType=99,()=>g.space='CMYK',()=>g.itemLink.filePath='C:/other.png',()=>g.profile=99,()=>g.imageRenderingIntent=99]){const saved={...g,itemLink:{...g.itemLink},clippingPath:{...g.clippingPath},geometricBounds:g.geometricBounds.slice()};mutate();assert.equal(check(),false);Object.assign(g,saved);}
+ source.details.ClippingPathSettings.ClippingType='DetectEdges';assert.match(G.reason(source),/active graphic clipping/);
+});
+test('placed graphic snapshots remain page-relative through cleanup and detect real motion',()=>{
+ const F=require('../src/registered-fidelity'),frame=(y,x)=>({parentPage:{bounds:[y,x,y+500,x+500]},geometricBounds:[y,x,y+100,x+100],allGraphics:[{geometricBounds:[y-10,x-10,y+110,x+110],itemLink:{filePath:'a.png'}}]});
+ const a=F.frameSnapshot(frame(0,0)),b=F.frameSnapshot(frame(50,600));assert.deepEqual(a.graphics,b.graphics);b.graphics[0].bounds[0]++;assert.notDeepEqual(a.graphics,b.graphics);
+});
+test('FillProportionally rejects letterboxing or distorted scale while preserving frame geometry',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),photo=e.original.elements.find(e=>e.type==='Rectangle');photo.pageCandidates=['p1'];photo.pageBounds={p1:[10,450,150,590]};photo.image=[];photo.properties={};photo.details={FrameFittingOption:{FittingOnEmptyFrame:'FillProportionally'}};e.descriptor.roles[photo.id]={role:'image1',confirmed:true};e.descriptor.images[photo.id]='required';const entry=R.register(e.original,e.descriptor),article={title:'새 제목',body:'새 본문',images:[{path:'C:/a.png',widthPx:1200,heightPx:800}]};
+ for(const bad of [false,true]){const h=host(entry,{onPlace:f=>{Object.assign(f.allGraphics[0],{horizontalScale:100,verticalScale:bad?80:100});}});h.ID.EmptyFrameFittingOptions={FILL_PROPORTIONALLY:42};h.frames.find(f=>f.extractLabel()===photo.id).frameFittingOptions.fittingOnEmptyFrame=42;
+ if(bad)await assert.rejects(()=>N.create(entry,article,h.env),/FillProportionally/);else {const c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.deepEqual(c.contentChecks.find(c=>c.imagePath).bounds,photo.pageBounds.p1);}}
+});
+
+test('native mixed-language BODY replacement preserves styles, rechecks each character and reports content overflow',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),s=e.original.stories.find(s=>s.id==='bodyStory'),r=structuredClone(s.paragraphs[0].runs[0]);r.tokens=[{type:'Content',text:'한글'}];r.properties.AppliedLanguage='Korean';r.resolvedProperties.AppliedLanguage='Korean';const r2=structuredClone(r);r2.tokens=[{type:'Content',text:' .'}];delete r2.properties.AppliedLanguage;r2.resolvedProperties.AppliedLanguage='[No Language]';s.paragraphs=[{...s.paragraphs[0],runs:[r,r2]}];
+ const entry=R.register(e.original,e.descriptor),h=host(entry),f=h.frames.find(f=>f.extractLabel()==='body'),story=f.parentStory,base=story.texts.item(0),languages=['Korean','Korean','[No Language]','[No Language]'];
+ story.characters.item=i=>Object.create(base,{contents:{get:()=>story.contents[i]},appliedLanguage:{get:()=>languages[i],set:v=>{languages[i]=v;}}});
+ story.characters.itemByRange=(a,b)=>({set appliedLanguage(v){for(let i=a;i<=b;i++)languages[i]=v;}});
+ const c=await N.create(entry,{title:'새 제목',body:'새 글.',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(story.contents,'새 글.');assert.deepEqual(languages,['Korean','[No Language]','Korean','[No Language]']);assert.equal(N.check(c,h.ID).length,0);assert.equal(c.autoFixAllowed,false);
+ languages[0]='English';assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));languages[0]='Korean';Object.defineProperty(story,'overflows',{get:()=>true});assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_OVERFLOW'));
+});
+
+test('POINT_TEXT alias uses subtitle role and reports overset without changing source size',async()=>{
+ const Input=require('../src/article-input'),a=Input.parse('a.txt','[TITLE]\n새 제목\n[POINT_TEXT]\n새 본문\n[BODY]\n본문');assert.equal(a.subtitle,'새 본문');
+ const e=JSON.parse(JSON.stringify(fixture())),b=e.original.elements.find(e=>e.id==='body'),story=e.original.stories.find(s=>s.id==='bodyStory'),sub=structuredClone(b),ss=structuredClone(story);sub.id='point';sub.textFrame.storyRef='pointStory';ss.id='pointStory';e.original.elements.push(sub);e.original.stories.push(ss);e.descriptor.roles.point={role:'subtitle',confirmed:true};
+ const entry=R.register(e.original,e.descriptor),h=host(entry,{contentOverflow:true}),c=await N.create(entry,{...a,images:[]},h.env),frame=h.frames.find(f=>f.extractLabel()==='point');assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(frame.parentStory.contents,'새 본문');assert.ok(h.recomposes>=2);assert.ok(N.check(c,h.ID).some(i=>i.role==='subtitle'&&i.cause==='CONTENT_OVERFLOW'));assert.deepEqual(frame.geometricBounds,sub.pageBounds.p1);assert.equal(frame.parentStory.texts.item(0).pointSize,ss.paragraphs[0].runs[0].resolvedProperties.PointSize);
+});
+
+test('missing template asset is explicit and separate from DOCX media, never authorizes output',()=>{
+ const ID={app:{scriptPreferences:{measurementUnit:'mm'}},MeasurementUnits:{POINTS:'pt'}},c={phase:'FIDELITY_FAILED',failure:'external source unavailable',baseline:{externalAssets:[{elementId:'frame',state:'EXTERNAL_ASSET_UNAVAILABLE'}]},contentChecks:[]};
+ const issues=N.check(c,ID);assert.ok(issues.some(i=>i.cause==='EXTERNAL_ASSET_UNAVAILABLE'&&i.source==='template'&&i.category==='BLOCKING'));assert.ok(!issues.some(i=>i.cause==='CONTENT_OVERFLOW'));
+ const report={errors:['external source unavailable'],issues,fidelity:{phase:'FIDELITY_FAILED',records:[]}},diag=require('../src/production-diagnostics').fidelityDiagnostic(report,fixture());assert.ok(JSON.stringify(diag).includes('EXTERNAL_ASSET_UNAVAILABLE'));
+});
