@@ -52,6 +52,17 @@ function mount(root,studio,adapter){
    return priority(b)-priority(a)||b.score-a.score||a.id.localeCompare(b.id);
   });
   const rows=candidates.slice(0,3);
+  const optionRows=rows.filter(row=>row.decision!=='BLOCK');
+  const optionFeedback=el('p','3안 고정: '+optionRows.map((r,i)=>'OPTION '+(i+1)+' = '+r.name).join(' / ')+' · 제작 가능 '+optionRows.length+'/3',results);optionFeedback.setAttribute('role','status');
+  const optionsButton=button('추천 3안으로 제작',async fresh=>{
+   if(JSON.stringify(studio.read().article)!==signature)throw new Error('원고가 바뀌었습니다. 다시 추천해주세요.');
+   const entries=optionRows.map(row=>state.entries.find(e=>e.descriptor.id===row.id));
+   if(!entries.length)throw new Error('제작 가능한 추천 디자인이 없습니다.');
+   if(!studio.createRegisteredOptions)throw new Error('실제 InDesign에서 실행해주세요.');
+   const report=await studio.createRegisteredOptions(entries,article);if(!fresh())return;
+   optionFeedback.textContent=report?.options?report.options.map(o=>o.optionId+' '+(o.designName||o.designId||'')+' '+o.status+' · '+o.stage+' · '+(o.errors||[]).join(' / ')).join('\n')+' · '+(report.outputReady?'3안 검사 완료':'부분/실패 결과 · 저장/PDF 차단'):'제작 중단 · 검사 및 출력의 오류를 확인해주세요.';
+  },results);optionsButton.feedback=optionFeedback;optionsButton.registrationDisabled=!optionRows.length;optionsButton.disabled=!optionRows.length;
+
   if(!rows.length)el('p','현재 원고의 역할·사진 수와 제작 지원 조건을 충족하는 디자인이 없습니다. 원고를 바꾸도록 강제하지 않습니다.',results);
   function collapsed(label,items,describe){if(!items.length)return;const area=el('div',undefined,results),content=el('div',undefined,area);content.style.display='none';const toggle=button(label,()=>{const open=content.style.display==='none';content.style.display=open?'':'none';toggle.setAttribute('aria-expanded',String(open));},area);toggle.setAttribute('aria-expanded','false');for(const row of items)el('p',describe(row),content);}
   for(const row of rows){const card=el('div',undefined,results);card.className='registered-card';el('h3',row.name+' · '+(row.decision==='WARN'?'제작 후보 · 조판 확인 필요':'구조적 후보'),card);

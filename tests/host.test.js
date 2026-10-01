@@ -31,7 +31,7 @@ function host(options={}){
  const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
  if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>{metrics.fontItems++;return options.fonts[i];},itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
  const module={exports:{}};
- vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='./registered-native'&&options.registeredNative?options.registeredNative:n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.imageGate)await options.imageGate;if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
+ vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='./registered-options'&&options.registeredOptions?options.registeredOptions:n==='./registered-options-host'&&options.registeredOptionsHost?options.registeredOptionsHost:n==='./registered-native'&&options.registeredNative?options.registeredNative:n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.imageGate)await options.imageGate;if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
  return {api:module.exports,docs,calls,metrics};
 }
 const a={title:'제목',subtitle:'',body:'본문입니다 '.repeat(150),images:[]};
@@ -270,4 +270,13 @@ test('registered production closes failed baseline clone and blocks export while
  const options={},h=host(options);await h.api.create(a,L.candidates(a)[0]);const doc=h.docs[0];const entry={descriptor:{name:'test',pageIds:['p']}};
  options.registeredNative={create:async()=>({doc,entry,phase:'FIDELITY_FAILED',failure:'source overflow',proofOnly:false,contentChecks:[],baseline:{records:[],externalAssets:[]},originalInspection:{errors:['source overflow']}}),check:()=>[{cause:'SOURCE_OVERFLOW',category:'BLOCKING',message:'source overflow'}]};
  const report=await h.api.createRegistered(entry,a,async()=>doc);assert.equal(report.outcome,'blocked');assert.equal(report.outputReady,false);assert.equal(doc.isValid,false);assert.ok(report.errors.some(x=>x.includes('DOCX')));assert.throws(()=>h.api.save('/out/no.indd'));
+});
+
+
+test('3-option Host blocks INDD and PDF for partial results, and rechecks after save/rebind',async()=>{
+ const options={saveAsNew:true},h=host(options);await h.api.create(a,L.candidates(a)[0]);const doc=h.docs[0];let ready=false,checked=[];
+ options.registeredOptions={freeze:()=>({}),run:async()=>({doc,rows:[],batch:{doc}})};
+ options.registeredOptionsHost={check:batch=>{checked.push(batch.doc.id);return {pageCount:batch.doc.pages.length,errors:ready?[]:['2/3'],warnings:[],issues:[],options:[],outputReady:ready};}};
+ await h.api.createRegisteredOptions([],a,async()=>doc);assert.throws(()=>h.api.save('/out/partial.indd'),/차단/);assert.throws(()=>h.api.exportPdf('/out/partial.pdf'));assert.equal(h.calls.length,0);
+ ready=true;h.api.save('/out/all.indd');assert.equal(checked.at(-1),h.docs[1].id);h.api.exportPdf('/out/all.pdf');assert.deepEqual(h.calls.map(c=>c[0]),['save','pdf']);assert.equal(h.calls.at(-1)[1],h.docs[1].id);
 });

@@ -602,3 +602,11 @@ PI는 일반 XML 노드로 보존하고 원본 ZIP의 독립 파서 증거와 �
 ## D042 — 추천의 추정 불확실성과 실제 제작 차단을 분리
 
 역할/사진/구조/스타일 보존이 불가능하거나 미확정이면 BLOCK을 유지한다. 글 수용량 근사식과 Adobe 검증 이력 부재는 실제 손상의 증거가 아니므로 수용량 WARN/검사필요 INFO로 분리한다. 추천과 콘텐츠 바인딩은 공통 productionAssessment를 사용한다. 원본 및 콘텐츠의 실제 Host 검사와 출력 차단은 변경하지 않는다. WARN 후보도 자동 축소나 원본 오류 Auto Fix를 허용하지 않는다. 구버전14개는 삭제/재활성화하지 않고 활성41와 등록55를 별도로 표시한다.
+
+
+## 2026-10-02 — registered options are independent productions, not a second binding engine
+
+- Reuse createRegistered for every frozen non-BLOCK candidate. Append complete successful Spread sets; preserve an OPTION-local source-reference namespace and per-option native Fidelity context.
+- Imported Story labels are restored only after exact copied thread, frame membership and content evidence. No content/typography repair during merging.
+- Resource definitions (including Parent, preferences, layers, fonts, styles and swatches) must match; different definitions are explicit merge blocks until safe namespacing is implemented. Never merge by display name alone.
+- Partial results may be inspected, but fewer than three PASS results cannot use the plugin INDD/PDF output path. All independent productions run even when another fails. Single-production behavior remains unchanged.

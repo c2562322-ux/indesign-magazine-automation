@@ -1351,3 +1351,16 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+
+# 추천 3안 제작 — 2026-10-02
+
+- 새 샘플 `172e0fb7adc52e31-u577b` (10쪽): 실제 InDesign 2026 UXP에서 기존 registered-smoke.docx 추출 payload로 TITLE/SUBTITLE/BODY 3개/IMAGE1 교체, Recompose, 사전/후검사 실행. 오류0, outputReady=true. 원고/사진 해상도 및 crop 확인 경고 유지. 실제 사용자 DOCX의 무조건 성공이나 모든 새 디자인 통과를 뜻하지 않음.
+- 별도 `추천 3안으로 제작` 버튼: 현재 non-BLOCK 추천 상위 최대3개를 표시/고정. 기존 단일 `이 디자인으로 제작`, parser, binding, IMAGE 엔진 불변. 각 옵션은 기존 Host.createRegistered로 독립 제작/검사하며 하나 실패해도 다음 옵션 진행.
+- 전체 페이지/Spread 세트를 첫 정상 임시 문서에 결합. OPTION ID/design ID/source hash/page IDs/page range 및 독립 Fidelity context 유지. Staging은 비표시, 마지막 결과 문서만 표시. 3개 미만/실패/후검사 오류는 부분 결과이며 플러그인의 INDD/PDF 출력 차단. 원본/사용자 열린 문서는 수정하지 않음.
+- 실제 Adobe 발견/수정: Spread.duplicate가 Story source label을 유실. 복사된 frame ID, 전체 thread 순서, OPTION 소속, 전체 Story.contents의 일치를 먼저 증명한 뒤 Story 식별 메타데이터만 복원. 문자/스타일/geometry 변경 없음. 잘못된 thread/content/기존 label은 BLOCK.
+- 실제 Adobe 3안: old source original u335e/u3d5/u577b + 동일 Smoke DOCX → 3 PASS /3페이지 /Fidelity·overflow 오류0 → INDD 저장 후 재검사 통과. 실제 PDF 3페이지, 각 페이지 DOCX 제목+이미지1 확인, 대표이미지 placeholder 없음. PDF afterExport 이벤트는 스크립트 실행에서 미관측(unconfirmed), 파일 자체 생성/파싱/렌더 확인과 구분.
+- Mock: 신규 3안 UI/후보 고정/독립 payload/실패 계속/3미만/복수 페이지/OPTION ref 충돌/리소스 충돌/Story 복원/손상 거부/저장·PDF 차단. Node328/328, Python18/18. 브라우저 Mock에서 추천3카드 및 새 버튼→OPTION별 PASS/검사·출력 상태 확인. UDT 패널의 마지막 Reload/클릭은 사용자 확인 필요.
+- 제한: 서로 다른 문서 전역 리소스/Parent/레이어/스타일/Swatch 정의는 이름만 병합하지 않고 OPTION_RESOURCE_CONFLICT로 차단. 자동 namespace 변환 미지원. 여러 Spread 사이 thread가 Adobe 복제에서 끊어지면 차단(임의 재연결/텍스트 재작성 없음). 복수페이지 묶음은 Mock 검증, 실제 Host 다중페이지 템플릿 재검증 필요. 후보가3개 미만인 현재 원고에 BLOCK 디자인을 채우지 않음. 단일 제작은 그대로 사용 가능.
+- 다음 최소 실기: UDT Reload → DOCX 불러오기 → 표시된 상위3안/제작 가능 N/3 확인 → 추천 3안으로 제작 → 한 문서 OPTION 순서/글·사진 확인. 3 PASS이면 기존 INDD 저장/PDF 사용. 부분/실패는 화면의 OPTION/단계/사유와 기존 Fidelity 진단 JSON 저장으로 전달.
+- 자세한 구현/검사 범위: docs/REGISTERED_OPTIONS.md. private Host scripts/reports/INDD/PDF는 ignored working 폴더에만 보존, Git에 포함하지 않음. main/원본/등록 Library 불변. 기존 미추적 sample/magazine-design.indd 보존.

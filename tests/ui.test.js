@@ -506,3 +506,11 @@ test('UXP diagnostic save rejects damaged readback, supports cancellation and bl
  const cancel=nativeAdapter({},async()=>null);assert.equal(await cancel.saveFidelityDiagnostic('{}'),null);
  let choose,writes=0;const stale=nativeAdapter({},()=>new Promise(r=>choose=r));const pending=stale.saveFidelityDiagnostic('{}');stale.dispose();choose({write:async()=>writes++,read:async()=> '{}'});await assert.rejects(pending,/다시 초기화/);assert.equal(writes,0);
 });
+
+test('3-option UI uses existing check/save/PDF adapter and partial results disable both outputs',async()=>{
+ const entry={descriptor:{id:'option',sourceSha256:'hash',name:'Option'},profile:{name:'Option'}};let partial=false;
+ const x=setup(true,{createRegisteredOptions:async()=>({pageCount:3,errors:partial?['OPTION_2 failed']:[],warnings:[],options:[{optionId:'OPTION_1',status:'PASS'}],outputReady:!partial})});
+ await x.app.createRegisteredOptions([entry],x.app.read().article);assert.equal(x.e.btnExportPdf.disabled,false);assert.equal(x.e.btnSaveIndd.disabled,false);x.e.btnCheckAuto.click();await tick();x.e.btnSaveIndd.click();await tick();x.e.btnExportPdf.click();await tick();assert.deepEqual(x.calls,['check','save','pdf']);
+ partial=true;await x.app.createRegisteredOptions([entry],x.app.read().article);assert.equal(x.e.btnSaveIndd.disabled,true);assert.equal(x.e.btnExportPdf.disabled,true);assert.equal(x.e.btnCheckAuto.disabled,false);
+ x.e.autoTitle.value='changed';x.e.autoTitle.listeners.input();assert.equal(x.e.btnCheckAuto.disabled,true);
+});

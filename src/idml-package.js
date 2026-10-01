@@ -46,13 +46,13 @@ function validate(input){
  for(const prefix of ['Spreads/','Stories/'])if(![...files.keys()].some(n=>n.startsWith(prefix)))fail(prefix+' 항목 누락');
  return {entries:count,bytes:b.length,crc32:P.crc(b).toString(16),aid:map.match(/<\?aid\s[^?]*\?>/)[0]};
 }
-async function open(bytes,{fs,format,app,guard=()=>{},progress=()=>{}}){
+async function open(bytes,{fs,format,app,guard=()=>{},progress=()=>{},showingWindow=true}){
  progress('registered.package.validate');const report=validate(bytes);guard();
  const folder=await fs.getTemporaryFolder(),file=await folder.createFile('registered-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.idml');
  progress('registered.package.write');await file.write(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),{format});guard();
  progress('registered.package.readback');const saved=new Uint8Array(await file.read({format}));guard();
  if(saved.length!==bytes.length||saved.some((b,i)=>b!==bytes[i]))throw new Error('IDML_WRITE_MISMATCH: 저장 후 바이트 불일치 · '+file.nativePath);
  validate(saved);progress('registered.package.open.start');
- try{const doc=await app.open(file.nativePath,true);progress('registered.package.open.success '+JSON.stringify(require('./registered-dom-trace').identity(doc)));return doc;}catch(error){throw new Error('IDML_HOST_OPEN_FAILED: 패키지/저장 바이트 검사 통과 ('+report.entries+'개, '+report.bytes+' bytes, CRC '+report.crc32+') · '+file.nativePath+' · '+error.message);}
+ try{const doc=await app.open(file.nativePath,showingWindow);progress('registered.package.open.success '+JSON.stringify(require('./registered-dom-trace').identity(doc)));return doc;}catch(error){throw new Error('IDML_HOST_OPEN_FAILED: 패키지/저장 바이트 검사 통과 ('+report.entries+'개, '+report.bytes+' bytes, CRC '+report.crc32+') · '+file.nativePath+' · '+error.message);}
 }
 module.exports={MIME,LEGACY_AID,designmap,validate,open};

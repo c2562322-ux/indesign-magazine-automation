@@ -215,3 +215,15 @@ test('capacity warnings reach direct production with unchanged DOCX payload and 
 test('unknown font inventory warns but does not grant Adobe verification or bypass known missing fonts',()=>{
  const e=registered(),result=R.recommendations([e],article,null);assert.equal(result.allCandidates.length,1);assert.ok(result.allCandidates[0].soft.some(d=>d.code==='FONT_STATUS_UNKNOWN'));assert.equal(result.allCandidates[0].productionReady,false);assert.equal(R.recommendations([e],article,[]).allCandidates.length,0);
 });
+
+test('3-option control freezes displayed non-BLOCK recommendations and preserves the single button',async()=>{
+ const original=registered(),entries=Array.from({length:4},(_,i)=>R.register(original.original,{...original.descriptor,id:'option-'+i}));
+ const x=setup({load:async()=>R.pack(entries)}),calls=[];x.studio.createRegisteredOptions=async(es,a)=>{calls.push({ids:es.map(e=>e.descriptor.id),a});return {options:es.map((e,i)=>({optionId:'OPTION_'+(i+1),status:'PASS',stage:'combined-check',errors:[]})),outputReady:true};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(e=>e.textContent==='이 디자인으로 제작').length,3);
+ await x.click('추천 3안으로 제작');assert.equal(calls.length,1);assert.equal(calls[0].ids.length,3);assert.equal(calls[0].a.title,article.title);
+});
+test('3-option freeze retains descriptor/article snapshot and excludes no safety checks',()=>{
+ const Options=require('../src/registered-options'),e=registered(),entries=Array.from({length:4},(_,i)=>R.register(e.original,{...e.descriptor,id:'freeze-'+i}));const manuscript=copy(article),j=Options.freeze(entries,manuscript);
+ assert.equal(j.selected.length,3);manuscript.title='changed';assert.equal(j.article.title,article.title);assert.notEqual(j.selected[0].descriptor,entries[0].descriptor);
+ const blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['unsafe mixed style']}});assert.throws(()=>Options.freeze([blocked],article),/PRODUCTION_UNSUPPORTED/);assert.throws(()=>Options.freeze([],article));
+});

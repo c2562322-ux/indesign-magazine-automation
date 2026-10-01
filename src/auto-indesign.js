@@ -8,9 +8,10 @@ const D = require('./production-diagnostics.js');
 const Fit = require('./auto-fit.js');
 let fitContexts=new WeakMap();
 let registeredContexts=new WeakMap();
+let optionContexts=new WeakMap();
 let latest = null;
 let fontCatalog = null, session = 0;
-function resetSession(){latest=null;fitContexts=new WeakMap();registeredContexts=new WeakMap();fontCatalog=null;session++;}
+function resetSession(){latest=null;fitContexts=new WeakMap();registeredContexts=new WeakMap();optionContexts=new WeakMap();fontCatalog=null;session++;}
 // UXP DOM enum values may be distinct wrappers for the same value.
 function sameEnum(value,expected){return value!=null&&typeof value.equals==='function'?value.equals(expected):value===expected;}
 function mm(n) { return n + 'mm'; }
@@ -169,7 +170,11 @@ function addPage(doc,design,s,a,styles,index){
     });
     return body;
 }
-function check(doc,progress,repair=false){
+function check(doc,progress,repair=false,ignoreOptions=false){
+    if(!ignoreOptions&&optionContexts.has(doc)){
+        const report=require('./registered-options-host').check(optionContexts.get(doc),ID,progress),global=check(doc,progress,false,true);
+        report.errors.push(...global.errors);report.warnings.push(...global.warnings);report.issues.push(...global.issues);report.outputReady=report.outputReady&&report.errors.length===0;return report;
+    }
     if(!doc||!doc.isValid)throw new Error('생성한 문서가 닫혔습니다. 새 문서를 만들어주세요.');
     D.step('check.Document.recompose',()=>doc.recompose(),progress);
     const context=fitContexts.get(doc),registered=registeredContexts.get(doc);
@@ -240,6 +245,23 @@ async function createRegistered(entry,article,open,progress,mode='production'){
  latest=context.doc;return report;}
  catch(e){const doc=e.registeredDocument||created;if(doc&&doc.isValid)try{doc.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}latest=null;throw e;}
 }
+async function createRegisteredOptions(entries,article,open,progress=()=>{}){
+ const generation=session,guard=()=>{if(generation!==session)throw new Error('패널 Reload로 3안 제작이 취소되었습니다.');};
+ const Options=require('./registered-options'),Merge=require('./registered-options-host');latest=null;
+ const job=Options.freeze(entries,article);let result;
+ try{
+  result=await Options.run(job,{progress,close:doc=>Merge.close(doc,ID),produce:async(entry,copy)=>{
+   guard();const report=await createRegistered(entry,copy,open,progress,'production'),doc=latest;latest=null;
+   try{guard();}catch(e){Merge.close(doc,ID);throw e;}
+   return {doc,report,context:doc&&registeredContexts.get(doc)};
+  },combine:(made,rows)=>Merge.combine(made,rows,ID,progress,guard)});
+  guard();latest=result.doc;
+  if(result.batch){registeredContexts.delete(result.doc);optionContexts.set(result.doc,result.batch);}
+  const report=result.batch?check(result.doc,progress):Options.report(result.rows,0);
+  if(latest&&latest.windows&&latest.windows.length===0)latest.windows.add();
+  return report;
+ }catch(e){if(result?.doc)Merge.close(result.doc,ID);if(generation===session)latest=null;throw e;}
+}
 async function create(raw,plan,progress){
     const generation=session;
     // A failed new attempt must never silently export the previous successful document.
@@ -302,9 +324,10 @@ async function create(raw,plan,progress){
 function current(){if(!latest||!latest.isValid)throw new Error('먼저 이 패널에서 새 문서를 만들어주세요.');return latest;}
 function save(path,progress){
     const doc=D.step('save.latest',current,progress);
+    if(optionContexts.has(doc)){const report=check(doc,progress);if(!report.outputReady||report.errors.length)throw new Error('3안 검사/개수 미충족: 부분 결과 INDD 저장/PDF 차단 · '+report.errors.join(' / '));}
     const saved=D.step('save.Document.save',()=>doc.save(path),progress);
     // Document.save may close the original and return the newly opened copy.
-    if(saved&&saved.isValid){const context=registeredContexts.get(doc);if(context){require('./registered-native').rebind(context,saved);registeredContexts.set(saved,context);}latest=saved;}
+    if(saved&&saved.isValid){const context=registeredContexts.get(doc);if(context){require('./registered-native').rebind(context,saved);registeredContexts.set(saved,context);}const batch=optionContexts.get(doc);if(batch){batch.doc=saved;optionContexts.set(saved,batch);}latest=saved;}
     try{return check(current(),progress);}catch(e){throw D.failure('save.completed.postCheck',new Error(e.message));}
 }
 function exportPdf(path,progress){
@@ -323,4 +346,4 @@ function exportPdf(path,progress){
     if(progress)progress(completed?'pdf.afterExport.confirmed':'pdf.afterExport.notObserved');
     return {...report,outcome:completed?'exported':'unconfirmed'};
 }
-module.exports={create,createRegistered,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress,true),progress),save,exportPdf};
+module.exports={create,createRegistered,createRegisteredOptions,listFonts,validateFonts,validateDesignFonts,resetSession,sessionId:()=>session,invalidateDocument:()=>{latest=null;},check:progress=>D.step('check.latest',()=>check(current(),progress,true),progress),save,exportPdf};
