@@ -1,3 +1,14 @@
+# 세 번째 실제 Adobe batch — 2026-10-01 01:30Z
+
+- 실제 결과는 통과5 / 실패4 / 미지원16으로 동일. KinsokuSet readback 오류는 없어졌고 전체 문자 비교까지 진행. 실패4페이지의 baseline 차이2423개는 두 locale 의미 유형뿐: Composer2239 / Roman-only kerning184(일반92+direct92).
+- 페이지별 Composer/일반Kerning/directKerning: original/u577b750/42/42, u577c1292/18/18, u853e148/12/12, central/u1cf49/20/20.
+- HL Composer J ↔ Adobe CJK 단락 컴포저, Metrics - Roman Only ↔ 메트릭 - 로마자 전용을 속성별 공통 canonical layer에서 비교. 정확한 관측 alias 및 Host findKeyStrings/translateKeyString 사용. 일반 Metrics/Optical/숫자 커닝과 로마자 전용은 별개; 다른 컴포저와 미지 문자열도 별개. 생성/원본 디자인/검사 tolerance/Auto Fix 정책 불변.
+- 실제JSON2423쌍을 수정 comparator로 오프라인 재비교: 잔여0. 이는 Adobe 재실행/전체 Fidelity 통과가 아님. 실제 실패가0이 아니므로 미지원16 지원 확대 조건은 아직 충족되지 않음.
+- Node276/Python16 통과. 최초 proof와 original recheck 통합에도 한글 composer/roman-only 적용, 실제 pointSize 변경 차단 유지.
+- NEXT STEP: Reload → 기존 DOCX/25페이지 Library → 전체 등록 디자인 일괄 검증 → 전체 페이지 검증 결과 저장. 다음 실기에서 실패0인지 확인 후 미지원16의 공유객체/효과/고정이미지 지원 범위 확대.
+
+---
+
 # 두 번째 실제 Adobe batch — 2026-10-01 01:14Z
 
 - 실제 결과25: 통과5 / 실패4 / 미지원16. 신규 통과 original/u3356, original/u3d6. 기존 u1ba/u335e/u3d5 통과 유지. 이전 path120/특수문자12/색상2 차이는 새 결과에서 없음.

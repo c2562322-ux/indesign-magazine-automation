@@ -127,22 +127,24 @@ function restore(target,values){
 }
 // Property-scoped semantic values, not a general display-name translator.
 // Adobe Korean help documents Metrics=메트릭 and Optical=광학; the former is
-// also confirmed by the user's Host report. Exact aliases only: Roman-only,
+// also confirmed by the user's Host report. Roman-only is a distinct mode;
 // manual, unknown strings and numeric kerning remain distinct.
-const KERNING=new Map([['Metrics','Metrics'],['메트릭','Metrics'],['Optical','Optical'],['광학','Optical']]);
+const KERNING=new Map([['Metrics','Metrics'],['메트릭','Metrics'],['Optical','Optical'],['광학','Optical'],['Metrics - Roman Only','Metrics - Roman Only'],['메트릭 - 로마자 전용','Metrics - Roman Only']]);
+const COMPOSER=new Map([['HL Composer J','HL Composer J'],['Adobe CJK 단락 컴포저','HL Composer J']]);
 const stripKey=v=>typeof v==='string'?v.replace(/^\$ID\//,''):v;
-function kerning(v,ID){
- const key=stripKey(v);if(KERNING.has(key))return KERNING.get(key);
+function localizedValue(v,ID,aliases){
+ const key=stripKey(v);if(aliases.has(key))return aliases.get(key);
+ const allowed=[...new Set(aliases.values())];
  const app=ID&&ID.app;
  if(typeof v!=='string'||!app)return key;
  if(typeof app.findKeyStrings==='function'){
   const found=app.findKeyStrings(v),keys=Array.isArray(found)?found:[found];
-  const canonical=[...new Set(keys.map(stripKey).filter(k=>k==='Metrics'||k==='Optical'))];
+  const canonical=[...new Set(keys.map(stripKey).filter(k=>allowed.includes(k)))];
   if(canonical.length===1)return canonical[0];
   if(canonical.length>1)return key;
  }
  if(typeof app.translateKeyString==='function'){
-  const matches=['Metrics','Optical'].filter(k=>app.translateKeyString('$ID/'+k)===v);
+  const matches=allowed.filter(k=>app.translateKeyString('$ID/'+k)===v);
   if(matches.length===1)return matches[0];
  }
  return key;
@@ -152,14 +154,15 @@ function canonicalPair(key,expected,actual,ID){
   const language=v=>stripKey(v&&v.untranslatedName||v&&v.name||v);
   return {expected:language(expected),actual:language(actual)};
  }
- if(key==='KerningMethod'||key==='kerningMethod')return {expected:kerning(expected,ID),actual:kerning(actual,ID)};
+ if(key==='KerningMethod'||key==='kerningMethod')return {expected:localizedValue(expected,ID,KERNING),actual:localizedValue(actual,ID,KERNING)};
+ if(key==='Composer'||key==='composer')return {expected:localizedValue(expected,ID,COMPOSER),actual:localizedValue(actual,ID,COMPOSER)};
  return {expected,actual};
 }
 // All serializable typography comparison paths share this boundary. Raw reports
 // stay untouched; only comparison operands are converted, without tolerance changes.
 function compare(expected,actual,ID){
  function walk(a,b,key){
-  if(['KerningMethod','kerningMethod','AppliedLanguage','appliedLanguage'].includes(key))return canonicalPair(key,a,b,ID);
+  if(['KerningMethod','kerningMethod','AppliedLanguage','appliedLanguage','Composer','composer'].includes(key))return canonicalPair(key,a,b,ID);
   if(a&&b&&typeof a==='object'&&typeof b==='object'&&Array.isArray(a)===Array.isArray(b)){
    const x=Array.isArray(a)?[]:{},y=Array.isArray(b)?[]:{};
    for(const k of new Set([...Object.keys(a),...Object.keys(b)])){const p=walk(a[k],b[k],k);if(Object.prototype.hasOwnProperty.call(a,k))x[k]=p.expected;if(Object.prototype.hasOwnProperty.call(b,k))y[k]=p.actual;}
@@ -208,7 +211,7 @@ function directCompare(source,properties,ID,model,doc){
   else if(['FillColor','StrokeColor'].includes(k)&&model){expected[k]=colorExpected(model,v);actual[k]=colorActual(got,ID,doc);}
   else if(originTypes[k]){expected[k]=originValue(k,v,ID);actual[k]=originValue(k,got,ID);}
   else if(k==='AppliedFont'){expected[k]=v;actual[k]=got&&got.fontFamily;}
-  else if(k==='AppliedLanguage'||k==='KerningMethod'){const pair=canonicalPair(k,v,got,ID);expected[k]=pair.expected;actual[k]=pair.actual;}
+  else if(k==='AppliedLanguage'||k==='KerningMethod'||k==='Composer'){const pair=canonicalPair(k,v,got,ID);expected[k]=pair.expected;actual[k]=pair.actual;}
   else if(k==='Justification'){expected[k]=v;actual[k]=Object.keys(Model.ALIGN).find(n=>enumEqual(got,(ID.Justification||{})[Model.ALIGN[n]]));}
   else if(k==='Leading'&&v==='Auto'){expected[k]='Auto';actual[k]=enumEqual(got,ID.Leading.AUTO)?'Auto':value(got);}
   else if(typeof v==='string'&&typeof got==='string'){expected[k]=k==='KerningMethod'?v.replace(/^\$ID\//,''):v;actual[k]=k==='KerningMethod'?got.replace(/^\$ID\//,''):got;}

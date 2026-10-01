@@ -1,6 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const P=require('../src/package-xml'),Z=require('../src/docxZip'),D=require('../src/docx-media'),N=require('../src/registered-native'),Match=require('../src/design-matching');
 const png=(w,h)=>{const b=Buffer.alloc(24);Buffer.from([137,80,78,71,13,10,26,10]).copy(b);b.writeUInt32BE(13,8);b.write('IHDR',12);b.writeUInt32BE(w,16);b.writeUInt32BE(h,20);return b;};
+test('CJK composer and Roman-only kerning normalize in both run and direct paths without merging modes',()=>{
+ const F=require('../src/registered-fidelity');
+ const expected={runs:[{KerningMethod:'$ID/Metrics - Roman Only',direct:{Composer:'HL Composer J',KerningMethod:'Metrics - Roman Only'}}]},actual={runs:[{KerningMethod:'메트릭 - 로마자 전용',direct:{Composer:'Adobe CJK 단락 컴포저',KerningMethod:'메트릭 - 로마자 전용'}}]};
+ assert.equal(F.compare(expected,actual,{}).equal,true);
+ assert.equal(F.directCompare({composer:'Adobe CJK 단락 컴포저',kerningMethod:'메트릭 - 로마자 전용'},{Composer:'HL Composer J',KerningMethod:'Metrics - Roman Only'},{}).comparison.equal,true);
+ for(const different of ['Metrics','Optical',0,'Unknown'])assert.equal(F.compare({KerningMethod:'Metrics - Roman Only'},{KerningMethod:different},{}).equal,false);
+ for(const different of ['Adobe 단락 컴포저','Adobe CJK 싱글라인 컴포저','HL Composer','Unknown'])assert.equal(F.compare({Composer:'HL Composer J'},{Composer:different},{}).equal,false);
+ const ID={app:{findKeyStrings:v=>v==='localized composer'?['$ID/HL Composer J']:[],translateKeyString:k=>k==='$ID/Metrics - Roman Only'?'localized roman':k}};
+ assert.equal(F.compare({Composer:'HL Composer J',KerningMethod:'Metrics - Roman Only'},{Composer:'localized composer',KerningMethod:'localized roman'},ID).equal,true);
+ assert.equal(expected.runs[0].KerningMethod,'$ID/Metrics - Roman Only');
+});
 test('page cleanup compares line and Bezier paths relative to actual page origin, preserving real drift',()=>{
  const F=require('../src/registered-fidelity');
  const path=[[10,20],[[30,40],[50,60],[70,80]]],shift=p=>p.length===2&&p.every(Number.isFinite)?[p[0]+612.283465,p[1]+100]:p.map(shift);
@@ -96,11 +107,11 @@ test('direct color overrides use source color definitions and reject actual pain
  assert.throws(()=>F.directCompare({fillColor:{}},{FillColor:'Color/missing'},ID,model,doc),/UNSUPPORTED/);
 });
 test('native proof and original recheck share enum/character canonicalization and still block real typography drift',async()=>{
- const e=fixture();for(const story of e.original.stories)for(const p of story.paragraphs){p.properties.ParagraphShadingTopOrigin='EmBoxTopOrigin';p.properties.KinsokuSet='KoreanKinsoku';for(const r of p.runs)r.tokens=[{type:'Content',text:'“가\u2028”'}];}
+ const e=JSON.parse(JSON.stringify(fixture()));for(const story of e.original.stories)for(const p of story.paragraphs){p.properties.ParagraphShadingTopOrigin='EmBoxTopOrigin';p.properties.KinsokuSet='KoreanKinsoku';p.properties.Composer='HL Composer J';for(const r of p.runs){r.tokens=[{type:'Content',text:'“가\u2028”'}];r.properties.KerningMethod='Metrics - Roman Only';r.resolvedProperties.KerningMethod='Metrics - Roman Only';}}
  const h=host(e),member={toString:()=> 'EM_BOX_TOP_ORIGIN'};
  h.ID.ParagraphShadingTopOriginEnum={EM_BOX_TOP_ORIGIN:member};h.ID.SpecialCharacters={DOUBLE_LEFT_QUOTE:1,DOUBLE_RIGHT_QUOTE:2,FORCED_LINE_BREAK:3};
  h.ID.KinsokuSet={KOREAN_KINSOKU:1263692659};let drift=false;
- for(const frame of h.frames.filter(f=>f.parentStory)){const chars=frame.parentStory.characters,original=chars.item;chars.item=i=>{const r=original(i),v={'“':1,'”':2,'\u2028':3}[r.contents];return Object.create(r,{contents:{value:v===undefined?r.contents:v},paragraphShadingTopOrigin:{value:member},kinsokuSet:{value:1263692659},pointSize:{value:r.pointSize+(drift?1:0)}});};}
+ for(const frame of h.frames.filter(f=>f.parentStory)){const chars=frame.parentStory.characters,original=chars.item;chars.item=i=>{const r=original(i),v={'“':1,'”':2,'\u2028':3}[r.contents];return Object.create(r,{contents:{value:v===undefined?r.contents:v},paragraphShadingTopOrigin:{value:member},kinsokuSet:{value:1263692659},composer:{value:'Adobe CJK 단락 컴포저'},kerningMethod:{value:'메트릭 - 로마자 전용'},pointSize:{value:r.pointSize+(drift?1:0)}});};}
  const c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_PASSED',JSON.stringify(c.baseline.records.filter(r=>!r.comparison.equal)));
  assert.equal(N.check(c,h.ID).length,0);
  drift=true;assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
