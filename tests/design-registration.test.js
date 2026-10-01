@@ -134,3 +134,11 @@ test('batch cancellation preserves partial results; Mock success never counts as
  const e=registered(),entries=Array.from({length:3},(_,i)=>R.register(e.original,{...e.descriptor,id:'cancel'+i}));let saved;const x=setup({hostKind:'mock',load:async()=>R.pack(entries),saveBatch:async p=>{saved=p;return true;}});let calls=0;
  x.studio.createRegistered=async()=>{calls++;await x.click('일괄 검증 중지');return {errors:[],issues:[],fidelity:{phase:'FIDELITY_PASSED',proofOnly:true}};};await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('전체 등록 디자인 일괄 검증');await x.click('전체 페이지 검증 결과 저장');assert.equal(calls,1);assert.equal(saved.counts.passed,0);assert.equal(saved.counts.mockPassed,1);assert.equal(saved.counts.notRun,2);assert.equal(saved.run.cancelled,true);
 });
+
+test('source revision appends without overwriting original library or inheriting proof approval',()=>{
+ const {revision}=require('../tools/register-design-revision'),entry=registered(),library=R.pack([entry]),before=JSON.stringify(library),fresh=copy(entry.original);fresh.metadata.sourceSha256='f'.repeat(64);
+ for(const e of fresh.elements)e.properties.Label={children:[{attributes:{Key:'MagazineStudioSourceRef',Value:e.id}}]};
+ const out=revision(library,fresh,entry.descriptor.id,'p1');assert.equal(out.library.designs.length,2);assert.equal(JSON.stringify(library),before);assert.notEqual(out.designId,entry.descriptor.id);assert.equal(R.unpack(out.library).entries[1].fidelity.productionReady,false);
+ const bad=copy(fresh);delete bad.elements.find(e=>e.id==='body').properties.Label;assert.throws(()=>revision(library,bad,entry.descriptor.id,'p1'),/Missing role/);
+ const duplicate=copy(fresh);duplicate.elements.find(e=>e.id==='body').properties.Label=duplicate.elements.find(e=>e.id==='title').properties.Label;assert.throws(()=>revision(library,duplicate,entry.descriptor.id,'p1'),/Duplicate/);
+});

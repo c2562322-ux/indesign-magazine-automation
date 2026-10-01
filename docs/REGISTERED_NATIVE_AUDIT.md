@@ -1,3 +1,18 @@
+# 디자이너 수정본 버전 등록 — 2026-10-01
+
+- 최신 IDML 별도 추출: working/designer-revision.private.json. 일반1쪽 uaa4, Parent2쪽. 기존 source label로 original/u3d5 수정본임을 확인(u335e/u3d6 아님).
+- tools/register-design-revision.js: 고유 source label로 역할 재연결, 타입/누락/중복 차단, 원본 Library 불변 append. 새 hash, 검증승인 미승계. 개인 모델/원본은 Git 제외.
+- 별도 working/registered-pages-26-designer.private.json: 기존25 + 새1. 새 디자인 deffe649a1a91680-uaa4. 기존25 파일/검증 이력 변경 없음.
+- 최신 TITLE30pt/leading16(기존24/16), subtitle POINT_TEXT14/21(기존16/16), RGB84.15 각채널(기존Black). BODY13/18 유지. geometry와 source XML을 최신 추출값 그대로 사용.
+- 사진 frame x51.9685..560.315 y45.3543..338.7402pt, FillProportionally 명시. 공통 엔진은 이미 원본 fitting 적용; 임의 crop 숫자 변경 안 함.
+- Parent 번호 프레임2개 보존. 실제 왼쪽/오른쪽 표시 및 자동번호 토큰/페이지 side는 Adobe 검증 필요. 단일 일반 페이지 수정본을 좌우2개로 임의 복제하지 않음.
+- 미완료: 새 소스에 실제 배치 PNG(UXP 임시 경로)가 있어 기존 fixed graphic readback 미지원; BODY 혼합 Typography 교체 미지원. capability 차단 유지. 새버전은 Production Ready 아님. 엔진 제한을 해제하거나 본문을 단일 스타일로 평탄화하지 않음.
+- 다음 작업: 원본 배치 IMAGE의 transform/link/clipping Fidelity 지원 및 mixed BODY 실제 차이 분석 후 보존형 교체. POINT_TEXT는 새 geometry로 실기 Recompose하여 넘침 검사. 현재 제작 성공을 요구하는 작업 전체는 미완료.
+- Node277/Python16 통과. 회귀: 원본 Library 불변, 신규버전 승인미승계, role 참조 누락/중복 차단. 실제 Adobe 미실행.
+- PC: 새26 Library 로드 → 수정본 항목과 미지원 사유 확인. 현재 제작 버튼 우회 금지. 원본 INDD에서 번호/POINT_TEXT 넘침 및 사진 링크를 읽기 전용 확인하고 화면 제공. 기존25 제작은 기존 Library 사용 가능.
+
+---
+
 # 세 번째 실제 Adobe batch — 2026-10-01 01:30Z
 
 - 실제 결과는 통과5 / 실패4 / 미지원16으로 동일. KinsokuSet readback 오류는 없어졌고 전체 문자 비교까지 진행. 실패4페이지의 baseline 차이2423개는 두 locale 의미 유형뿐: Composer2239 / Roman-only kerning184(일반92+direct92).
