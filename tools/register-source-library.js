@@ -12,6 +12,7 @@ function append(library,model,{approvedColors={}}={}){
    const title=all.find(e=>proposal.roles[e.id]?.role==='title'),story=title&&model.stories.find(s=>s.id===title.textFrame?.storyRef),text=story?.paragraphs.flatMap(p=>p.runs.flatMap(r=>r.tokens.map(t=>t.text||''))).join('')||'';
    if(/제목/.test(text)&&!/부제|혹은/.test(text)){for(const [id,r] of Object.entries(proposal.roles))if(['title','body'].includes(r.role)||/^image/.test(r.role))R.confirm(d,id,r.role,proposal.images[id]);if(proposal.bodyFlow)d.bodyFlow=proposal.bodyFlow.slice();d.mappingReview=[];d.mappingNotes=['명시 제목 자리표시와 본문 구조 확인; 기타 영역은 KEEP'];}
   }
+  d=R.resolveClearRoles(model,d);
   if(approvedColors[p.id])d.colorSlots=approvedColors[p.id];
   let entry=R.register(model,d);d.capability=N.support(entry);entry=R.register(model,d);entries.push(entry);
   rows.push({pageId:p.id,name:p.name,revisionOf:d.revisionOf?.designId||null,roles:d.roles,proposedRoles:d.proposedRoles||null,colorSlots:d.colorSlots||[],readyForMatching:entry.profile.readyForMatching,capability:d.capability});

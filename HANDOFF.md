@@ -1,3 +1,12 @@
+# 원고 기준 제작 후보 분리 — 2026-10-01
+
+- docs/ARTICLE_FIRST_RECOMMENDATIONS.md 전체29표. 일반 카드는 원고+역할+제작 capability 통과만, 나머지는 개발자 확인 접기. 동일 엔진/안전검사 유지.
+- 객관적 BODY/IMAGE placeholder/POINT_TEXT/단독 heading 부분등록13페이지. 기존 source/컬러/26버전 보존, private active 백업 후 새29 sidecar만 보강.
+- 제작 사전 풀6개(0장4,1장1,2장0,3장1,4+0)로 확대 목표 미완료. 제목19/본문650 시험원고 평가0장1,1/2/3/4장각0. 사진 수 외 분량 등 검사 유지. 사용자에게 특정디자인 맞춤 원고 요구하지 않음.
+- Node301/Python18 통과. Adobe 미검증. NEXT: 기존DOCX 그대로 자동추천→가능카드 제작 또는 후보없음 안내 확인. 새원고 준비 불필요.
+
+---
+
 # 새 29페이지 제작 일괄 분석 — 2026-10-01
 
 - docs/NEW29_PRODUCTION_AUDIT.md 전체29표, tools/audit-production-library.js 읽기 전용 공통 분석 추가.

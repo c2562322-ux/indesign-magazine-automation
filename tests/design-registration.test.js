@@ -102,7 +102,7 @@ test('near subtitle separated from section heading maps safely while crowded alt
 
 
 test('review and excluded designs stay bounded and excluded reasons expand on demand',async()=>{
- const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,3);assert.ok(x.nodes().some(n=>n.textContent==='추가 후보 5개'));
+ const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,0);assert.ok(x.nodes().some(n=>n.textContent==='개발자 확인 필요 8개'));
  const y=setup({load:async()=>R.pack(entries)});y.studio.read=()=>({article:{...article,images:[{width:1200,height:800}]}});await y.click('디자인 모델 / 등록 파일 불러오기');await y.click('등록 디자인에서 추천');assert.equal(y.nodes().filter(n=>n.className==='registered-card').length,0);const toggle=y.nodes().find(n=>n.textContent==='제외된 디자인 8개'),parent=y.nodes().find(n=>n.children.includes(toggle));assert.equal(parent.children[0].style.display,'none');await toggle.click();assert.equal(parent.children[0].style.display,'');assert.equal(y.ui.state.entries.length,8);
 });
 
@@ -156,7 +156,7 @@ test('direct user action runs production without manual proof and retains failur
  await x.click('이 디자인으로 제작');assert.deepEqual(calls,['production']);assert.equal(x.ui.state.report.fidelity.phase,'FIDELITY_FAILED');assert.equal(Object.keys(x.ui.state.readyTemplates).length,0);
 });
 test('direct user action blocks unsupported capability and ignores late default import',async()=>{
- const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['ambiguous style'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});let calls=0;x.studio.createRegistered=async()=>{calls++;};await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.equal(calls,0);
+ const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['ambiguous style'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});let calls=0;x.studio.createRegistered=async()=>{calls++;};await x.ui.articleLoaded();assert.equal(x.nodes().filter(n=>n.tagName==='button'&&n.textContent==='이 디자인으로 제작').length,0);assert.equal(calls,0);
  let resolve;const y=setup({loadDefault:()=>new Promise(r=>resolve=r)});await y.click('디자인 모델 / 등록 파일 불러오기');const before=y.ui.state.entries[0];resolve(R.pack([blocked]));await y.ui.ready;assert.equal(y.ui.state.entries[0],before);
 });
 
@@ -187,4 +187,13 @@ test('direct card retains engine failure after null, rejected report, and thrown
 test('unsupported and busy cards explain blocks without invoking production',async()=>{
  const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['mixed typography'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});await x.ui.articleLoaded();assert.ok(x.nodes().some(n=>String(n.textContent).includes('제작 차단: mixed typography')));
  const y=setup({loadDefault:async()=>R.pack([e])});await y.ui.articleLoaded();y.studio.state.busy=true;let calls=0;y.studio.createRegistered=async()=>{calls++;};await y.click('이 디자인으로 제작');assert.equal(calls,0);assert.ok(y.nodes().some(n=>String(n.textContent).includes('다른 작업이 진행 중')));
+});
+
+
+test('normal recommendations exclude production unsupported and preserve all evaluated records',()=>{
+ const e=registered(),blocked=R.register(e.original,{...e.descriptor,id:'blocked',capability:{productionReasons:['real style difference'],fidelityReasons:[]}});const result=R.recommendations([e,blocked],article,fonts);assert.equal(result.allCandidates.length,1);assert.equal(result.allCandidates[0].id,e.descriptor.id);assert.ok(result.reviewRequired.some(r=>r.id==='blocked'&&r.review.some(x=>x.code==='PRODUCTION_UNSUPPORTED')));
+ const photos={...article,images:[{widthPx:1200,heightPx:800},{widthPx:1200,heightPx:800},{widthPx:1200,heightPx:800},{widthPx:1200,heightPx:800}]};assert.equal(R.recommendations([e],photos,fonts).allCandidates.length,0);
+});
+test('objective partial registration preserves existing source, colors and unresolved intent',()=>{
+ const e=registered(),d=copy(e.descriptor);d.mappingReview=['review'];d.colorSlots=[];const before=JSON.stringify(d),next=R.resolveClearRoles(e.original,d);assert.equal(JSON.stringify(d),before);assert.deepEqual(next.colorSlots,[]);for(const [id,role] of Object.entries(d.roles))assert.deepEqual(next.roles[id],role);assert.ok(next.mappingReview.length);assert.deepEqual(R.resolveClearRoles(e.original,next),next);
 });

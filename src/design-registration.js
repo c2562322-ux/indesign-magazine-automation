@@ -56,13 +56,44 @@ function autoDraft(model,pageId,name){
  const captions=text.filter(t=>!d.roles[t.e.id]&&/^(캡션|caption)[:：]/i.test(t.content.trim()));if(captions.length===1)assign(captions[0],'caption',.9,'명시적 캡션 라벨');else if(captions.length>1)review.push('캡션 여러 개: 분배 확인');
  d.mappingReview=review;d.mappingEvidence=evidence;return d;
 }
+function resolveClearRoles(model,descriptor){
+ const d=copy(descriptor),pageId=d.pageIds[0],proposal=autoDraft(model,pageId),all=frames(model,pageId),evidence=[];
+ // Complete only previously unconfirmed registration drafts. Existing confirmed roles stay intact.
+ if(!d.mappingReview?.length)return d;
+ for(const [id,r] of Object.entries(proposal.roles)){
+  if(d.roles[id])continue;
+  if(r.role==='body'||/^image[1-9]/.test(r.role)){
+   confirm(d,id,r.role,proposal.images[id]);evidence.push({elementId:id,role:r.role,reason:'single-page story/body or explicit image-placeholder containment'});
+  }
+ }
+ for(const e of all.filter(e=>e.textFrame&&!d.roles[e.id])){
+  const story=model.stories.find(s=>s.id===e.textFrame.storyRef),text=story?.paragraphs.flatMap(p=>p.runs.flatMap(r=>r.tokens.map(t=>t.text||''))).join('').trim()||'';
+  if(/^(?:POINT_TEXT|강조문구를\s*입력하세요)[.!。]?$/i.test(text.replace(/[“”"']/g,''))){
+   if(!Object.values(d.roles).some(r=>r.role==='subtitle')){confirm(d,e.id,'subtitle');evidence.push({elementId:e.id,role:'subtitle',reason:'explicit POINT_TEXT placeholder; current subtitle/pointText contract'});}
+  }
+ }
+ if(!Object.values(d.roles).some(r=>r.role==='title')){
+  const bodies=all.filter(e=>d.roles[e.id]?.role==='body'),top=bodies.length?Math.min(...bodies.map(e=>e.pageBounds[pageId][0])):0;
+  const headings=all.filter(e=>e.textFrame&&!d.roles[e.id]).map(e=>{const s=model.stories.find(s=>s.id===e.textFrame.storyRef),runs=s?.paragraphs.flatMap(p=>p.runs)||[];return {e,text:runs.flatMap(r=>r.tokens.map(t=>t.text||'')).join('').trim(),size:Math.max(0,...runs.map(r=>r.resolvedProperties.PointSize||0))};}).filter(t=>t.text.length>=4&&t.text.length<=100&&!/강조|이미지|설명|캡션|목차|부제|[“”]/.test(t.text)&&t.e.pageBounds[pageId][2]<=top&&t.size>=14).sort((a,b)=>b.size-a.size);
+  if(headings.length===1){confirm(d,headings[0].e.id,'title');evidence.push({elementId:headings[0].e.id,role:'title',reason:'unique short heading above all article body frames; quote/caption/TOC excluded'});}
+ }
+ if(proposal.bodyFlow)d.bodyFlow=proposal.bodyFlow;
+ d.mappingEvidence=(d.mappingEvidence||[]).concat(evidence);
+ // Partial objective mapping does not certify a standalone title, caption distribution or logo.
+ d.mappingReview=['단독 기사 TITLE 및 남은 설명/캡션/장식의 의미 확인 필요'];
+ return d;
+}
 function gate(entry){
  // A saved file cannot grant itself production authorization. Full renderer/readback is pending.
  return {state:(entry.descriptor.capability?.fidelityReasons||[]).length?'UNSUPPORTED':entry.profile.readyForMatching?'READY_FOR_FIDELITY_TEST':'ROLE_MAPPING_REQUIRED',productionReady:false,
   reasons:(entry.descriptor.capability?.fidelityReasons||[]).concat(entry.profile.issues).concat('실제 Host Fidelity 검사 전 · 검증 제작 가능, 출력은 검사 결과에 따름')};
 }
 function register(model,descriptor){Colors.validate(model,descriptor);const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
-function recommendations(entries,article,fonts){const result=Match.rank(entries,article,{installedFonts:fonts});return {...result,allCandidates:result.candidates,candidates:result.candidates.slice(0,3),selectedId:null};}
+function recommendations(entries,article,fonts){
+ const result=Match.rank(entries,article,{installedFonts:fonts}),blocked=[];
+ const candidates=result.candidates.filter(row=>{const entry=entries.find(e=>e.descriptor.id===row.id),reasons=[...(entry.descriptor.capability?.fidelityReasons||[]),...(entry.descriptor.capability?.productionReasons||[])];if(reasons.length){blocked.push({...row,status:'review-required',review:row.review.concat(reasons.map(message=>({code:'PRODUCTION_UNSUPPORTED',message})))});return false;}return entry.profile.readyForMatching;});
+ return {...result,reviewRequired:result.reviewRequired.concat(blocked),allCandidates:candidates,candidates:candidates.slice(0,3),selectedId:null};
+}
 function selection(entry,article,fonts){return {designId:entry.descriptor.id,articleSignature:JSON.stringify(article),overlay:Match.bindContent(entry,article,{installedFonts:fonts}),fidelity:gate(entry)};}
 function lifecycle(entry,evidence){
  const unsupported=entry.descriptor.capability?.fidelityReasons||[],production=entry.descriptor.capability?.productionReasons||[],mappingState=entry.profile.readyForMatching?'MAPPED':'ROLE_MAPPING_REQUIRED';
@@ -103,5 +134,5 @@ function diagnose({comparison,originalOverflow,currentOverflow,missingFonts=fals
 }
 function pack(entries){const models={};return {schema:'magazine-registered-library/v1',models,designs:entries.map(e=>{const key=e.original.metadata.sourceSha256;models[key]=e.original;return {modelKey:key,descriptor:copy(e.descriptor)};})};}
 function unpack(data){if(!data||data.schema!=='magazine-registered-library/v1'||!Array.isArray(data.designs))throw new Error('등록 라이브러리 JSON이 아닙니다.');const entries=[],errors=[],ids=new Set(),cache=new Map();for(const row of data.designs)try{const model=cache.get(row.modelKey)||data.models&&data.models[row.modelKey]||row.model;const entry=register(model,row.descriptor);if(ids.has(entry.descriptor.id))throw new Error('중복 디자인 ID');ids.add(entry.descriptor.id);if(row.modelKey)cache.set(row.modelKey,entry.original);entries.push(entry);}catch(e){errors.push(String(e.message));}return {entries,errors};}
-return {Colors,ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
+return {resolveClearRoles,Colors,ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
 });

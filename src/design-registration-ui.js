@@ -41,7 +41,8 @@ function mount(root,studio,adapter){
    const priority=row=>{const e=state.entries.find(e=>e.descriptor.id===row.id);return (e.profile.readyForMatching?4:0)+(e.profile.supportedRoles.includes('body')?2:0)+((e.descriptor.capability?.fidelityReasons||[]).length?0:1);};
    return priority(b)-priority(a)||b.score-a.score||a.id.localeCompare(b.id);
   });
-  const rows=candidates.slice(0,3).concat(reviewRows.slice(0,3));
+  const rows=candidates.slice(0,3);
+  if(!rows.length)el('p','현재 원고의 사진 수·분량과 제작 지원 조건을 모두 충족하는 디자인이 없습니다. 원고를 바꾸도록 강제하지 않습니다.',results);
   function collapsed(label,items,describe){if(!items.length)return;const area=el('div',undefined,results),content=el('div',undefined,area);content.style.display='none';const toggle=button(label,()=>{const open=content.style.display==='none';content.style.display=open?'':'none';toggle.setAttribute('aria-expanded',String(open));},area);toggle.setAttribute('aria-expanded','false');for(const row of items)el('p',describe(row),content);}
   for(const row of rows){const card=el('div',undefined,results);card.className='registered-card';el('h3',row.name+' · '+(row.status==='candidate'?'구조적 후보':'확인 필요'),card);
    el('p',row.reasons.concat(row.soft.map(r=>r.message||r.reason||r.code),row.review.map(r=>r.message||r.reason||r.code)).join(' / '),card);
@@ -57,7 +58,8 @@ function mount(root,studio,adapter){
    if(choose.disabled)el('p','역할·사진 정책을 확인하고 다시 등록해야 선택할 수 있습니다.',card);
   }
   status.textContent='전체 평가 '+state.entries.length+' · 구조적 후보 '+candidates.length+' · 확인 필요 '+ranked.reviewRequired.length+' · 조건 불일치 '+ranked.excluded.length+' (자동 선택 없음)';
-  collapsed('추가 후보 '+(Math.max(0,candidates.length-3)+Math.max(0,ranked.reviewRequired.length-3))+'개',candidates.slice(3).concat(reviewRows.slice(3)),row=>row.name+' · '+row.status+' · '+row.review.map(r=>r.message||r.code).join(' / ')+' · 개발자 전체 페이지 목록에서 확인');
+  collapsed('개발자 확인 필요 '+reviewRows.length+'개',reviewRows,row=>row.name+' · 제작 차단: '+row.review.map(r=>r.message||r.code).join(' / '));
+  collapsed('추가 후보 '+Math.max(0,candidates.length-3)+'개',candidates.slice(3),row=>row.name+' · '+row.status+' · '+row.review.map(r=>r.message||r.code).join(' / ')+' · 개발자 전체 페이지 목록에서 확인');
   collapsed('제외된 디자인 '+ranked.excluded.length+'개',ranked.excluded,row=>row.name+' 제외: '+row.hard.map(r=>r.message||r.reason||r.code).join(' / '));
  }
  button('등록 디자인에서 추천',recommend);
