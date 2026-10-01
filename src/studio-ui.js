@@ -295,13 +295,13 @@
         report.warnings.forEach(w=>$('inspectionIssues').appendChild(element('p','small',safe('참고: '+w))));
     }
     function showReport(report,label,trace){
-        state.hasDocument=true;state.report=report;state.fidelityJSON=report.fidelity?D.diagnosticJSON(D.fidelityDiagnostic(report,state.registeredEntry,null,trace)):null;
+        state.hasDocument=report.outcome!=='blocked';state.report=report;state.fidelityJSON=report.fidelity?D.diagnosticJSON(D.fidelityDiagnostic(report,state.registeredEntry,null,trace)):null;
         state.pdfReady=report.errors.length===0&&report.outputReady!==false;
         if(api.registration&&api.registration.report)api.registration.report(report);
         $('hostReport').textContent=safe(trace.join('\n')+'\n'+label+' · '+report.pageCount+'페이지\n'+(report.errors.length?'확인 필요\n'+report.errors.join('\n')+(report.issues?'\n'+report.issues.map(i=>[i.category||'',i.cause||'',i.role||'',i.detail||''].join(' · ')).join('\n'):''):'텍스트 넘침·폰트·링크 기본 검사 통과')+(report.warnings.length?'\n'+report.warnings.join('\n'):'')+'\n최종 인쇄 전 크롭·색상·재단 여백을 확인해주세요.');
         if(report.fidelity)$('hostReport').textContent+='\n원본 재현 비교\n'+safe(JSON.stringify(report.fidelity,null,2));
         if(report.autoFixes&&report.autoFixes.length)$('hostReport').textContent+='\n자동 수정 기록\n'+safe(JSON.stringify(report.autoFixes,null,2));
-        if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
+        if(report.outcome==='blocked')status('제작 중단 · '+report.errors.join(' / '),true);else if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
         else status(label+(report.errors.length?' 완료 · 검사 오류가 있어 PDF를 차단했습니다. 수정 후 문서 검사를 다시 실행해주세요.':' 성공'),!!report.errors.length);
     }
     function documentKey(){if(state.registeredEntry)return 'registered|'+state.registeredEntry.descriptor.id+'|'+state.registeredEntry.original.metadata.sourceSha256+'|'+JSON.stringify(L.safeArticle(read().article))+'|'+JSON.stringify(state.themeColors||{});return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
@@ -315,7 +315,7 @@
         try{
             if(adapter.yieldUI)await adapter.yieldUI();if(api.disposed)return;
             const report=await action(progress);if(api.disposed)return;
-            if(report){showReport(report,label,trace);$('productionStatus').textContent=report.outcome==='unconfirmed'?label+' 완료 미확인 · 출력 파일을 확인해주세요.':'✓ '+label+' 완료'+(report.errors.length?' · 검사 수정 필요':'');}
+            if(report){showReport(report,label,trace);$('productionStatus').textContent=report.outcome==='blocked'?'제작 중단 · '+report.errors.join(' / '):report.outcome==='unconfirmed'?label+' 완료 미확인 · 출력 파일을 확인해주세요.':'✓ '+label+' 완료'+(report.errors.length?' · 검사 수정 필요':'');}
             else{trace.push(label+' 취소');$('hostReport').textContent=safe(trace.join('\n'));status(label+' 취소');$('productionStatus').textContent=label+' 취소 · 다시 시도할 수 있습니다.';}
             return report;
         }catch(e){

@@ -31,7 +31,7 @@ function host(options={}){
  const app={documents:{add:document},fonts:{length:1,itemByName:name=>({name,fontStyleName:name.includes("Bold")?"Bold":"Regular",isValid:!options.missingFont,status:status()}),item:()=>({name:'regular',fontFamily:'regular',status:status()})},doScript:fn=>fn(),get activeDocument(){throw new Error('The active user document must never be accessed');}};
  if(options.fonts)app.fonts={get length(){return options.fonts.length;},item:i=>{metrics.fontItems++;return options.fonts[i];},itemByName:n=>options.fonts.find(f=>f.name===n)||{isValid:false}};
  const module={exports:{}};
- vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.imageGate)await options.imageGate;if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
+ vm.runInNewContext(fs.readFileSync('src/auto-indesign.js','utf8'),{require:n=>n==='./registered-native'&&options.registeredNative?options.registeredNative:n==='indesign'?{...enums,app}:n==='fs'?{lstat:async()=>{if(options.imageGate)await options.imageGate;if(options.missingImage)throw new Error('missing');return {isFile:()=>true};}}:require('../src/'+n.replace('./','')),module,Set,console});
  return {api:module.exports,docs,calls,metrics};
 }
 const a={title:'제목',subtitle:'',body:'본문입니다 '.repeat(150),images:[]};
@@ -263,4 +263,11 @@ test('body repair stops at forty pages and remains blocked without repeated appe
 test('rollback failure poisons the generated document even if later overset becomes false',async()=>{
  let armed=false;const h=host({overset:st=>st.frames[0].label==='AUTO_TITLE'?armed:undefined,onRecompose:doc=>{const f=doc.items.find(f=>f.label==='AUTO_TITLE');if(armed&&f&&parseFloat(f.geometricBounds[2])>doc.bottom){const value=f.geometricBounds;Object.defineProperty(f,'geometricBounds',{get:()=>value,set:()=>{throw new Error('mock write denied');}});throw new Error('mock compose denied');}}});
  await h.api.create(a,L.candidates(a)[0]);h.docs[0].bottom=parseFloat(h.docs[0].items.find(f=>f.label==='AUTO_TITLE').geometricBounds[2]);armed=true;assert.throws(()=>h.api.check(),/원복 실패/);armed=false;assert.ok(h.api.check().errors.some(e=>e.includes('원복')));assert.throws(()=>h.api.exportPdf('/out/test.pdf'));
+});
+
+
+test('registered production closes failed baseline clone and blocks export while retaining report',async()=>{
+ const options={},h=host(options);await h.api.create(a,L.candidates(a)[0]);const doc=h.docs[0];const entry={descriptor:{name:'test',pageIds:['p']}};
+ options.registeredNative={create:async()=>({doc,entry,phase:'FIDELITY_FAILED',failure:'source overflow',proofOnly:false,contentChecks:[],baseline:{records:[],externalAssets:[]},originalInspection:{errors:['source overflow']}}),check:()=>[{cause:'SOURCE_OVERFLOW',category:'BLOCKING',message:'source overflow'}]};
+ const report=await h.api.createRegistered(entry,a,async()=>doc);assert.equal(report.outcome,'blocked');assert.equal(report.outputReady,false);assert.equal(doc.isValid,false);assert.ok(report.errors.some(x=>x.includes('DOCX')));assert.throws(()=>h.api.save('/out/no.indd'));
 });

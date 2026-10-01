@@ -1304,3 +1304,15 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+# 원본 복제본과 제작 완료 구분 — 2026-10-01
+
+- 사용자 실기: DOCX/사진3장 인식 및 새문서 열림, 샘플 내용 잔존. 화면 본문 overset 표시가 있으나 상세진단 없으므로 해당 실행의 정확한 SOURCE_OVERFLOW/Fidelity 차단 원인 미확정.
+- 확인된 코드 경로: native.create baseline 실패는 교체 전 FIDELITY_FAILED context 반환. auto-indesign은 이를 열린 latest 문서로 유지, Studio는 체크마크 완료/검사수정필요 표시. 실제 교체 후 샘플로 restore하는 코드는 없음. source label로 frames/story binding, 역할별 text/IMAGE place는 기존 공통 엔진.
+- production에서 CONTENT_APPLIED가 아니면 보고서/JSON을 보존하고 해당 임시 clone만 저장 없이 닫음, outcome blocked/출력불가. proof는 원본 비교 목적 유지. UI에 제작 중단과 실제 오류 표시, 성공 체크마크/문서존재 상태 부여하지 않음.
+- 계획한 역할/element마다 contentChecks 완료기록을 요구하며 누락시 CONTENT_REPLACEMENT_INCOMPLETE + role 차단. 기존 실제 text 일치/이미지 링크/geometry/style/overflow 재검사 유지. 원본 overset 우회 금지.
+- Node304/304 Python18/18 통과: 원본 실패 clone 닫기/보고서유지/저장차단, 역할별 교체증거 누락 검출. 기존1/2/3/4/40사진 common pipeline mock 유지. Adobe 문서 콘텐츠 교체 성공 재검증 필요, 이번 이미지로 실제제작 문제가 해결됐다고 단정하지 않음.
+- NEXT: UDT Reload → 같은DOCX → 추천 → 제작. 정상은 DOCX 제목/본문/사진3장. 원본검사 차단이면 샘플문서를 남기지 않고 카드에 실제원인 표시. 실패시 Fidelity JSON으로 baseline 원인 확인 필요. main/원본/개인등록데이터 미변경.
+
+---
+

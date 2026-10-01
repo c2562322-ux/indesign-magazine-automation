@@ -547,3 +547,8 @@ test('equivalent explicit/inherited overrides preserve effective typography but 
  s.paragraphs[0].runs[1]={...run,resolvedProperties:{PointSize:11,Leading:25}};assert.throws(()=>T.policy(s),/Leading/);
  s.paragraphs[0].runs[1]={...run,properties:{PointSize:11,UnknownOverride:1}};assert.throws(()=>T.policy(s),/UNSUPPORTED/);
 });
+
+
+test('production requires completion evidence for every planned role',async()=>{
+ const entry=fixture(),h=host(entry),c=await N.create(entry,{title:'현재 DOCX 제목',body:'현재 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.ok(c.requiredContent.length>=2);c.contentChecks=c.contentChecks.filter(x=>x.role!=='title');assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_REPLACEMENT_INCOMPLETE'&&i.role==='title'));
+});

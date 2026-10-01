@@ -231,7 +231,13 @@ async function createRegistered(entry,article,open,progress,mode='production'){
  const generation=session;latest=null;
  const guard=()=>{if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 다시 제작해주세요.');};
  let created;
- try{const context=await require('./registered-native').create(entry,article,{ID,open,guard,inspect:doc=>check(doc,progress,false),progress,mode});created=context.doc;guard();registeredContexts.set(context.doc,context);latest=context.doc;return check(latest,progress,false);}
+ try{const context=await require('./registered-native').create(entry,article,{ID,open,guard,inspect:doc=>check(doc,progress,false),progress,mode});created=context.doc;guard();registeredContexts.set(context.doc,context);const report=check(context.doc,progress,false);
+ if(mode!=='proof'&&(context.phase!=='CONTENT_APPLIED'||report.issues?.some(i=>i.cause==='CONTENT_REPLACEMENT_INCOMPLETE'))){
+  report.outcome='blocked';report.outputReady=false;report.errors.unshift('제작 중단: DOCX 콘텐츠 교체가 완료되지 않았습니다. '+(context.failure||''));
+  if(progress)progress('registered.production.blocked '+JSON.stringify({phase:context.phase,errors:report.errors,contentApplied:report.fidelity?.contentApplied}));
+  context.doc.close(ID.SaveOptions.NO);latest=null;return report;
+ }
+ latest=context.doc;return report;}
  catch(e){const doc=e.registeredDocument||created;if(doc&&doc.isValid)try{doc.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}latest=null;throw e;}
 }
 async function create(raw,plan,progress){
