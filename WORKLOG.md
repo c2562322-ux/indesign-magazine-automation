@@ -1328,3 +1328,14 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+# u3d6 실제 원본 overset 확정 — 2026-10-01
+
+- 최신 JSON 2026-10-01T09:54:47.823Z: 새5쪽 u3d6, 비교15개 모두일치/차이0. Host Story2866 source overflow.
+- 실제 InDesign COM/ExtendScript로 복사본만 검사: 원본 INDD, 원본 IDML, packagePlan 생성본 페이지정리 전/후 모두 BODY u7dea / Story u7ded overset=true. 원본 INDD IDs32234/32237, IDML Host IDs2884/2866. 샘플882자. 원본 미설치폰트0. 다른5쪽 텍스트들은 overset=false.
+- 원본 샘플 자체 문제이므로 재생성/추천/Library/parser 코드 미변경. 검사우회/자동축소/프레임확대/AutoFix 금지 유지. 문서만 commit. 실제 UXP 전체제작 성공을 주장하지 않음.
+- docs/U3D6_SOURCE_OVERFLOW.md 근거. 무시된 private 로그/복사본 working에 보존, 원본/개인자료 Git 미포함.
+- NEXT: 디자이너가 원본 BODY 샘플 넘침을 해소한 수정본 제공 → 재추출/등록 후 동일 DOCX 제작. 현원본으로 Reload만 반복하면 정상적으로 계속 차단됨.
+
+---
+
