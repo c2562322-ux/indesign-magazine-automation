@@ -539,3 +539,11 @@ test('metadata packet package preservation rejects loss and retains duplicate pa
  assert.equal(G.validateMetadata({'Spreads/a.xml':tree},[['Spreads/a.xml',xml]]).packetCount,2);
  assert.throws(()=>G.validateMetadata({'Spreads/a.xml':tree},[['Spreads/a.xml',xml.replace(P.serialize(packet).replace(/^<\?xml[^?]*\?>/,''),'')]]),/serialization loss/);
 });
+
+
+test('equivalent explicit/inherited overrides preserve effective typography but semantic differences block',()=>{
+ const T=require('../src/registered-text-policy');const run={styleRef:'same',properties:{PointSize:11},resolvedProperties:{PointSize:11,Leading:19},tokens:[{type:'Content',text:'body'}]};const s={paragraphs:[{styleRef:'body',properties:{},runs:[run,{...run,properties:{PointSize:11,Leading:19}}]}]};assert.equal(T.policy(s).mode,'uniform');
+ s.paragraphs[0].runs[1]={...run,styleRef:'emphasis'};assert.throws(()=>T.policy(s),/UNSUPPORTED/);
+ s.paragraphs[0].runs[1]={...run,resolvedProperties:{PointSize:11,Leading:25}};assert.throws(()=>T.policy(s),/Leading/);
+ s.paragraphs[0].runs[1]={...run,properties:{PointSize:11,UnknownOverride:1}};assert.throws(()=>T.policy(s),/UNSUPPORTED/);
+});

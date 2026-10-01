@@ -4,10 +4,12 @@ const withoutLanguage=o=>Object.fromEntries(Object.entries(o||{}).filter(([k])=>
 function kind(c){if(/[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u.test(c))return 'hangul';if(/[A-Za-z]/u.test(c))return 'latin';if(/[0-9]/u.test(c))return 'number';if(/\s/u.test(c))return 'space';if(/\p{P}|\p{S}/u.test(c))return 'punctuation';if(/\p{Script=Han}/u.test(c))return 'han';return 'other';}
 function policy(story){
  const runs=story?.paragraphs.flatMap(p=>p.runs)||[],first=runs[0];
- const fail=()=>{throw new Error('UNSUPPORTED 혼합 Typography: 원본 스타일/언어 패턴을 안전하게 대응할 수 없습니다.');};
+ const fail=()=>{const paths=[...new Set(runs.flatMap(r=>M.compare(first?.resolvedProperties||{},r.resolvedProperties||{}).differences.map(d=>d.path)))];throw new Error('UNSUPPORTED 혼합 Typography: 원본 스타일/언어 패턴을 안전하게 대응할 수 없습니다.'+(paths.length?' 실제 속성 차이: '+paths.join(', '):' 문단/문자 스타일·특수 콘텐츠 구조 확인 필요'));};
  if(!first||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)||t.contentTree)))return fail();
  if(story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!M.compare(p.properties,story.paragraphs[0].properties).equal))return fail();
- const uniform=runs.every(r=>r.styleRef===first.styleRef&&M.compare(r.properties,first.properties).equal&&M.compare(r.resolvedProperties,first.resolvedProperties).equal);
+ // Different explicit/inherited representations are safe only when every changed
+ // key is resolved, effective values match, and named style identity is unchanged.
+ const uniform=runs.every(r=>r.styleRef===first.styleRef&&M.compare(r.resolvedProperties,first.resolvedProperties).equal&&M.compare(r.properties,first.properties).differences.every(d=>{const key=d.path.slice(2);return Object.prototype.hasOwnProperty.call(first.resolvedProperties,key)&&Object.prototype.hasOwnProperty.call(r.resolvedProperties,key);}));
  if(uniform)return {mode:'uniform'};
  if(runs.some(r=>r.styleRef!==first.styleRef||!M.compare(withoutLanguage(r.properties),withoutLanguage(first.properties)).equal||!M.compare(withoutLanguage(r.resolvedProperties),withoutLanguage(first.resolvedProperties)).equal))return fail();
  const classes={},samples={};let offset=0;

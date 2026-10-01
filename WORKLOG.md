@@ -1270,3 +1270,13 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+# 새 29페이지 제작 일괄 분석 — 2026-10-01
+
+- docs/NEW29_PRODUCTION_AUDIT.md 전체29표, tools/audit-production-library.js 읽기 전용 공통 분석 추가.
+- 사전조건 충족6: 표시3/5/10/11/12/13. 역할 확인8, 실제 Typography 의미 대응 필요2, 공유/효과/색관리 등 추가 엔진13. Adobe 통과 아님. Library/원본 불변.
+- u3d5 BODY는 실제18/11pt 및25/19 leading 차이. 단순언어 문제가 아니므로 우세 스타일 평탄화/원문 offset 복사하지 않음. 동일스타일+동일resolved값의 중복 direct override만 공통 허용. 미해결속성/실제서식차이 차단 유지, 오류에 difference paths 표시.
+- Node299/299, Python18/18 전체 통과. NEXT: 사진3장 DOCX → 새 샘플5쪽 u3d6 직접제작 한 건. 다른 페이지 반복 테스트 요구하지 않음. 새 모델 Adobe 성공 미확인.
+
+---
+
