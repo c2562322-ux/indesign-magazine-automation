@@ -197,3 +197,9 @@ test('normal recommendations exclude production unsupported and preserve all eva
 test('objective partial registration preserves existing source, colors and unresolved intent',()=>{
  const e=registered(),d=copy(e.descriptor);d.mappingReview=['review'];d.colorSlots=[];const before=JSON.stringify(d),next=R.resolveClearRoles(e.original,d);assert.equal(JSON.stringify(d),before);assert.deepEqual(next.colorSlots,[]);for(const [id,role] of Object.entries(d.roles))assert.deepEqual(next.roles[id],role);assert.ok(next.mappingReview.length);assert.deepEqual(R.resolveClearRoles(e.original,next),next);
 });
+
+
+test('library analysis yields progress once per batch, stays cached for later articles and surfaces failures',async()=>{
+ const e=registered(),entries=Array.from({length:9},(_,i)=>R.register(e.original,{...e.descriptor,id:'entry'+i}));let loads=0,checks=0;const x=setup({loadDefault:async()=>{loads++;return R.pack(entries);},capability:()=>{checks++;return {fidelityReasons:[],productionReasons:[]};}}),events=[];x.studio.progress=async message=>events.push(message);await x.ui.ready;await x.ui.articleLoaded();await x.ui.articleLoaded();assert.equal(loads,1);assert.equal(checks,9);assert.ok(events.some(x=>x.includes('4/9')));assert.ok(events.some(x=>x.includes('추천 조건 계산 완료')));
+ const y=setup({loadDefault:async()=>{throw new Error('bad library');}});await assert.rejects(()=>y.ui.articleLoaded(),/bad library/);
+});

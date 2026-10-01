@@ -12,7 +12,7 @@ function guard(expected=token){if(!active||expected!==token||(Host&&Host.session
 function resetSession(){if(Host&&Host.resetSession)Host.resetSession();token=Host&&Host.sessionId?Host.sessionId():0;active=true;}
 function dispose(){active=false;if(Host&&Host.resetSession&&(!Host.sessionId||Host.sessionId()===token))Host.resetSession();}
 function previewPath(path){return 'file:'+path.replace(/\\/g,'/');}
-async function load(){
+async function load(progress=async()=>{}){
  const f=await fs.getFileForOpening({types:['docx','txt','json']});if(!f)return null;
  let result;
  if(/\.json$/i.test(f.name)){
@@ -20,9 +20,9 @@ async function load(){
    if(data.schemaVersion===1 && data.article)result={article:data.article,settings:data.settings,plan:data.plan};
    else result={article:Input.parse(f.name,JSON.stringify(data))};
  }else if(/\.docx$/i.test(f.name)){
-   const expected=token;result=require('./src/docx-media').extract(await f.read({format:U.storage.formats.binary}));guard(expected);
+   const expected=token;await progress('DOCX 읽는 중…');let started=Date.now();const bytes=await f.read({format:U.storage.formats.binary});guard(expected);await progress('DOCX 읽기 완료 · '+(Date.now()-started)+'ms · 압축 해제/텍스트·사진 분석 중…');started=Date.now();result=require('./src/docx-media').extract(bytes);guard(expected);await progress('텍스트·사진 추출 완료 · '+(Date.now()-started)+'ms');
    if(result.article.images.length){const base=await fs.getDataFolder();const folder=await base.createFolder('docx-'+Date.now()+'-'+Math.random().toString(36).slice(2));guard(expected);
-    for(let i=0;i<result.article.images.length;i++){const im=result.article.images[i],out=await folder.createFile('image-'+(i+1)+(im.mimeType==='image/png'?'.png':'.jpg'));await out.write(im.bytes.buffer.slice(im.bytes.byteOffset,im.bytes.byteOffset+im.bytes.byteLength),{format:U.storage.formats.binary});guard(expected);im.path=out.nativePath;im.extractedPathOrHandle=out.nativePath;delete im.bytes;}}
+    for(let i=0;i<result.article.images.length;i++){await progress('사진 작업 파일 저장 중… '+(i+1)+'/'+result.article.images.length);guard(expected);const im=result.article.images[i],out=await folder.createFile('image-'+(i+1)+(im.mimeType==='image/png'?'.png':'.jpg'));await out.write(im.bytes.buffer.slice(im.bytes.byteOffset,im.bytes.byteOffset+im.bytes.byteLength),{format:U.storage.formats.binary});guard(expected);im.path=out.nativePath;im.extractedPathOrHandle=out.nativePath;delete im.bytes;}}
  }else result={article:Input.parse(f.name,await f.read())};
  (result.article.images||[]).forEach(im=>{im.path=Input.resolve(f.nativePath,im.path);im.preview=previewPath(im.path);});
  return result;
@@ -36,7 +36,7 @@ async function saveProduction(name,types,write,progress){
  return write(path,progress);
 }
 Studio.mount({registration:api=>require('./src/design-registration-ui').mount(document.getElementById('registeredDesigns'),api,{
- loadDefault:async()=>{const expected=token;guard(expected);const folder=await fs.getPluginFolder();let entry;try{entry=await folder.getEntry('assets/templates/working/active-library.private.json');}catch(error){const data=await fs.getDataFolder();try{entry=await data.getEntry('registered-library.private.json');}catch(missing){return null;}}guard(expected);const text=await entry.read();guard(expected);return JSON.parse(text);},
+ loadDefault:async(progress=async()=>{})=>{const expected=token;guard(expected);const folder=await fs.getPluginFolder();let entry;try{entry=await folder.getEntry('assets/templates/working/active-library.private.json');}catch(error){const data=await fs.getDataFolder();try{entry=await data.getEntry('registered-library.private.json');}catch(missing){return null;}}guard(expected);const start=Date.now(),text=await entry.read();guard(expected);await progress('Library 읽기 완료 · '+(Date.now()-start)+'ms · 파싱 중…');const parseStart=Date.now(),data=JSON.parse(text);await progress('Library 파싱 완료 · '+(Date.now()-parseStart)+'ms');guard(expected);return data;},
  rememberLibrary:async data=>{const expected=token,folder=await fs.getDataFolder();guard(expected);const file=await folder.createFile('registered-library.private.json',{overwrite:true}),text=JSON.stringify(data);await file.write(text);guard(expected);if(await file.read()!==text)throw new Error('등록 Library 저장 내용 불일치');},
  hostKind:'adobe',capability:entry=>require('./src/registered-native').support(entry),
  saveBatch:data=>{const expected=token;guard(expected);return saveAs('registered-page-verification.private.json',['json'],async f=>{const text=require('./src/production-diagnostics').diagnosticJSON(data);await f.write(text);guard(expected);if(await f.read()!==text)throw new Error('검증 결과 저장 후 내용 불일치');guard(expected);return true;});},

@@ -136,11 +136,12 @@ function replacementPlan(entry,article){const binding=Match.bindContent(entry,ar
   }else edits.push(b);}
  return edits;
 }
+const supportedMarkerSources=new WeakSet();
 function support(entry){
  const fidelity=[],production=[];
  try{validatePageStories(entry);}catch(e){fidelity.push(e.message);}
  const m=entry.original;
- try{Markers.validateSource(m);}catch(e){fidelity.push(e.message);}
+ try{if(!supportedMarkerSources.has(m)){Markers.validateSource(m);if(Match.isImmutable(m))supportedMarkerSources.add(m);}}catch(e){fidelity.push(e.message);}
  if(!m.sourceXml||!m.sourceXml['designmap.xml'])fidelity.push('원본 IDML XML 없음');
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!m.sourceXml?.[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));if(unknown.length)fidelity.push('원본 바이너리 리소스 미보존: '+unknown.map(x=>x.name).join(', '));
  for(const e of m.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){

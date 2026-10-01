@@ -3,7 +3,7 @@
 function attrs(tag){const out={};for(const m of tag.matchAll(/([\w:.-]+)\s*=\s*(["'])(.*?)\2/g))out[m[1]]=W.decode(m[3]);return out;}
 function target(path){if(/^[a-z]+:|^[\\/]|[?#]/i.test(path))throw new Error('DOCX 외부/절대 이미지 경로는 지원하지 않습니다.');const parts=['word'];for(const p of path.split('/')){if(p==='..'){if(parts.length<=1)throw new Error('DOCX 이미지 경로 이탈');parts.pop();}else if(p&&p!=='.')parts.push(p);}const name=parts.join('/');if(!/^word\/media\/[^/]+$/.test(name))throw new Error('본문 media 이미지 경로가 아닙니다.');return name;}
 function extract(buffer){
- const xml=Z.utf8BytesToString(Z.readZipEntry(buffer,'word/document.xml'));const paragraphs=W.extract(xml,true);let article=Input.parse('article.docx',buffer);const warnings=[],images=[],relationships=new Map();
+ const xml=Z.utf8BytesToString(Z.readZipEntry(buffer,'word/document.xml'));const paragraphs=W.extract(xml,true);let article=Input.wordArticle(paragraphs);const warnings=[],images=[],relationships=new Map();
  let relXML='';try{relXML=Z.utf8BytesToString(Z.readZipEntry(buffer,'word/_rels/document.xml.rels'));}catch(e){if(/(?:blip|imagedata)\b/.test(xml))throw new Error('Word 이미지 relationship을 찾지 못했습니다.');}
  if(/<!DOCTYPE|<!ENTITY/i.test(relXML))throw new Error('지원하지 않는 relationship XML');
  for(const m of relXML.matchAll(/<(?:\w+:)?Relationship\b[^>]*\/?\s*>/g)){const a=attrs(m[0]);if(relationships.has(a.Id))throw new Error('중복 relationship ID');relationships.set(a.Id,a);}

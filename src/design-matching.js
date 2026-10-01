@@ -6,7 +6,7 @@
 
 const clone=x=>JSON.parse(JSON.stringify(x));
 const ROLES=['title','subtitle','body','image1','image2','caption','header','footer','pageNumber'];
-const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;};
+const freeze=x=>{if(x&&typeof x==='object'&&!Object.isFrozen(x)){Object.values(x).forEach(freeze);Object.freeze(x);}return x;};
 const originals=new WeakSet();
 function immutable(model){if(originals.has(model))return model;const value=freeze(clone(model));originals.add(value);return value;}
 const count=text=>Array.from(String(text||'')).length;
@@ -269,6 +269,6 @@ function calibration(estimate,observed){
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-return {imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
 
 });

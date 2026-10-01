@@ -13,15 +13,18 @@
     lines.forEach(line=>{const m=line.trim().match(marker);if(m){flush();field=map[m[1]];if(Object.prototype.hasOwnProperty.call(data,field))throw new Error('중복 원고 마커: '+m[1]);buf=[];}else{if(/^\[[A-Z_]+\]$/.test(line.trim()))throw new Error('알 수 없는 원고 마커: '+line.trim());if(field)buf.push(line);else if(line.trim())throw new Error('첫 마커 앞의 원고를 확인해주세요.');}});flush();
     return L.article(data);
  }
- function parse(name,contents){
-    const ext=String(name).split('.').pop().toLowerCase();
-    if(ext==='docx'){
-        const paragraphs=W.extract(Z.utf8BytesToString(Z.readZipEntry(contents,'word/document.xml')),true);
+ function wordArticle(paragraphs){
         const plain=paragraphs.join('\n');
         if(/^\[\s*(TITLE|POINT_TEXT|SUBTITLE|BODY|HERO_IMAGE|KICKER|AUTHOR)\s*\]$/m.test(plain))return textArticle(plain);
         const first=paragraphs.findIndex(p=>p.trim());
         if(first<0)throw new Error('Word 원고가 비어 있습니다.');
         return L.article({title:paragraphs[first],body:paragraphs.slice(first+1).join('\n')});
+ }
+ function parse(name,contents){
+    const ext=String(name).split('.').pop().toLowerCase();
+    if(ext==='docx'){
+        const paragraphs=W.extract(Z.utf8BytesToString(Z.readZipEntry(contents,'word/document.xml')),true);
+        return wordArticle(paragraphs);
     }
     if(ext==='json')return L.article(JSON.parse(String(contents).replace(/^\uFEFF/,'')));
     if(ext==='txt')return textArticle(contents);
@@ -34,5 +37,5 @@
     if(p<0)throw new Error('사진 상대경로의 기준 폴더가 없습니다. 사진을 다시 선택해주세요.');
     return base.slice(0,p+1)+path;
  }
- return {parse,textArticle,resolve};
+ return {parse,textArticle,wordArticle,resolve};
 });
