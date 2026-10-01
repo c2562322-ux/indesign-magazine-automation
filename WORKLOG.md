@@ -1232,3 +1232,15 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+
+# 최신 샘플 29페이지 / 명시 ACCENT 슬롯 — 2026-10-01
+
+- 최신 IDML 재추출: 일반29페이지/15spread/Parent2. 기존26버전 보존 + 신규29 = 개인 active Library55버전. 일반 추천은 명시 대체 버전을 제외한41버전 평가.
+- 신규 역할 준비8/확인21, 정적 Fidelity 가능16/미지원13, 역할+제작 capability 충족6. Adobe 신규 검증0 / Production Ready0. 과거 u335e/u3d6 성공은 이전 모델의 역사로 보존.
+- 승인된 단일 페이지 회색 면4개만 ACCENT. 원본 Fidelity 후 선택 fill만 변경/재검사. 미선택 및 proof는 원본 유지. 공유/사진/텍스트/로고 제외. 해당4페이지의 다른 capability 제한은 아직 남아 있어 실제 컬러 제작 성공 미확인.
+- Node295/295, Python18/18. 원본/개인 모델 Git 제외, sample/magazine-design.indd 미추적 파일 보존.
+- NEXT STEP: UDT Reload → DOCX → 새 샘플 추천의 이 디자인으로 제작 → 결과 검사. 개발자 일괄검증 JSON으로 신규 공통 제한 확인. 상세/전체29표: docs/LATEST_SOURCE_REGISTRATION.md.
+
+---
+

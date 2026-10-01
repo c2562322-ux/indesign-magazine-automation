@@ -1,4 +1,4 @@
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-model'),require('./design-matching'));else root.MagazineRegistration=factory(root.MagazineDesignModel,root.MagazineMatching);})(typeof window!=='undefined'?window:this,function(Model,Match){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-model'),require('./design-matching'),require('./design-color-slots'));else root.MagazineRegistration=factory(root.MagazineDesignModel,root.MagazineMatching,root.MagazineColorSlots);})(typeof window!=='undefined'?window:this,function(Model,Match,Colors){
 'use strict';
 const ROLES=['title','subtitle','body','image1','image2','caption','header','footer','pageNumber','keep'];
 const copy=x=>JSON.parse(JSON.stringify(x));
@@ -61,7 +61,7 @@ function gate(entry){
  return {state:(entry.descriptor.capability?.fidelityReasons||[]).length?'UNSUPPORTED':entry.profile.readyForMatching?'READY_FOR_FIDELITY_TEST':'ROLE_MAPPING_REQUIRED',productionReady:false,
   reasons:(entry.descriptor.capability?.fidelityReasons||[]).concat(entry.profile.issues).concat('실제 Host Fidelity 검사 전 · 검증 제작 가능, 출력은 검사 결과에 따름')};
 }
-function register(model,descriptor){const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
+function register(model,descriptor){Colors.validate(model,descriptor);const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
 function recommendations(entries,article,fonts){const result=Match.rank(entries,article,{installedFonts:fonts});return {...result,allCandidates:result.candidates,candidates:result.candidates.slice(0,3),selectedId:null};}
 function selection(entry,article,fonts){return {designId:entry.descriptor.id,articleSignature:JSON.stringify(article),overlay:Match.bindContent(entry,article,{installedFonts:fonts}),fidelity:gate(entry)};}
 function lifecycle(entry,evidence){
@@ -103,5 +103,5 @@ function diagnose({comparison,originalOverflow,currentOverflow,missingFonts=fals
 }
 function pack(entries){const models={};return {schema:'magazine-registered-library/v1',models,designs:entries.map(e=>{const key=e.original.metadata.sourceSha256;models[key]=e.original;return {modelKey:key,descriptor:copy(e.descriptor)};})};}
 function unpack(data){if(!data||data.schema!=='magazine-registered-library/v1'||!Array.isArray(data.designs))throw new Error('등록 라이브러리 JSON이 아닙니다.');const entries=[],errors=[],ids=new Set(),cache=new Map();for(const row of data.designs)try{const model=cache.get(row.modelKey)||data.models&&data.models[row.modelKey]||row.model;const entry=register(model,row.descriptor);if(ids.has(entry.descriptor.id))throw new Error('중복 디자인 ID');ids.add(entry.descriptor.id);if(row.modelKey)cache.set(row.modelKey,entry.original);entries.push(entry);}catch(e){errors.push(String(e.message));}return {entries,errors};}
-return {ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
+return {Colors,ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
 });

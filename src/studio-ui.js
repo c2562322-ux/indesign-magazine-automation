@@ -89,7 +89,7 @@
         const values={autoTitle:a.title,autoSubtitle:a.subtitle||a.pointText||'',autoBody:a.body,autoKicker:a.kicker||'ARTICLE',autoAuthor:a.author||'',pageWidth:s.width,pageHeight:s.height,pageMargin:s.margin,pageBleed:s.bleed,bodySize:s.bodySize,accent:s.accent,publication:s.publication,bodyFont:s.bodyFont,titleFont:s.titleFont};
         Object.keys(values).forEach(id=>$(id).value=values[id]);state.images=a.images||[];imageList();changed();
     }
-    function invalidateDocument(){state.fidelityJSON=null;state.registeredEntry=null;state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
+    function invalidateDocument(){state.themeColors={};state.fidelityJSON=null;state.registeredEntry=null;state.report=null;$('productionStatus').textContent='';$('inspectionSummary').textContent='아직 검사한 문서가 없습니다.';$('inspectionIssues').textContent='';state.hasDocument=false;state.documentKey='';state.pdfReady=false;if(adapter.invalidateDocument)adapter.invalidateDocument();}
     function changed(){
         if(api.registration)api.registration.invalidate();
         $('wordCount').textContent=($('autoBody').value||'').length.toLocaleString()+'자';
@@ -304,7 +304,7 @@
         if(report.outcome==='unconfirmed')status(label+' 완료 미확인: 옵션 창에서 취소했거나 완료 신호를 확인하지 못했습니다. 출력 파일을 확인해주세요.');
         else status(label+(report.errors.length?' 완료 · 검사 오류가 있어 PDF를 차단했습니다. 수정 후 문서 검사를 다시 실행해주세요.':' 성공'),!!report.errors.length);
     }
-    function documentKey(){if(state.registeredEntry)return 'registered|'+state.registeredEntry.descriptor.id+'|'+state.registeredEntry.original.metadata.sourceSha256+'|'+JSON.stringify(L.safeArticle(read().article));return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
+    function documentKey(){if(state.registeredEntry)return 'registered|'+state.registeredEntry.descriptor.id+'|'+state.registeredEntry.original.metadata.sourceSha256+'|'+JSON.stringify(L.safeArticle(read().article))+'|'+JSON.stringify(state.themeColors||{});return state.signature+'|'+JSON.stringify(state.plans[state.selected]);}
     function requireCurrentDocument(){
         if(!state.registeredEntry)fresh();
         if(!state.hasDocument||state.documentKey!==documentKey())throw new Error('현재 원고와 시안으로 새 문서를 먼저 만들어주세요.');
@@ -342,7 +342,7 @@
     if($('modeStudio'))on('modeStudio','click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});
     diagnostic('Events binding complete · '+listeners.length+' listeners');
     fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
-    Object.assign(api,{read,state,prepare,diagnostics,invalidateRegistered:entry=>{invalidateDocument();if(entry)state.registeredEntry=entry;buttons();},createRegistered:(entry,article,mode='production')=>production(mode==='proof'?'원본 검증용 문서 생성':'등록 디자인 제작',async progress=>{invalidateDocument();if(!adapter.createRegistered)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredEntry=entry;const key=documentKey();const report=await adapter.createRegistered(entry,article,progress,mode);if(api.disposed)return;state.documentKey=key;return report;})});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
+    Object.assign(api,{read,state,prepare,diagnostics,invalidateRegistered:entry=>{invalidateDocument();if(entry)state.registeredEntry=entry;buttons();},createRegistered:(entry,article,mode='production',themeColors={})=>production(mode==='proof'?'원본 검증용 문서 생성':'등록 디자인 제작',async progress=>{invalidateDocument();if(!adapter.createRegistered)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredEntry=entry;state.themeColors=JSON.parse(JSON.stringify(themeColors));const key=documentKey();const report=await adapter.createRegistered(entry,{...article,themeColors:state.themeColors},progress,mode);if(api.disposed)return;state.documentKey=key;return report;})});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
     }catch(e){diagnostic('Studio init 실패: '+e.message);api.destroy();const el=$('studioStatus');if(el)el.textContent='Studio init 실패: '+D.redact(e.message);throw e;}
  }
  return {mount,SAMPLE};

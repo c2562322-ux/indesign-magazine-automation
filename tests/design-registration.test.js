@@ -159,3 +159,19 @@ test('direct user action blocks unsupported capability and ignores late default 
  const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['ambiguous style'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});let calls=0;x.studio.createRegistered=async()=>{calls++;};await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.equal(calls,0);
  let resolve;const y=setup({loadDefault:()=>new Promise(r=>resolve=r)});await y.click('디자인 모델 / 등록 파일 불러오기');const before=y.ui.state.entries[0];resolve(R.pack([blocked]));await y.ui.ready;assert.equal(y.ui.state.entries[0],before);
 });
+
+test('COLOR_SLOT registration rejects photos/text/duplicates and validates RGB/CMYK without defaults',()=>{
+ const C=R.Colors,e=registered(),m=copy(e.original),d=copy(e.descriptor),shape=m.elements.find(e=>e.type==='Rectangle');shape.properties.ContentType='Unassigned';shape.properties.FillColor=m.colors.find(c=>c.type==='Color').id;shape.image=[];shape.pageCandidates=d.pageIds.slice();d.preserveElementIds.push(shape.id);d.colorSlots=[{name:'BACKGROUND',confirmed:true,elementIds:[shape.id]}];const entry=R.register(m,d);assert.deepEqual(C.plan(entry),[]);assert.equal(C.plan(entry,{BACKGROUND:{space:'CMYK',values:[0,10,20,30]}}).length,1);assert.throws(()=>C.plan(entry,{OTHER:{space:'RGB',values:[1,2,3]}}),/미등록/);assert.throws(()=>C.plan(entry,{BACKGROUND:{space:'RGB',values:[999,0,0]}}),/컬러/);
+ for(const mode of ['photo','graphic','duplicate','text']){const mm=copy(m),dd=copy(d),ss=mm.elements.find(e=>e.id===shape.id);if(mode==='photo')ss.image=[{}];if(mode==='graphic')ss.properties.ContentType='GraphicType';if(mode==='duplicate')dd.colorSlots[0].elementIds.push(shape.id);if(mode==='text')ss.textFrame={};assert.throws(()=>C.validate(mm,dd),/COLOR_SLOT/);}
+});
+
+test('new source append preserves prior library, transfers only stable role references and never approvals',()=>{
+ const A=require('../tools/register-source-library'),e=registered(),old=R.pack([e]),m=copy(e.original);m.metadata.sourceSha256='b'.repeat(64);const before=JSON.stringify(old),result=A.append(old,m);assert.equal(JSON.stringify(old),before);assert.equal(result.library.designs.length,old.designs.length+m.pages.filter(p=>p.kind==='Spread').length);assert.equal(result.rows[0].revisionOf,e.descriptor.id);assert.deepEqual(result.rows[0].roles,e.descriptor.roles);assert.equal(R.unpack(result.library).entries.at(-1).fidelity.productionReady,false);
+ const changed=copy(m);changed.elements.find(x=>x.id==='title').textFrame.storyRef='bs';const uncertain=A.append(old,changed);assert.equal(uncertain.rows[0].revisionOf,null);assert.ok(uncertain.rows[0].proposedRoles);
+});
+
+test('recommendation color input is optional and passes only confirmed theme values to production',async()=>{
+ const e=registered(),m=copy(e.original),d=copy(e.descriptor),shape=m.elements.find(e=>e.type==='Rectangle');shape.properties={ContentType:'Unassigned',FillColor:m.colors.find(c=>c.type==='Color').id};shape.image=[];shape.pageCandidates=d.pageIds.slice();shape.pageBounds={[d.pageIds[0]]:[0,0,40,40]};d.preserveElementIds.push(shape.id);d.colorSlots=[{name:'ACCENT',confirmed:true,elementIds:[shape.id]}];const entry=R.register(m,d),x=setup({loadDefault:async()=>R.pack([entry])});let theme;
+ x.studio.createRegistered=async(e,a,mode,colors)=>{theme=colors;assert.equal(a,article);return {errors:[],issues:[],fidelity:{phase:'CONTENT_APPLIED',records:[]}};};await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.deepEqual(theme,{});
+ x.nodes().find(n=>n.tagName==='input').value='#1256ab';await x.click('이 디자인으로 제작');assert.deepEqual(theme,{ACCENT:{space:'RGB',values:[18,86,171]}});
+});

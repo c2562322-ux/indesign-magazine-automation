@@ -366,7 +366,7 @@ def extract_package(pkg, digest):
                 label = e.get("Label")
                 if label is None:
                     label = e.findtext("./Properties/Label")
-                roles = {"TITLE": "title", "SUBTITLE": "subtitle", "BODY": "body", "HERO_IMAGE": "image1",
+                roles = {"TITLE": "title", "SUBTITLE": "subtitle", "POINT_TEXT": "subtitle", "BODY": "body", "HERO_IMAGE": "image1",
                          "IMAGE_1": "image1", "IMAGE_2": "image2", "HEADER": "header", "FOOTER": "footer", "PAGE_NUMBER": "pageNumber", "CAPTION": "caption"}
                 role = roles.get((label or "").strip().upper())
                 ep = properties(e)

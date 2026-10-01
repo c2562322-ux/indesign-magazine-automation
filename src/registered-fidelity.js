@@ -71,6 +71,7 @@ function capture(doc,pageIds,progress=()=>{},ID={}){
 }
 function preservation(before,after,edits=[]){
  const a=JSON.parse(JSON.stringify(before)),b=JSON.parse(JSON.stringify(after));
+ for(const edit of edits)if(edit.colorFill&&a.objects[edit.elementId])a.objects[edit.elementId].object.fillColor=edit.colorFill;
  for(const edit of edits)if(edit.hidePlaceholder&&a.objects[edit.elementId])a.objects[edit.elementId].object.visible=false;
  for(const edit of edits)for(const state of [a,b]){
   if(edit.storyId)for(const obj of Object.values(state.objects))if(obj.storyRef===edit.storyId)delete obj.story;

@@ -4,7 +4,7 @@
 // Native IDML import preserves source constructs instead of approximating them
 // with the v1 coordinate renderer. No original file is opened or written.
 const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity'),Trace=require('./registered-dom-trace');
-const Markers=require('./idml-markers'),TextPolicy=require('./registered-text-policy'),Graphics=require('./registered-graphics');
+const Markers=require('./idml-markers'),TextPolicy=require('./registered-text-policy'),Graphics=require('./registered-graphics'),Colors=require('./design-color-slots');
 const KEY='MagazineStudioSourceRef',local=n=>n.tag.replace(/^\{[^}]+\}/,'');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function validatePageStories(entry){
@@ -58,7 +58,7 @@ const fields={...Model.TYPE,...Model.PARA,
  DesiredGlyphScaling:'desiredGlyphScaling',MinimumGlyphScaling:'minimumGlyphScaling',MaximumGlyphScaling:'maximumGlyphScaling'};
 function canonical(key,value){return key==='KerningMethod'&&typeof value==='string'?value.replace(/^\$ID\//,''):value;}
 function readType(range,ID){const t={};for(const key of Object.keys(fields)){const v=range[fields[key]];if(v!==undefined)t[key]=canonical(key,key==='Leading'&&sameEnum(v,ID.Leading.AUTO)?'Auto':v);}t.AppliedFont=range.appliedFont.fontFamily;t.FontStyle=range.fontStyle;t.Justification=Object.keys(Model.ALIGN).find(k=>sameEnum(range.justification,ID.Justification[Model.ALIGN[k]]));return t;}
-function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
+function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
  const records=[],externalAssets=[],frames=new Map(),pages=items(doc.pages);
  const record=(role,id,expected,actual,error=null)=>records.push({role,elementId:id,original:expected,generated:actual,comparison:F.compare(expected,actual,ID),readbackFailure:error?{operation:'registered.fidelity.readback',property:error.registeredFailure&&error.registeredFailure.property||null,message:String(error.message),code:Number.isInteger(error.number)?error.number:null}:null});
  for(const page of pages)for(const f of items(page.allPageItems)){const id=f.extractLabel(KEY);if(id){if(frames.has(id))record('reference',id,{unique:true},{unique:false});frames.set(id,f);}}
@@ -82,6 +82,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
    const expected={bounds:e.pageBounds[e.pageCandidates[0]],page:e.pageCandidates[0]},actual={bounds:relative(f),page:F.ref(f.parentPage)};
    const props=F.objectProperties(entry.original,e);expected.appearance={};actual.appearance={};
    for(const [key,v] of Object.entries(props)){expected.appearance[key]=/Color$/.test(key)?F.colorExpected(entry.original,v):v;const inactive=(key==='FillTint'&&props.FillColor==='Swatch/None'&&F.noPaint(f.fillColor,doc))||(key==='StrokeTint'&&(props.StrokeColor==='Swatch/None'||props.StrokeWeight===0)&&(F.noPaint(f.strokeColor,doc)||f.strokeWeight===0));if(inactive){expected.appearance[key]=F.na('source and generated paint inactive');actual.appearance[key]=F.na('source and generated paint inactive');continue;}const got=f[key[0].toLowerCase()+key.slice(1)];actual.appearance[key]=/Color$/.test(key)?F.colorActual(got,ID,doc):got;}
+   if(colorOverrides[e.id]){expected.appearance.FillColor=colorOverrides[e.id];actual.appearance.FillColor=F.colorActual(f.fillColor,ID,doc);}
    // Fixed placed graphics are retained by the native importer. Unsupported
    // clipping/effects cannot be certified by bounds alone.
    expected.graphicCount=(e.image||[]).length;actual.graphicCount=F.list(f.allGraphics).length;
@@ -154,6 +155,7 @@ function support(entry){
  return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};
 }
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
+ const colorPlan=mode==='proof'?[]:Colors.plan(entry,article?.themeColors||{});
  const plan=packagePlan(entry,{allowUnmapped:mode==='proof'});guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
  let failure;
  const operation=(name,o,p,v,fn)=>Trace.run(progress,name,o,p,v,fn);
@@ -215,6 +217,8 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
    }
   }
+  context.colorOverrides={};
+  for(const change of colorPlan){guard();const frame=baseline.frames.get(change.elementId);if(!frame)throw new Error('COLOR_SLOT 프레임 없음');const swatch=operation('registered.color.create',doc,'colors.add',change.color,()=>doc.colors.add({model:ID.ColorModel.PROCESS,space:ID.ColorSpace[change.color.space],colorValue:change.color.values}));operation('registered.color.apply',frame,'fillColor',change.color,()=>{frame.fillColor=swatch;});const got=F.colorActual(frame.fillColor,ID,doc);if(!Model.compare(change.color,got).equal)throw new Error('COLOR_SLOT readback 불일치');context.colorOverrides[change.elementId]=change.color;context.edits.push({elementId:change.elementId,colorFill:F.value(swatch)});}
   operation('registered.content.recompose',doc,'recompose()',null,()=>doc.recompose());context.phase='CONTENT_APPLIED';progress('registered.content.inspection.ready');return context;
  }catch(e){failure=e;e.registeredDocument=doc;throw e;}finally{try{operation('registered.units.restore',ID.app.scriptPreferences,'measurementUnit',String(old),()=>{ID.app.scriptPreferences.measurementUnit=old;});}catch(restoreError){if(failure){failure.message+=' · restore failed: '+restoreError.message;}else{restoreError.registeredDocument=doc;throw restoreError;}}}
 }
@@ -225,7 +229,7 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  if(context.snapshot){
   const current=F.capture(context.doc,context.entry.descriptor.pageIds,undefined,ID),kept=F.preservation(context.snapshot,current,context.edits);
   if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체 · 페이지 · Story · 레이어 · 쌓임 순서 보존 불일치',differences:kept.differences,failureOperation:'registered.preservation.compare',detail:JSON.stringify(kept.differences)});
-  const live=diagnostics(context.entry,context.doc,ID,{ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
+  const live=diagnostics(context.entry,context.doc,ID,{colorOverrides:context.colorOverrides||{},ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
   for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,elementId:r.elementId,differences:r.comparison.differences,failureOperation:r.readbackFailure&&r.readbackFailure.operation,property:r.readbackFailure&&r.readbackFailure.property,adobeError:r.readbackFailure&&r.readbackFailure.message,adobeErrorCode:r.readbackFailure&&r.readbackFailure.code,detail:JSON.stringify(r.comparison.differences)});
  }
  for(const c of context.contentChecks){const f=c.frame;let comparison=Model.compare(c.bounds,relative(f));if(c.typography){const got=readType(c.languagePlan?f.parentStory.characters.item(0):f.parentStory.texts.item(0),ID);comparison=F.compare({bounds:c.bounds,typography:c.typography},{bounds:relative(f),typography:got},ID);}
