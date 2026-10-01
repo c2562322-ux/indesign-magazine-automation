@@ -67,10 +67,20 @@ function capture(doc,pageIds,progress=()=>{},ID={}){
  const candidates=pageIds?pages.flatMap(p=>list(get(p,'allPageItems'))).concat(masters):list(get(doc,'allPageItems')).concat(masters);
  const objects={},seen=new Set();for(const f of candidates){if(seen.has(f))continue;seen.add(f);const id=ref(f);if(id){if(objects[id])throw new Error('중복 원본 객체 식별: '+id);objects[id]=Trace.run(progress,'registered.snapshot.object',f,'snapshot',undefined,()=>frameSnapshot(f,progress,doc,ID),{before:false});}}
  for(const [id,obj] of Object.entries(objects))if(obj.kind==='Group')for(const child of obj.children)if(!objects[child]||objects[child].group!==id)throw new Error('Group child snapshot/reference missing: '+id+' / '+child);
- return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(ref)})),objects};
+ // allPageItems includes a newly placed Image inside its existing frame.
+ // Record the actual ownership relation, never equate arbitrary nulls with absence.
+ const orderRef=item=>{const id=ref(item);if(id)return id;const parent=get(item,'parent'),owner=ref(parent);
+  if(owner&&Array.isArray(objects[owner]?.graphics)&&list(get(parent,'allGraphics')).some(g=>g===item||(get(item,'id')!=null&&get(g,'id')===get(item,'id'))))return {placedGraphicOf:owner};
+  return null;
+ };
+ return {pages:pages.map(p=>({id:ref(p),parent:ref(get(p,'appliedMaster')),order:list(get(p,'allPageItems')).map(orderRef)})),objects};
 }
 function preservation(before,after,edits=[]){
  const a=JSON.parse(JSON.stringify(before)),b=JSON.parse(JSON.stringify(after));
+ // Only authorized IMAGE content replacement may add/remove its graphic child.
+ // Frame order, unidentified objects and graphics in KEEP frames stay strict.
+ const imageFrames=new Set(edits.filter(e=>e.image).map(e=>e.elementId));
+ for(const state of [a,b])for(const page of state.pages||[])page.order=page.order.filter(id=>!(id&&typeof id==='object'&&imageFrames.has(id.placedGraphicOf)));
  for(const edit of edits)if(edit.colorFill&&a.objects[edit.elementId])a.objects[edit.elementId].object.fillColor=edit.colorFill;
  for(const edit of edits)if(edit.hidePlaceholder&&a.objects[edit.elementId])a.objects[edit.elementId].object.visible=false;
  for(const edit of edits)for(const state of [a,b]){

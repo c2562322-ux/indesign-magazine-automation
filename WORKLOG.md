@@ -1339,3 +1339,15 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+# u3d5 성공 후 검사 3건 — 2026-10-02
+
+- 사용자 실기: original/u3d5 마커 v2 DOCX 제목/부제/본문/내부사진1 실제 교체 성공. parser/binding/place 경로 미변경.
+- 열린 실제 InDesign 검증본/제작본 읽기 확인: TITLE u7d84 / Story u7d87 원본19자 overset=false → DOCX22자 true. SUBTITLE u7d9e / Story u7da1 원본15자 false → DOCX75자 true. 본문878자 false. geometry/inset/font/size/leading/tracking/composer 동일. 각각 24pt/16leading SemiBold, 16pt/16leading Medium. 두 넘침은 CONTENT_OVERFLOW로 유지, 자동축소/프레임확대 없음.
+- REFERENCE_MISMATCH pages.0.order.5: 실제 allPageItems에 새 Image(source label 없음)가 IMAGE u7d63 자식으로 추가됨. 원본 배열 항목 없음 vs 생성null이며 단순 undefined/null 동등화 대상이 아님.
+- registered-fidelity.capture가 미라벨 객체의 parent source와 실제 parent.allGraphics 소속을 확인하여 placedGraphicOf로 기록. preservation은 edit.image로 승인된 frame의 그래픽 자식만 양쪽 순서 비교에서 분리. 프레임 순서/geometry/KEEP/무관한null은 계속 엄격 비교. 실제 사진의 링크/개수/crop/transform 후검사 유지. 페이지 ID/문구 예외 없음.
+- tests/registered-production.test.js 82/82 통과. 회귀: 허용된 이미지 자식 추가 vs 무관한null/KEEP 자식/프레임순서/geometry 손상 구분. 실제 수정된 UXP 후검사 재실기 필요. 추천/Library/DOCX/parser/binding/image production 코드 불변.
+- NEXT: Reload → 동일 DOCX → original u3d5 마커v2 선택(개발자 드롭다운) → 선택 페이지 검증 준비 → 검증용 문서 → 원본과 비교 완료 → 선택한 등록 디자인으로 제작. order.5 오류는 없어져야 함. 같은 내용의 TITLE/SUBTITLE overflow 두 건은 정상적으로 남으며 PDF 성공을 주장하지 않음.
+
+---
+

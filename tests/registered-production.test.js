@@ -562,3 +562,15 @@ test('estimated overflow with one DOCX image reaches native replacement but actu
  Object.defineProperty(c.contentChecks.find(c=>c.role==='body').frame.parentStory,'overflows',{get:()=>true});assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_OVERFLOW'));assert.equal(c.autoFixAllowed,false);
  const source=host(entry,{originalOverflow:true}),failed=await N.create(entry,a,source.env);assert.equal(failed.phase,'FIDELITY_FAILED');assert.equal(failed.autoFixAllowed,false);assert.ok(!failed.contentChecks?.length);
 });
+
+
+test('placed image child in allPageItems is not a frame z-order change; unrelated nulls and KEEP graphics remain strict',()=>{
+ const F=require('../src/registered-fidelity'),raw=JSON.parse(JSON.stringify(fixture())),shape=raw.original.elements.find(e=>e.type==='Rectangle');shape.pageCandidates=['p1'];shape.pageBounds={p1:[10,450,150,590]};const e=R.register(raw.original,raw.descriptor),h=host(e),frame=h.frames.find(f=>!f.parentStory);assert.ok(frame);const page=frame.parentPage,before=F.capture(h.doc,e.descriptor.pageIds);
+ const image={id:1001,parent:frame,geometricBounds:frame.geometricBounds,itemLink:{filePath:'C:/docx/internal.png'}};frame.allGraphics=[image];page.allPageItems.push(image);
+ const after=F.capture(h.doc,e.descriptor.pageIds);assert.deepEqual(after.pages[0].order.at(-1),{placedGraphicOf:frame.extractLabel()});const edits=[{elementId:frame.extractLabel(),image:{path:'C:/docx/internal.png'}}];
+ assert.equal(F.preservation(before,after).equal,false);assert.equal(F.preservation(before,after,edits).equal,true);
+ const extra=JSON.parse(JSON.stringify(after));extra.pages[0].order.push(null);assert.equal(F.preservation(before,extra,edits).equal,false);
+ const reordered=JSON.parse(JSON.stringify(after));reordered.pages[0].order.reverse();assert.equal(F.preservation(before,reordered,edits).equal,false);
+ const wrongOwner=JSON.parse(JSON.stringify(after));wrongOwner.pages[0].order.at(-1).placedGraphicOf='KEEP';assert.equal(F.preservation(before,wrongOwner,edits).equal,false);
+ const changed=JSON.parse(JSON.stringify(after));changed.objects[frame.extractLabel()].bounds[0]+=1;assert.equal(F.preservation(before,changed,edits).equal,false);
+});
