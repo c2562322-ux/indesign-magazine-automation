@@ -112,3 +112,8 @@ RGB 강조색은 배치 시안의 출발점입니다. 색상 프로파일·오�
 ## 디자인 수용량과 후보 평가 (Phase B·C 코어)
 
 [DESIGN_MATCHING](docs/DESIGN_MATCHING.md)에 원고/이미지 프로필, 역할 확인, 수용량 추정, Hard/Soft 평가 및 CLI 사용법을 기록했습니다. AI 호출·자동 최종 선택·새로운 제작기는 없습니다. 기존·신규 실제 IDML을 분석했으며, 원본의 역할 미확정 항목은 추천 대신 확인 필요로 반환합니다. 기존 패널에는 아직 연결하지 않았습니다.
+
+
+## 특수 마커 모델 갱신 (2026-10-01)
+
+PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기존 모델은 원본에서 재추출해야 하며 과거 Fidelity 승인을 승계하지 않습니다. 기존 Library/역할/검증 기록은 보존됩니다. 새 Library 및 Parent 자동 번호 확인 절차: [특수 마커 안내](docs/SPECIAL_MARKERS.md). Node282/Python18 통과, 새 모델 Adobe 재검증 필요.

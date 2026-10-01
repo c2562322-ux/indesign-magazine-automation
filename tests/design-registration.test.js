@@ -142,3 +142,9 @@ test('source revision appends without overwriting original library or inheriting
  const bad=copy(fresh);delete bad.elements.find(e=>e.id==='body').properties.Label;assert.throws(()=>revision(library,bad,entry.descriptor.id,'p1'),/Missing role/);
  const duplicate=copy(fresh);duplicate.elements.find(e=>e.id==='body').properties.Label=duplicate.elements.find(e=>e.id==='title').properties.Label;assert.throws(()=>revision(library,duplicate,entry.descriptor.id,'p1'),/Duplicate/);
 });
+
+test('marker-aware library migration requires exact source hashes and preserves roles with fresh IDs',()=>{
+ const {upgrade}=require('../tools/reextract-library'),entry=registered(),library=R.pack([entry]),before=JSON.stringify(library);
+ const result=upgrade(library,[entry.original]);assert.equal(JSON.stringify(library),before);assert.deepEqual(result.designs[0].descriptor.roles,entry.descriptor.roles);assert.notEqual(result.designs[0].descriptor.id,entry.descriptor.id);assert.equal(R.unpack(result).entries[0].fidelity.productionReady,false);
+ assert.throws(()=>upgrade(library,[]),/Missing exact/);const bad=copy(entry.original);delete bad.metadata.markerPreservationVersion;assert.throws(()=>upgrade(library,[bad]),/REEXTRACTION/);
+});

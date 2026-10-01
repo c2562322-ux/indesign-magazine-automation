@@ -203,7 +203,7 @@ test('original overflow and replacement overflow have separate causes, neither p
  const target=host(e,{contentOverflow:true}),made=await N.create(e,{title:'새 제목',body:'새 본문',images:[]},target.env);assert.ok(N.check(made,target.ID).some(i=>i.cause==='CONTENT_OVERFLOW'));assert.equal(made.autoFixAllowed,false);
 });
 test('package keeps a single container and escapes XML attribute whitespace',()=>{
- const e=JSON.parse(JSON.stringify(fixture()));e.original.sourceXml['META-INF/container.xml']={tag:'container',attributes:{},children:[]};
+ const e=JSON.parse(JSON.stringify(fixture()));e.original.sourceXml['META-INF/container.xml']={tag:'container',attributes:{},children:[]};e.original.metadata.sourceProcessingInstructions['META-INF/container.xml']=[];
  const bytes=N.packagePlan(e).bytes;assert.equal(Z.utf8BytesToString(Z.readZipEntry(bytes,'META-INF/container.xml')).includes('rootfile'),true);
  const xml=P.serialize({tag:'x',attributes:{label:'a\tb\nc\rd'},children:[]});assert.match(xml,/&#9;/);assert.match(xml,/&#10;/);assert.match(xml,/&#13;/);
 });
@@ -448,4 +448,31 @@ test('mixed Group paint delegates to strict child snapshots and retains containe
  for(const [key,v] of [['fillTint',50],['overprintFill',true],['strokeWeight',2],['strokeTint',30],['overprintStroke',true]]){const old=a[key];a[key]=v;assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false,key);a[key]=old;}
  group.transparencySettings.blendingSettings.opacity=40;assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);group.transparencySettings.blendingSettings.opacity=100;
  group.pageItems=[b,a];assert.equal(F.preservation(before,F.capture(doc,['p'])).equal,false);group.pageItems=[a,b];page.allPageItems=[group,a];assert.throws(()=>F.capture(doc,['p']),/child snapshot/);page.allPageItems=[group,a,b];Object.defineProperty(a,'fillColor',{get(){throw new Error('Required child read failed');}});assert.throws(()=>F.capture(doc,['p']),/Required child read failed/);
+});
+
+test('original-byte PI evidence survives extraction, registration and package recreation; loss is blocked',()=>{
+ const Markers=require('../src/idml-markers'),raw=spawnSync(fs.existsSync(py)?py:'python3',['tests/test_design_extraction.py','--marker-model'],{encoding:'utf8'});assert.equal(raw.status,0,raw.stderr);
+ const model=JSON.parse(raw.stdout),d=R.draft(model,'p1'),entry=R.register(model,d);
+ Markers.validateSource(model);const packed=R.pack([entry]),restored=R.unpack(packed).entries[0],plan=N.packagePlan(restored,{allowUnmapped:true});
+ assert.equal(plan.validation.markerValidation.sourceVerified,true);
+ const story=Object.keys(model.sourceXml).find(n=>n.startsWith('Stories/')),xml=Z.utf8BytesToString(Z.readZipEntry(plan.bytes,story));assert.match(xml,/before<\?ACE 18\?>middle<\?future preserve\?>after/);
+ const mutate=JSON.parse(JSON.stringify(model));function lose(n){if(n.children)n.children=n.children.filter(c=>c.tag!=='#pi');for(const c of n.children||[])lose(c);}lose(mutate.sourceXml[story]);assert.throws(()=>Markers.validateSource(mutate),/SOURCE_MARKER_LOSS/);
+ const projection=JSON.parse(JSON.stringify(model));delete projection.stories[0].paragraphs[0].runs[0].tokens[0].contentTree;assert.throws(()=>Markers.validateSource(projection),/PROJECTION_LOSS/);
+ const legacy=JSON.parse(JSON.stringify(model));delete legacy.metadata.markerPreservationVersion;assert.throws(()=>Markers.validateSource(legacy),/REEXTRACTION_REQUIRED/);
+ const entries=Object.entries(model.sourceXml).map(([n,t])=>[n,P.serialize(t)]);entries.find(([n])=>n===story)[1]=xml.replace('<?ACE 18?>','');assert.throws(()=>Markers.validateSerialized(model.sourceXml,entries),/GENERATED_MARKER_LOSS/);
+});
+test('PI serialization retains generic instructions and rejects terminator injection',()=>{
+ const tree={tag:'Content',text:'a',children:[{tag:'#pi',target:'future',data:'x < y & z',tail:'b'},{tag:'#comment',text:'note',tail:'c'},{tag:'#pi',target:'ACE',data:'18',tail:'d'}],beforeRoot:[{tag:'#pi',target:'before',data:'v'}],afterRoot:[{tag:'#pi',target:'after',data:'v'}]};
+ const xml=P.serialize(tree);assert.ok(xml.includes('<?before v?><Content>a<?future x < y & z?>b<!--note-->c<?ACE 18?>d</Content><?after v?>'));
+ assert.throws(()=>P.serialize({tag:'#pi',target:'ACE',data:'18?><evil/>'}),/Invalid/);
+});
+test('Host Current Page Number audit requires native marker identity, not a literal page number',()=>{
+ const M=require('../src/idml-markers'),entry={descriptor:{pageIds:['p']},original:{pages:[{id:'master',kind:'MasterSpread'}],elements:[{id:'frame',pageCandidates:['master'],textFrame:{storyRef:'s'}}],stories:[{id:'s',paragraphs:[{runs:[{tokens:[{type:'Content',contentTree:{tag:'Content',text:'',children:[{tag:'#pi',target:'ACE',data:'18',tail:''}]}}]}]}]}]}},ID={SpecialCharacters:{AUTO_PAGE_NUMBER:123}};
+ let contents=123;const f={extractLabel:()=> 'frame',parentStory:{characters:{length:1,item:()=>({contents})}}},doc={allPageItems:[],masterSpreads:[{allPageItems:[f]}]};const check=()=>{let result;M.checkHost(entry,doc,ID,(_role,_id,a,b)=>{result=Mdl.compare(a,b);});return result;};const Mdl=require('../src/design-model');
+ assert.equal(check().equal,true);contents='4';assert.equal(check().equal,false);contents='';assert.equal(check().equal,false);
+ entry.original.stories[0].paragraphs[0].runs[0].tokens[0].contentTree.children[0].data='999';assert.equal(check().equal,false);
+});
+test('explicit page number restoration only fills an empty single-style Story and retains style',()=>{
+ const M=require('../src/idml-markers'),tree={tag:'Story',attributes:{Self:'s'},children:[{tag:'ParagraphStyleRange',attributes:{AppliedParagraphStyle:'p'},children:[{tag:'CharacterStyleRange',attributes:{PointSize:10},children:[]}]}]},trees={'Stories/s.xml':tree},request=[{kind:'RESTORE_CURRENT_PAGE_NUMBER',storyId:'s',donorSourceSha256:'source',donorStoryId:'old'}];
+ M.applyRestorations(trees,request);assert.equal(tree.children[0].children[0].attributes.PointSize,10);assert.equal(M.inventory(tree)[0].data,'18');assert.throws(()=>M.applyRestorations(trees,request),/EMPTY/);
 });

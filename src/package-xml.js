@@ -9,8 +9,11 @@ function zip(entries){const parts=[],central=[];let offset=0,total=0;const seen=
 }
 const escape=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\r/g,'&#13;');
 function serialize(tree){const uris=new Map();function name(n){const m=n.match(/^\{([^}]+)\}(.*)$/);if(!m)return n;if(!uris.has(m[1]))uris.set(m[1],m[1]==='http://www.w3.org/XML/1998/namespace'?'xml':m[1]==='http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging'?'idPkg':'ns'+uris.size);return uris.get(m[1])+':'+m[2];}
- function collect(n){name(n.tag);Object.keys(n.attributes||{}).forEach(name);(n.children||[]).forEach(collect);}collect(tree);
- function node(n,isRoot){const attrs=Object.entries(n.attributes||{}).map(([k,v])=>' '+name(k)+'="'+escape(v).replace(/\n/g,'&#10;').replace(/\t/g,'&#9;')+'"').join(''),ns=isRoot?[...uris].filter(([,p])=>p!=='xml').map(([u,p])=>' xmlns:'+p+'="'+escape(u)+'"').join(''):'';return '<'+name(n.tag)+attrs+ns+'>'+escape(n.text||'')+(n.children||[]).map(c=>node(c,false)).join('')+'</'+name(n.tag)+'>'+escape(n.tail||'');}return '<?xml version="1.0" encoding="UTF-8"?>'+node(tree,true);
+ function collect(n){if(n.tag==='#pi'||n.tag==='#comment')return;name(n.tag);Object.keys(n.attributes||{}).forEach(name);(n.children||[]).forEach(collect);}collect(tree);
+ function node(n,isRoot){
+ if(n.tag==='#pi'){if(!/^[A-Za-z_][\w.:-]*$/.test(n.target)||/^xml$/i.test(n.target)||/\?>/.test(n.data||''))throw new Error('Invalid processing instruction');return '<?'+n.target+(n.data?' '+n.data:'')+'?>'+escape(n.tail||'');}
+ if(n.tag==='#comment'){if(/--/.test(n.text||'')||/-$/.test(n.text||''))throw new Error('Invalid XML comment');return '<!--'+(n.text||'')+'-->'+escape(n.tail||'');}
+ const attrs=Object.entries(n.attributes||{}).map(([k,v])=>' '+name(k)+'="'+escape(v).replace(/\n/g,'&#10;').replace(/\t/g,'&#9;')+'"').join(''),ns=isRoot?[...uris].filter(([,p])=>p!=='xml').map(([u,p])=>' xmlns:'+p+'="'+escape(u)+'"').join(''):'';return '<'+name(n.tag)+attrs+ns+'>'+escape(n.text||'')+(n.children||[]).map(c=>node(c,false)).join('')+'</'+name(n.tag)+'>'+escape(n.tail||'');}return '<?xml version="1.0" encoding="UTF-8"?>'+(tree.beforeRoot||[]).map(n=>node(n,false)).join('')+node(tree,true)+(tree.afterRoot||[]).map(n=>node(n,false)).join('');
 }
 return {utf8,crc,zip,serialize,escape};
 });

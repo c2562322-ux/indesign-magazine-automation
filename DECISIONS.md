@@ -580,3 +580,8 @@ v2 source를 수정하지 않고 Library sidecar에 hash/page scope/확정 role/
 ## D038 — 등록 디자인은 원본 Fidelity 승인 전 분석 후보로만 사용
 
 원본 모델과 등록 sidecar/기사 overlay를 분리한다. 역할 추론은 근거/강도를 표시하고 명시 라벨 외 콘텐츠는 사용자 확인한다. 미지정 유지 일괄 확인은 명시 동작이다. API 없는 추천 UI를 기존 무료/AI와 분리하고 파일의 productionReady 주장을 신뢰하지 않는다. 기존 단일 프레임 proof를 선택 실행하되 전체 지면 제작 승인/기존 latest로 연결하지 않는다. 전체 renderer와 mixed-run 콘텐츠 교체가 미구현이므로 우회 생성하지 않는다. 상세 docs/DESIGN_REGISTRATION.md.
+
+
+## D039 — 특수 마커 증거와 명시적 Parent 복원 분리 (2026-10-01)
+
+PI는 일반 XML 노드로 보존하고 원본 ZIP의 독립 파서 증거와 비교한다. 구형 손실 모델 간 비교로 거짓 통과시키지 않는다. Host는 Current Page Number의 enum identity를 검사하고 미지 Story 마커를 미지원으로 차단한다. 원본에 없는 마커 추가는 자동 추론하지 않는다. 사용자가 승인한 최신 수정본 복원만 donor source hash/Story 및 고유 source label 관계를 가진 sidecar로 표현한다. 기존 Parent의 빈 단일 스타일 Story에만 적용하며 모델 원문/원본 파일은 불변이다. 재추출은 정확한 source hash와 신규 design ID를 요구하고 과거 검증 승인을 이전하지 않는다.

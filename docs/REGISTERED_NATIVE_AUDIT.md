@@ -349,3 +349,8 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 다음은 [PC Smoke Test](REGISTERED_PC_SMOKE.md) 실행이다. app.open, native label, Parent/페이지 축소, 실제 폰트 조판, style override setter, fitting/crop, 실제 INDD/PDF를 **Adobe UXP에서 아직 실행하지 않았다**. 해당 단계가 실패하면 재현 증거를 받아 수정하며 Auto Fix로 숨기지 않는다.
 
 참고한 Adobe DOM 계약: [Story labels](https://developer.adobe.com/indesign/uxp/dom/api/s/story/), [FrameFittingOption](https://developer.adobe.com/indesign/uxp/omv/f/FrameFittingOption/). 문서 확인은 실기 증거가 아니다.
+
+
+## 특수 마커 모델 갱신 (2026-10-01)
+
+PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기존 모델은 원본에서 재추출해야 하며 과거 Fidelity 승인을 승계하지 않습니다. 기존 Library/역할/검증 기록은 보존됩니다. 새 Library 및 Parent 자동 번호 확인 절차: [특수 마커 안내](SPECIAL_MARKERS.md). Node282/Python18 통과, 새 모델 Adobe 재검증 필요.

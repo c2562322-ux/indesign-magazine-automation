@@ -175,3 +175,8 @@
 ## v2 등록 디자인 검증판
 
 기존 양식 Script Label 계약은 유지한다. 새 v2 등록에서는 원본 라벨을 쓰지 않고 별도 등록 JSON의 roles/preserveElementIds에 사용자가 확인한 역할을 저장한다. 제목/부제/본문/사진1·2/캡션/헤더/푸터/페이지번호 및 원본유지를 지원한다. 등록만으로 제작 가능해지지 않으며 상세 계약은 docs/DESIGN_REGISTRATION.md를 따른다.
+
+
+## 특수 마커 모델 갱신 (2026-10-01)
+
+PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기존 모델은 원본에서 재추출해야 하며 과거 Fidelity 승인을 승계하지 않습니다. 기존 Library/역할/검증 기록은 보존됩니다. 새 Library 및 Parent 자동 번호 확인 절차: [특수 마커 안내](SPECIAL_MARKERS.md). Node282/Python18 통과, 새 모델 Adobe 재검증 필요.

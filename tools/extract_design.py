@@ -11,6 +11,7 @@ import re
 from pathlib import Path, PurePosixPath
 import zipfile
 import xml.etree.ElementTree as ET
+from xml.parsers import expat
 
 SCHEMA = "magazine-studio-design/v2"
 ITEMS = {"TextFrame", "Rectangle", "Oval", "Polygon", "GraphicLine", "Group"}
@@ -18,12 +19,69 @@ IDENTITY = [1, 0, 0, 1, 0, 0]
 
 
 def tag(e):
+    if e.tag is ET.ProcessingInstruction:
+        return "#pi"
+    if e.tag is ET.Comment:
+        return "#comment"
     return e.tag.split("}")[-1]
 
 
 def raw(e):
+    if e.tag is ET.ProcessingInstruction:
+        target, _, data = (e.text or "").partition(" ")
+        return {"tag": "#pi", "target": target, "data": data, "tail": e.tail or ""}
+    if e.tag is ET.Comment:
+        return {"tag": "#comment", "text": e.text or "", "tail": e.tail or ""}
     return {"tag": e.tag, "attributes": dict(e.attrib), "text": e.text or "",
             "tail": e.tail or "", "children": [raw(c) for c in e]}
+
+
+def pi_evidence(data):
+    """Independent event parse of original package bytes, not the model tree."""
+    parser = expat.ParserCreate(namespace_separator="}")
+    stack, records, before, after = [], [], [], []
+    root_seen = False
+    def start(name, attrs):
+        nonlocal root_seen
+        name = name.split("}")[-1]
+        index = stack[-1]["counts"].get(name, 0) if stack else 0
+        if stack:
+            finish_tail()
+            stack[-1]["counts"][name] = index + 1
+        path = (stack[-1]["path"] if stack else "") + "/" + name + "[" + str(index) + "]"
+        stack.append({"path": path, "counts": {}, "text": ""})
+        root_seen = True
+    def end(name):
+        finish_tail()
+        stack.pop()
+        if stack:
+            stack[-1]["text"] = ""
+    def text(value):
+        if stack:
+            stack[-1]["text"] += value
+    def finish_tail():
+        if stack and "pending_pi" in stack[-1]:
+            records[stack[-1].pop("pending_pi")]["after"] = stack[-1]["text"]
+    def pi(target, value):
+        finish_tail()
+        records.append({"path": stack[-1]["path"] if stack else ("/after" if root_seen else "/before"),
+                        "target": target, "data": value, "before": stack[-1]["text"] if stack else "", "after": ""})
+        if stack:
+            stack[-1]["text"] = ""
+            stack[-1]["pending_pi"] = len(records) - 1
+        else:
+            (after if root_seen else before).append({"tag": "#pi", "target": target, "data": value})
+    def comment(value):
+        if stack:
+            finish_tail()
+            stack[-1]["text"] = ""
+        else:
+            (after if root_seen else before).append({"tag": "#comment", "text": value})
+    parser.StartElementHandler, parser.EndElementHandler = start, end
+    parser.CharacterDataHandler, parser.ProcessingInstructionHandler = text, pi
+    parser.CommentHandler = comment
+    parser.Parse(data, True)
+    return records, before, after
 
 
 def scalar(s):
@@ -127,6 +185,7 @@ class Package:
                 self.zip.close()
                 raise ValueError("IDML member too large")
         self.cache = {}
+        self.marker_evidence = {}
 
     def read(self, name):
         if name not in self.cache:
@@ -135,7 +194,8 @@ class Package:
             check = data.replace(b"\x00", b"").upper()
             if b"<!DOCTYPE" in check or b"<!ENTITY" in check:
                 raise ValueError("DTD/entities are not allowed")
-            self.cache[name] = ET.fromstring(data)
+            self.marker_evidence[name] = pi_evidence(data)
+            self.cache[name] = ET.fromstring(data, parser=ET.XMLParser(target=ET.TreeBuilder(insert_pis=True, insert_comments=True)))
         return self.cache[name]
 
 
@@ -151,13 +211,13 @@ def extract_package(pkg, digest):
     doc = pkg.read("designmap.xml")
     model = {"schema": SCHEMA, "schemaVersion": 2, "unit": "pt",
              "metadata": {"sourceFormat": "IDML", "sourceSha256": digest,
-                          "domVersion": doc.get("DOMVersion"), "extractorVersion": 1,
+                          "domVersion": doc.get("DOMVersion"), "extractorVersion": 2,
                           "contentPrivacy": "Contains original text and link metadata; do not publish automatically"},
              "pages": [], "spreads": [], "elements": [], "stories": [], "threads": [],
              "styles": {"paragraph": [], "character": [], "object": []},
              "fonts": [], "colors": [], "layers": [], "issues": [], "sourceXml": {}}
 
-    # ElementTree drops processing instructions; retain the document marker separately.
+    # Retain the legacy aid field as well as the PI-preserving XML envelope.
     marker = re.search(r"<\?aid\s[^?]*\?>", pkg.zip.read("designmap.xml").decode("utf-8-sig"))
     if marker:
         model["metadata"]["aidProcessingInstruction"] = marker.group(0)
@@ -175,6 +235,10 @@ def extract_package(pkg, digest):
             if name != "designmap.xml" and name not in [r[1] for r in refs]:
                 issue("RAW_ONLY_RESOURCE", name, "Preserved XML; not linked by designmap")
     model["sourceXml"] = {name: raw(root) for name, root in pkg.cache.items()}
+    model["metadata"]["markerPreservationVersion"] = 1
+    model["metadata"]["sourceProcessingInstructions"] = {name: evidence[0] for name, evidence in pkg.marker_evidence.items()}
+    for name, tree in model["sourceXml"].items():
+        tree["beforeRoot"], tree["afterRoot"] = pkg.marker_evidence[name][1:]
     model["metadata"]["packageInventory"] = [{"name": i.filename, "bytes": i.file_size,
         "preservation": "XML tree" if i.filename in pkg.cache else "source package only"} for i in pkg.zip.infolist()]
     style_map = {}
@@ -244,6 +308,9 @@ def extract_package(pkg, digest):
                 resolved = {**effective, **resolve(cp.get("AppliedCharacterStyle")), **cp}
                 tokens = [{"type": tag(t), "text": t.text or "", "properties": properties(t)}
                           for t in c if tag(t) != "Properties"]
+                for token, element in zip(tokens, (t for t in c if tag(t) != "Properties")):
+                    if len(element) or tag(element) in ("#pi", "#comment"):
+                        token["contentTree"] = raw(element)
                 for t in tokens:
                     if t["type"] not in ("Content", "Br"):
                         issue("COMPLEX_STORY_TOKEN", story["id"], t["type"]+" retained in sourceXml")

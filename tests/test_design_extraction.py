@@ -33,6 +33,24 @@ class Extraction(unittest.TestCase):
         fixture(self.path, lambda name, text: text.replace("<Document", marker + "<Document", 1) if name == "designmap.xml" else text)
         self.assertEqual(extract(self.path)["metadata"]["aidProcessingInstruction"], marker)
 
+    def test_processing_instructions_preserve_content_order_and_independent_source_evidence(self):
+        fixture(self.path, lambda name, text: text.replace('<Content>', '<Content>before<?ACE 18?>between<?future a &lt; b?>after', 1) if name.startswith('Stories/') else text)
+        model = extract(self.path)
+        self.assertEqual(model['metadata']['extractorVersion'], 2)
+        evidence = [p for values in model['metadata']['sourceProcessingInstructions'].values() for p in values]
+        self.assertTrue(any(p['target'] == 'ACE' and p['before'] == 'before' for p in evidence))
+        self.assertTrue(any(p['target'] == 'future' and p['before'] == 'between' for p in evidence))
+        token = model['stories'][0]['paragraphs'][0]['runs'][0]['tokens'][0]
+        self.assertEqual(token['contentTree']['children'][0]['tag'], '#pi')
+        self.assertEqual(token['contentTree']['children'][0]['tail'], 'between')
+        self.assertTrue(token['contentTree']['children'][1]['tail'].startswith('after'))
+
+    def test_generic_prolog_epilog_and_comments_are_preserved(self):
+        fixture(self.path, lambda name, text: text.replace('<Document', '<?before custom?><Document', 1) + '<?after custom?>' if name == 'designmap.xml' else text)
+        m = extract(self.path)
+        self.assertEqual(m['sourceXml']['designmap.xml']['beforeRoot'][0]['target'], 'before')
+        self.assertEqual(m['sourceXml']['designmap.xml']['afterRoot'][0]['target'], 'after')
+
     def test_geometry_in_points_and_page_coordinate_system(self):
         m = self.model
         self.assertEqual(m["unit"], "pt")
@@ -141,10 +159,10 @@ class Extraction(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == "--model":
+    if len(sys.argv) == 2 and sys.argv[1] in ("--model", "--marker-model"):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)/"fixture.idml"
-            fixture(p)
+            fixture(p, (lambda name, text: text.replace('<Content>', '<Content>before<?ACE 18?>middle<?future preserve?>after', 1) if name.startswith('Stories/') else text) if sys.argv[1] == '--marker-model' else None)
             print(json.dumps(extract(p), ensure_ascii=True))
     else:
         unittest.main()

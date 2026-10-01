@@ -4,6 +4,7 @@
 // Native IDML import preserves source constructs instead of approximating them
 // with the v1 coordinate renderer. No original file is opened or written.
 const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity'),Trace=require('./registered-dom-trace');
+const Markers=require('./idml-markers');
 const KEY='MagazineStudioSourceRef',local=n=>n.tag.replace(/^\{[^}]+\}/,'');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function validatePageStories(entry){
@@ -24,13 +25,16 @@ function validatePageStories(entry){
 function packagePlan(entry,{allowUnmapped=false}={}){
  validatePageStories(entry);
  const m=entry.original;if(!m.sourceXml||!m.sourceXml['designmap.xml'])throw new Error('원본 IDML XML이 없는 모델입니다. 다시 추출해주세요.');
+ Markers.validateSource(m);
  const unsupported=(m.issues||[]).filter(i=>['MISSING_STYLE','STYLE_CYCLE','DUPLICATE_STYLE','UNMODELED_SPREAD_OBJECT'].includes(i.code));
  if(unsupported.length)throw new Error('UNSUPPORTED 원본 참조/객체: '+unsupported.map(i=>i.code+' '+i.ref).join(', '));
  if(!allowUnmapped&&!entry.profile.readyForMatching)throw new Error('제목/본문/사진 역할을 먼저 확인해주세요.');
  const trees=clone(m.sourceXml),normal=new Set(m.pages.filter(p=>p.kind==='Spread').map(p=>p.id));
+ for(const r of entry.descriptor.markerRestorations||[]){const f=m.elements.find(e=>e.id===r.frameId);if(!f||f.textFrame?.storyRef!==r.storyId||f.pageCandidates.length!==1||!m.pages.some(p=>p.id===f.pageCandidates[0]&&p.kind==='MasterSpread'))throw new Error('Marker restoration requires an existing Parent frame');}
+ Markers.applyRestorations(trees,entry.descriptor.markerRestorations);
  const tagged=new Set([...m.spreads.map(p=>p.id),...m.pages.map(p=>p.id),...m.stories.map(s=>s.id),...m.elements.map(e=>e.id)]);
  function tag(n){if(tagged.has(n.attributes&&n.attributes.Self)){
-  let p=n.children.find(c=>local(c)==='Properties');if(!p){p={tag:'Properties',attributes:{},text:'',tail:'',children:[]};n.children.unshift(p);}let label=p.children.find(c=>local(c)==='Label');if(!label){label={tag:'Label',attributes:{},text:'',tail:'',children:[]};p.children.push(label);}label.children=label.children.filter(c=>c.attributes.Key!==KEY);label.children.push({tag:'KeyValuePair',attributes:{Key:KEY,Value:n.attributes.Self},text:'',tail:'',children:[]});}
+  let p=n.children.find(c=>local(c)==='Properties');if(!p){p={tag:'Properties',attributes:{},text:'',tail:'',children:[]};n.children.unshift(p);}let label=p.children.find(c=>local(c)==='Label');if(!label){label={tag:'Label',attributes:{},text:'',tail:'',children:[]};p.children.push(label);}label.children=label.children.filter(c=>c.attributes?.Key!==KEY);label.children.push({tag:'KeyValuePair',attributes:{Key:KEY,Value:n.attributes.Self},text:'',tail:'',children:[]});}
   for(const c of n.children||[])tag(c);
  }
  for(const tree of Object.values(trees))tag(tree);
@@ -39,7 +43,8 @@ function packagePlan(entry,{allowUnmapped=false}={}){
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!trees[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));
  if(unknown.length)throw new Error('원본 바이너리 리소스가 모델에 없어 재현 불가: '+unknown.map(x=>x.name).join(', '));
  const entries=[['mimetype','application/vnd.adobe.indesign-idml-package'],['META-INF/container.xml','<?xml version="1.0" encoding="UTF-8"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="designmap.xml" media-type="application/vnd.adobe.indesign-idml-package"/></rootfiles></container>'],...Object.entries(trees).filter(([name])=>name!=='META-INF/container.xml'&&name!=='mimetype').map(([name,tree])=>[name,name==='designmap.xml'?IDML.designmap(tree,m.metadata.aidProcessingInstruction):Package.serialize(tree)])];
- const bytes=Package.zip(entries),validation=IDML.validate(bytes);
+ const markerValidation=Markers.validateSerialized(trees,entries);
+ const bytes=Package.zip(entries),validation={...IDML.validate(bytes),markerValidation};
  return {bytes,validation,packagingNotes:m.metadata.aidProcessingInstruction===undefined?['Legacy model omitted processing instructions; standard IDML document aid declaration restored (not a typography fallback).']:[],sourceHash:m.metadata.sourceSha256,pageIds:entry.descriptor.pageIds.slice(),normalPageIds:[...normal]};
 }
 function items(collection){if(Array.isArray(collection))return collection;const out=[];for(let i=0;i<collection.length;i++)out.push(collection.item(i));return out;}
@@ -97,7 +102,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
     expected.next=e.textFrame.nextRef==='n'?null:e.textFrame.nextRef||null;actual.next=F.ref(f.nextTextFrame);
     const story=entry.original.stories.find(s=>s.id===e.textFrame.storyRef);let offset=0;expected.runs=[];actual.runs=[];
     if(!ignoreStories.includes(story.id))for(const p of story.paragraphs)for(const r of p.runs){
-     const text=r.tokens.map(t=>t.type==='Content'?t.text:t.type==='Br'?'\r':'').join('');
+     const text=Markers.storyParts({paragraphs:[{runs:[r]}]}).map(p=>p.text|| (p.target?'\ufffc':'')).join('');
      if(r.tokens.some(t=>!['Content','Br'].includes(t.type))||/[\uD800-\uDFFF]/.test(text)){expected.unsupported='UNSUPPORTED 복합 텍스트 토큰/문자 인덱스';continue;}if(!text)continue;
      const source=r.resolvedProperties,want={};
      for(const k of [...Object.keys(fields),'AppliedFont','FontStyle','Justification'])if(source[k]!==undefined)want[k]=canonical(k,source[k]);
@@ -109,18 +114,19 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
      const range=f.parentStory.characters.item(offset+index),got=readType(range,ID);
      const direct=F.directCompare(range,{...p.properties,...r.properties},ID,entry.original,doc);
      const colorsExpected={},colorsActual={};for(const key of ['FillColor','StrokeColor'])if(source[key]!==undefined){colorsExpected[key]=F.colorExpected(entry.original,source[key]);colorsActual[key]=F.colorActual(range[key[0].toLowerCase()+key.slice(1)],ID,doc);}
-     expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:F.characterText(range.contents,ID),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
+     expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:text[index]==='\ufffc'&&sameEnum(range.contents,ID.SpecialCharacters?.AUTO_PAGE_NUMBER)?'\ufffc':F.characterText(range.contents,ID),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
      }offset+=text.length;
     }
    }
    record(role,e.id,expected,actual);
   }catch(error){record(role,e.id,{readback:'supported'},{readback:'UNSUPPORTED: '+error.message},error);}
  }
+ Markers.checkHost(entry,doc,ID,record);
  return {frames,records,equal:records.every(r=>r.comparison.equal),fallbacks:[]};
 }
 function replacementPlan(entry,article){const binding=Match.bindContent(entry,article,{installedFonts:entry.profile.requiredFonts});
  const edits=[];for(const b of binding.content){if(b.storyId){const story=entry.original.stories.find(s=>s.id===b.storyId),runs=story.paragraphs.flatMap(p=>p.runs);
-   if(!runs.length||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type))||!Model.compare(r.resolvedProperties,runs[0].resolvedProperties).equal||r.styleRef!==runs[0].styleRef||!Model.compare(r.properties,runs[0].properties).equal)||story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!Model.compare(p.properties,story.paragraphs[0].properties).equal))throw new Error(b.role+': 혼합 Typography 콘텐츠 교체는 아직 지원하지 않습니다. 원본 유지');
+   if(!runs.length||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)||t.contentTree)||!Model.compare(r.resolvedProperties,runs[0].resolvedProperties).equal||r.styleRef!==runs[0].styleRef||!Model.compare(r.properties,runs[0].properties).equal)||story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!Model.compare(p.properties,story.paragraphs[0].properties).equal))throw new Error(b.role+': 혼합 Typography 콘텐츠 교체는 아직 지원하지 않습니다. 원본 유지');
    const frames=entry.original.elements.filter(e=>e.textFrame&&e.textFrame.storyRef===b.storyId);if(frames.some(e=>e.pageCandidates.length!==1||!entry.descriptor.pageIds.includes(e.pageCandidates[0])))throw new Error('선택 페이지 밖 Story 연결');
    edits.push({...b,elementId:frames[0].id,typography:runs[0].resolvedProperties,paragraphOverrides:story.paragraphs[0].properties,characterOverrides:runs[0].properties});
   }else edits.push(b);}
@@ -130,6 +136,7 @@ function support(entry){
  const fidelity=[],production=[];
  try{validatePageStories(entry);}catch(e){fidelity.push(e.message);}
  const m=entry.original;
+ try{Markers.validateSource(m);}catch(e){fidelity.push(e.message);}
  if(!m.sourceXml||!m.sourceXml['designmap.xml'])fidelity.push('원본 IDML XML 없음');
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!m.sourceXml?.[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));if(unknown.length)fidelity.push('원본 바이너리 리소스 미보존: '+unknown.map(x=>x.name).join(', '));
  for(const e of m.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
@@ -138,7 +145,7 @@ function support(entry){
   const role=entry.descriptor.roles[e.id]?.role;
   if(e.textFrame&&['title','subtitle','body','caption'].includes(role)){
    const story=m.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?.paragraphs.flatMap(p=>p.runs)||[];
-   if(!runs.length||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type))||!Model.compare(r.resolvedProperties,runs[0].resolvedProperties).equal||r.styleRef!==runs[0].styleRef||!Model.compare(r.properties,runs[0].properties).equal)||story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!Model.compare(p.properties,story.paragraphs[0].properties).equal))production.push(role+' 혼합 Typography 교체 미지원');
+   if(!runs.length||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)||t.contentTree)||!Model.compare(r.resolvedProperties,runs[0].resolvedProperties).equal||r.styleRef!==runs[0].styleRef||!Model.compare(r.properties,runs[0].properties).equal)||story.paragraphs.some(p=>p.styleRef!==story.paragraphs[0].styleRef||!Model.compare(p.properties,story.paragraphs[0].properties).equal))production.push(role+' 혼합 Typography 교체 미지원');
   }
  }
  return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};

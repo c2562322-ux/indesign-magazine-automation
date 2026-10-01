@@ -1,3 +1,17 @@
+# 특수 마커 공통 보존 — 2026-10-01
+
+- extractorVersion=2 / markerPreservationVersion=1. PI의 target/data와 Content 텍스트·tail·순서, XML 앞뒤 PI를 보존. 원본 ZIP 바이트를 별도 Expat 파서로 읽은 위치/주변 텍스트 증거와 모델을 대조하고 직렬화 및 Host 마커를 추가 검사한다.
+- ACE18 이외 PI도 모델/패키지에서 보존. Host 의미가 미지원인 Story PI는 명시적으로 차단하며 숫자 문자열을 AUTO_PAGE_NUMBER로 인정하지 않는다. 구형 모델은 MARKER_REEXTRACTION_REQUIRED로 차단한다.
+- 기존25개 역할/Library/과거 Adobe 기록은 보존. 정확한 원본 hash로 재추출한 새 버전 ID를 사용하므로 과거 승인 미승계. 과거 실제8통과/1overflow/16미지원은 역사적 결과이며 새 마커 검사 통과가 아니다.
+- 새 개인 Library: assets/templates/working/registered-pages-26-markers-v2.private.json. 기존25개 새모델 + 디자이너 수정본1. 새 모델은 전부 Adobe 재검증 필요/Production Ready 아님. 기존25 중 정적 Fidelity 검증 가능9, 미지원16; 새 디자이너 수정본은 PNG/BODY 제한 유지.
+- 두 원본의 A/B Parent에 ACE18 각2개, 기존25 중20개 페이지가 해당 Parent 사용. 최신 수정본의 빈 Parent Story2개는 source label로 원본 번호 프레임과 일대일 연결됨. 명시적인 restoration sidecar로 기존 스타일/프레임 내 자동 마커만 복원. 고정 숫자나 특정 페이지 ID 분기 없음.
+- 직접 확인용 새 파일: assets/templates/working/designer-page-numbers-restored.private.idml. 원본 변경 없이 공통 packagePlan으로 생성한 번호 확인용 파일이며 전체 Fidelity/제작 통과가 아니다. 재추출 비교에서 source label 제외 pages/elements/fonts/colors/layers/styles 동일, 원본 hash 유지, 생성 ZIP에 ACE18 2개 확인.
+- 자동 Node282/Python18 통과. PI 순서/주변 텍스트 보존, 원본·모델·직렬화 손실 차단, literal 숫자 거부, 빈 Story만 복원, 버전등록/역할유지/승인미승계 회귀 포함. 실제 Adobe 미실행.
+- NEXT STEP: UDT Reload → 새26 Library 로드 → 전체 등록 디자인 일괄 검증 → 전체 페이지 검증 결과 저장. Adobe 파일 열기로 번호 확인용 IDML을 열어 일반 페이지 및 A/B Parent의 자동 번호/위치/스타일 확인. 원본에 저장하지 않음.
+- 이후 순서: 배치 PNG의 link/transform/clipping Fidelity → 혼합 BODY의 문단·문자 스타일/언어/override 보존 정책 → 실제 이미지 fitting/crop 및 POINT_TEXT Recompose 검사. 원본 FillProportionally 정책은 이미 적용 경로가 있으나 새 수정본 실기 미검증. POINT_TEXT 원본14/21 유지, 임의 축소 금지. 관련 절차 docs/SPECIAL_MARKERS.md.
+
+---
+
 # 디자이너 수정본 버전 등록 — 2026-10-01
 
 - 최신 IDML 별도 추출: working/designer-revision.private.json. 일반1쪽 uaa4, Parent2쪽. 기존 source label로 original/u3d5 수정본임을 확인(u335e/u3d6 아님).

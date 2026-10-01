@@ -7,6 +7,7 @@ function fail(message){throw new Error('IDML_PACKAGE_INVALID: '+message);}
 function designmap(tree,sourceInstruction){
  const instruction=sourceInstruction===undefined?LEGACY_AID:sourceInstruction;
  if(!/^<\?aid\s[^<>]*\?>$/.test(instruction)||! /\btype="document"/.test(instruction))fail('designmap.xml aid 문서 식별 선언 오류');
+ if((tree.beforeRoot||[]).some(n=>n.tag==='#pi'&&n.target==='aid'))return P.serialize(tree);
  return P.serialize(tree).replace(/^(<\?xml[^?]*\?>)/,'$1\n'+instruction+'\n');
 }
 function validate(input){
