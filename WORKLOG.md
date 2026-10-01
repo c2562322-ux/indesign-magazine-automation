@@ -1316,3 +1316,15 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+# 추천 차단과 조판 추정 분리 — 2026-10-01
+
+- docs/RECOMMENDATION_POLICY.md: 55버전 전체 정적/시험원고 상태표. 원본/Library/역할/기존 검증 이력 불변. 일반 추천은 대체된14 제외41개였으나 이전 UI는55평가로 표시했던 혼동 수정.
+- productionAssessment 공통 BLOCK/WARN/INFO: 실제 역할/참조/필수사진/없는폰트/지원불가 BLOCK, 저신뢰 수용량 추정과 폰트 목록 조회불가 WARN, 실제 Host 검사 필요 INFO. 추천과 bindContent/native replacementPlan에 같은 정책. 원본 Fidelity/overset, 콘텐츠 readback/배치/보존/overflow/출력 차단 미변경.
+- 정적55: BLOCK40/INFO15, 활성41: BLOCK34/INFO7. 사진1 시험원고(제목5/본문650/부제없음/1200x800) 전체 BLOCK50/WARN5, 활성 BLOCK40/WARN1. 새10/u577b 후보0→1, 추정 불확실성 때문에 제외되던 상태 해소. Adobe 성공/Production Ready 아님.
+- 사용자가 지정한 Desktop/테스트원고.docx는 현재 ENOENT. 동일 DOCX 후보수는 미확정이며 시험원고로 대체했다고 보고하지 않음. 원고 수정/별도 사진 요구 없음.
+- Node310/Python18. 신규 Mock: 추정초과+DOCX사진1 추천→선택→native 글/사진교체; 실제 source/content overflow 차단 유지. unknown-font 대신 ambiguous-role로 기존 UI접기 회귀의 입력 수정(새 WARN 정책과 일치).
+- NEXT: UDT Reload → 동일 DOCX → 추천 → 이 디자인으로 제작. WARN은 실제 조판 보장이 아니며 사전 Fidelity 실패시 기존 정책대로 clone 닫기/진단 유지. 실제 DOCX 제공 시 읽기전용 audit로 동일 원고 수치 확정 가능.
+
+---
+

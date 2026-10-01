@@ -122,3 +122,22 @@ test('caption only replaces a confirmed slot when the manuscript supplies a capt
  const {m,d}=design(),c=copy(m.elements.find(e=>e.id==='body')),s=copy(m.stories.find(s=>s.id==='bodyStory'));c.id='caption';c.textFrame.storyRef='captionStory';s.id='captionStory';m.elements.push(c);m.stories.push(s);d.roles.caption={role:'caption',confirmed:true};const entry=Match.libraryEntry(m,d);
  assert.ok(!Match.bindContent(entry,article,{installedFonts:fonts}).content.some(c=>c.role==='caption'));assert.equal(Match.bindContent(entry,{...article,caption:'사진 설명'},{installedFonts:fonts}).content.find(c=>c.role==='caption').text,'사진 설명');
 });
+
+
+test('production policy treats estimated capacity as WARN but retains legacy estimate evidence and immutable binding',()=>{
+ const {entry}=design({bodyHeight:60}),a={...article,body:'가'.repeat(650)},before=JSON.stringify(entry.original);
+ assert.ok(Match.evaluate(entry,a,{installedFonts:fonts}).hard.some(d=>d.code==='SEVERE_CAPACITY'));
+ const row=Match.productionAssessment(entry,a,{installedFonts:fonts});assert.equal(row.decision,'WARN');assert.equal(row.status,'candidate');assert.ok(row.diagnostics.some(d=>d.code==='SEVERE_CAPACITY'&&d.severity==='WARN'));
+ assert.equal(Match.bindContent(entry,a,{installedFonts:fonts}).content.find(c=>c.role==='body').text,a.body);assert.equal(JSON.stringify(entry.original),before);assert.equal(row.productionReady,false);
+});
+test('production policy retains BLOCK for roles, photos, unknown dimensions, fonts and unsupported engine',()=>{
+ const {entry,m,d}=design({required:'required'}),options={installedFonts:fonts};
+ for(const a of [article,{...article,images:[{}]},{...article,images:[{width:1200,height:800},{width:1200,height:800}]}]){assert.equal(Match.productionAssessment(entry,a,options).decision,'BLOCK');assert.throws(()=>Match.bindContent(entry,a,options));}
+ const a={...article,images:[{width:1200,height:800}]};assert.equal(Match.productionAssessment(entry,a,{installedFonts:[]}).decision,'BLOCK');
+ const bad=Match.libraryEntry(m,{...d,mappingReview:['ambiguous role']});assert.equal(Match.productionAssessment(bad,a,options).decision,'BLOCK');assert.throws(()=>Match.bindContent(bad,a,options));
+ const blocked=Match.libraryEntry(m,{...d,capability:{productionReasons:['semantic emphasis'],fidelityReasons:[]}});assert.equal(Match.productionAssessment(blocked,a,options).decision,'BLOCK');assert.throws(()=>Match.bindContent(blocked,a,options),/PRODUCTION_UNSUPPORTED/);
+});
+test('unverified history is INFO; optional image slot retains original while required slot remains BLOCK',()=>{
+ const {entry}=design(),row=Match.productionAssessment(entry,article,{installedFonts:fonts});assert.notEqual(row.decision,'BLOCK');assert.ok(row.diagnostics.some(d=>d.code==='HOST_CHECK_REQUIRED'&&d.severity==='INFO'));assert.equal(row.productionReady,false);
+ assert.equal(Match.bindContent(entry,article,{installedFonts:fonts}).content.find(c=>c.role==='image1').image,null);
+});

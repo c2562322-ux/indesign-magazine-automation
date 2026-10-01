@@ -90,9 +90,9 @@ function gate(entry){
 }
 function register(model,descriptor){Colors.validate(model,descriptor);const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
 function recommendations(entries,article,fonts){
- const result=Match.rank(entries,article,{installedFonts:fonts}),blocked=[];
- const candidates=result.candidates.filter(row=>{const entry=entries.find(e=>e.descriptor.id===row.id),reasons=[...(entry.descriptor.capability?.fidelityReasons||[]),...(entry.descriptor.capability?.productionReasons||[])];if(reasons.length){blocked.push({...row,status:'review-required',review:row.review.concat(reasons.map(message=>({code:'PRODUCTION_UNSUPPORTED',message})))});return false;}return entry.profile.readyForMatching;});
- return {...result,reviewRequired:result.reviewRequired.concat(blocked),allCandidates:candidates,candidates:candidates.slice(0,3),selectedId:null};
+ const assessments=entries.map(e=>Match.productionAssessment(e,article,{installedFonts:fonts}));
+ const candidates=assessments.filter(r=>r.status==='candidate').sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+ return {assessments,reviewRequired:assessments.filter(r=>r.status==='review-required'),excluded:assessments.filter(r=>r.status==='excluded'),allCandidates:candidates,candidates:candidates.slice(0,3),selectedId:null};
 }
 function selection(entry,article,fonts){return {designId:entry.descriptor.id,articleSignature:JSON.stringify(article),overlay:Match.bindContent(entry,article,{installedFonts:fonts}),fidelity:gate(entry)};}
 function lifecycle(entry,evidence){

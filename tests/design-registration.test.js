@@ -102,7 +102,7 @@ test('near subtitle separated from section heading maps safely while crowded alt
 
 
 test('review and excluded designs stay bounded and excluded reasons expand on demand',async()=>{
- const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,0);assert.ok(x.nodes().some(n=>n.textContent==='개발자 확인 필요 8개'));
+ const e=registered(),entries=Array.from({length:8},(_,i)=>R.register(e.original,{...e.descriptor,id:'review'+i}));const x=setup({load:async()=>R.pack(entries.map(e=>R.register(e.original,{...e.descriptor,mappingReview:['ambiguous article role']}))),fonts:async()=>null});await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(n=>n.className==='registered-card').length,0);assert.ok(x.nodes().some(n=>n.textContent==='개발자 확인 필요 8개'));
  const y=setup({load:async()=>R.pack(entries)});y.studio.read=()=>({article:{...article,images:[{width:1200,height:800}]}});await y.click('디자인 모델 / 등록 파일 불러오기');await y.click('등록 디자인에서 추천');assert.equal(y.nodes().filter(n=>n.className==='registered-card').length,0);const toggle=y.nodes().find(n=>n.textContent==='제외된 디자인 8개'),parent=y.nodes().find(n=>n.children.includes(toggle));assert.equal(parent.children[0].style.display,'none');await toggle.click();assert.equal(parent.children[0].style.display,'');assert.equal(y.ui.state.entries.length,8);
 });
 
@@ -202,4 +202,16 @@ test('objective partial registration preserves existing source, colors and unres
 test('library analysis yields progress once per batch, stays cached for later articles and surfaces failures',async()=>{
  const e=registered(),entries=Array.from({length:9},(_,i)=>R.register(e.original,{...e.descriptor,id:'entry'+i}));let loads=0,checks=0;const x=setup({loadDefault:async()=>{loads++;return R.pack(entries);},capability:()=>{checks++;return {fidelityReasons:[],productionReasons:[]};}}),events=[];x.studio.progress=async message=>events.push(message);await x.ui.ready;await x.ui.articleLoaded();await x.ui.articleLoaded();assert.equal(loads,1);assert.equal(checks,9);assert.ok(events.some(x=>x.includes('4/9')));assert.ok(events.some(x=>x.includes('추천 조건 계산 완료')));
  const y=setup({loadDefault:async()=>{throw new Error('bad library');}});await assert.rejects(()=>y.ui.articleLoaded(),/bad library/);
+});
+
+
+test('capacity warnings reach direct production with unchanged DOCX payload and no manual proof',async()=>{
+ const e=registered(),x=setup({loadDefault:async()=>R.pack([e])}),a={...article,body:'가'.repeat(10000)};x.studio.read=()=>({article:a});let received;
+ x.studio.createRegistered=async(entry,payload,mode)=>{received={entry,payload,mode};return {errors:['콘텐츠 overflow'],fidelity:{phase:'CONTENT_APPLIED'}};};
+ await x.ui.articleLoaded();const row=R.recommendations([e],a,fonts).allCandidates[0];assert.equal(row.decision,'WARN');assert.equal(row.productionReady,false);
+ await x.click('이 디자인으로 제작');assert.equal(received.payload,a);assert.equal(received.mode,'production');assert.equal(received.entry.id,e.id);assert.ok(x.nodes().some(n=>String(n.textContent).includes('콘텐츠 overflow')));
+});
+
+test('unknown font inventory warns but does not grant Adobe verification or bypass known missing fonts',()=>{
+ const e=registered(),result=R.recommendations([e],article,null);assert.equal(result.allCandidates.length,1);assert.ok(result.allCandidates[0].soft.some(d=>d.code==='FONT_STATUS_UNKNOWN'));assert.equal(result.allCandidates[0].productionReady,false);assert.equal(R.recommendations([e],article,[]).allCandidates.length,0);
 });

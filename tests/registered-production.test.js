@@ -552,3 +552,13 @@ test('equivalent explicit/inherited overrides preserve effective typography but 
 test('production requires completion evidence for every planned role',async()=>{
  const entry=fixture(),h=host(entry),c=await N.create(entry,{title:'현재 DOCX 제목',body:'현재 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.ok(c.requiredContent.length>=2);c.contentChecks=c.contentChecks.filter(x=>x.role!=='title');assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_REPLACEMENT_INCOMPLETE'&&i.role==='title'));
 });
+
+
+test('estimated overflow with one DOCX image reaches native replacement but actual source/content overflow still blocks',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),im={...JSON.parse(JSON.stringify(e.original.elements.find(e=>e.type==='Rectangle'))),id:'photo-slot',pageCandidates:['p1'],pageBounds:{p1:[10,450,150,590]},properties:{},details:{},image:[],groupId:null};e.original.elements.push(im);e.descriptor.roles[im.id]={role:'image1',confirmed:true};e.descriptor.images[im.id]='required';
+ const entry=R.register(e.original,e.descriptor),out=Match.parseArticle('one.docx',word(`<w:p>${drawing('a')}</w:p>`,rel('a','a.png'))),a={...out.article,body:'긴 본문 '.repeat(400)};a.images[0].path='C:/docx/internal.png';
+ const rank=R.recommendations([entry],a,entry.profile.requiredFonts);assert.equal(rank.allCandidates.length,1);assert.equal(rank.allCandidates[0].decision,'WARN');assert.equal(R.selection(entry,a,entry.profile.requiredFonts).overlay.content.find(c=>c.role==='body').text,a.body);
+ const h=host(entry),c=await N.create(entry,a,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(c.contentChecks.find(c=>c.role==='body').frame.parentStory.contents,a.body);assert.equal(c.contentChecks.find(c=>c.role==='image1').imagePath,a.images[0].path);assert.equal(N.check(c,h.ID).length,0);
+ Object.defineProperty(c.contentChecks.find(c=>c.role==='body').frame.parentStory,'overflows',{get:()=>true});assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_OVERFLOW'));assert.equal(c.autoFixAllowed,false);
+ const source=host(entry,{originalOverflow:true}),failed=await N.create(entry,a,source.env);assert.equal(failed.phase,'FIDELITY_FAILED');assert.equal(failed.autoFixAllowed,false);assert.ok(!failed.contentChecks?.length);
+});

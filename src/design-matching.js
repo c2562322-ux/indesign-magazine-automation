@@ -197,6 +197,25 @@ function evaluate(entry,article,{installedFonts=null}={}){
     return {id:p.id,name:p.name,status:hard.length?'excluded':review.length?'review-required':'candidate',score:Math.max(0,score),hard,review,soft,reasons,estimates,
         fixedPages:p.pageCount,productionReady:false};
 }
+// Recommendation uncertainty is not evidence of broken output. Only this explicit
+// allowlist moves estimates to WARN; unknown diagnostics fail closed. Native
+// Fidelity, font, role, content readback and overset checks still run at production.
+const ESTIMATE_WARNINGS=new Set(['CAPACITY_UNKNOWN','CAPACITY_MARGIN','SOURCE_CAPACITY_UNCALIBRATED','OVER_ESTIMATE','SEVERE_CAPACITY','TITLE_CAPACITY','AUTO_FIT_REQUIRED']);
+function productionAssessment(entry,article,options){
+    const row=evaluate(entry,article,options),diagnostics=[];
+    for(const [origin,list] of [['hard',row.hard],['review',row.review],['soft',row.soft]])for(const d of list){
+        const estimate=ESTIMATE_WARNINGS.has(d.code);
+        const severity=estimate||d.code==='FONT_STATUS_UNKNOWN'||origin==='soft'?'WARN':'BLOCK';
+        diagnostics.push({...d,severity,origin,message:estimate?d.message.replace('실제 조판 확인 전 추천 보류','제작 후 실제 조판 검사 필요')+' · 추정치이며 제작 후 Recompose/overflow 검사로 판정':d.message});
+    }
+    for(const message of [...(entry.descriptor.capability?.fidelityReasons||[]),...(entry.descriptor.capability?.productionReasons||[])])diagnostics.push({code:'PRODUCTION_UNSUPPORTED',message,severity:'BLOCK',origin:'capability'});
+    diagnostics.push({code:'HOST_CHECK_REQUIRED',severity:'INFO',origin:'runtime',message:'제작 시 원본 Fidelity와 콘텐츠 검사를 실행합니다. 추천은 Adobe 검증 완료를 의미하지 않습니다.'});
+    const blocks=diagnostics.filter(d=>d.severity==='BLOCK'),warnings=diagnostics.filter(d=>d.severity==='WARN');
+    return {...row,decision:blocks.length?'BLOCK':warnings.length?'WARN':'INFO',diagnostics,
+        status:blocks.length?(blocks.some(d=>d.origin==='hard')?'excluded':'review-required'):'candidate',
+        hard:blocks.filter(d=>d.origin==='hard'),review:blocks.filter(d=>d.origin!=='hard'),soft:warnings,
+        score:Math.max(0,row.score-diagnostics.filter(d=>ESTIMATE_WARNINGS.has(d.code)&&d.origin!=='soft').length*20),productionReady:false};
+}
 function rank(entries,article,options){
     const rows=entries.map(e=>evaluate(e,article,options));
     return {candidates:rows.filter(r=>r.status==='candidate').sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id)),
@@ -219,8 +238,8 @@ async function loadLibrary(manifest,read){
 function storyWeight(model,id){const s=model.stories.find(s=>s.id===id);return Math.max(1,s.paragraphs.flatMap(p=>p.runs).flatMap(r=>r.tokens).reduce((n,t)=>n+(t.type==='Content'?t.text.length:t.type==='Br'?1:0),0));}
 function bindContent(entry,article,options){
     if(!entry.profile.readyForMatching)throw new Error('Confirm roles and source references before binding');
-    const suitability=evaluate(entry,article,options);
-    if(suitability.hard.length)throw new Error('Content violates constraints: '+suitability.hard.map(x=>x.code).join(', '));
+    const suitability=productionAssessment(entry,article,options);
+    if(suitability.decision==='BLOCK')throw new Error('Content violates constraints: '+suitability.diagnostics.filter(x=>x.severity==='BLOCK').map(x=>x.code).join(', '));
     const bindings=[];
     for(const t of entry.profile.textFrames.filter(t=>['title','subtitle','body','caption'].includes(t.role))){
         if(t.role==='caption'&&!String(article.caption||'').trim())continue; // An absent DOCX caption does not erase fixed source text.
@@ -269,6 +288,6 @@ function calibration(estimate,observed){
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-return {isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {productionAssessment,isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
 
 });
