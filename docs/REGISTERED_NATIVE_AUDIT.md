@@ -1,3 +1,13 @@
+# 실제 Adobe batch 공통 readback 수정 — 2026-10-01
+
+- 실제25페이지 결과: 통과3 / Fidelity실패6 / 미지원16, 역할확인15(중복). baseline155차이는 path120 / paragraph origin enum21 / 특수문자12 / 색상공간2. 전체페이지 표와 공통 원인: docs/REGISTERED_BATCH_ANALYSIS.md.
+- 공통 snapshot path를 page-relative로 정규화(Bezier 포함), shading/border top/bottom native enum 비교, Character SpecialCharacters→Unicode, HSB→동등RGB 비교 지원. unknown/실제 차이 차단, tolerance/Auto Fix/생성 디자인 불변.
+- 색상2건은 HSB 추론이며 실제 raw space 없으므로 확정/통과 주장 금지. enum read 실패 뒤 숨겨진 추가 mismatch 가능. 미지원16페이지 제한 유지.
+- Node273/Python16 통과. 기존 u335e 실제 사용자 제작 성공과 별개로 이번 수정은 Adobe 재검증 필요. 원본/개인 파일 변경 없음.
+- NEXT STEP: UDT Reload → 기존 DOCX/25페이지 Library → 전체 등록 디자인 일괄 검증 → 전체 페이지 검증 결과 저장. JSON 하나로 전체 재검증, 개별페이지 반복 불필요.
+
+---
+
 # 등록 Library 일괄 원본 검증 — 2026-10-01
 
 - 개발자 버튼 전체 등록 디자인 일괄 검증: 로드한 Library 전체를 순차 검사. 기존 selectForProof/generate/createRegistered proof 경로 재사용, 페이지별 하드코딩 없음. 원고 교체/Auto Fix/PDF 실행 없음.

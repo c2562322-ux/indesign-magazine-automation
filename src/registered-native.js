@@ -109,7 +109,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
      const range=f.parentStory.characters.item(offset+index),got=readType(range,ID);
      const direct=F.directCompare(range,{...p.properties,...r.properties},ID);
      const colorsExpected={},colorsActual={};for(const key of ['FillColor','StrokeColor'])if(source[key]!==undefined){colorsExpected[key]=F.colorExpected(entry.original,source[key]);colorsActual[key]=F.colorActual(range[key[0].toLowerCase()+key.slice(1)],ID,doc);}
-     expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:String(range.contents),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
+     expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:F.characterText(range.contents,ID),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
      }offset+=text.length;
     }
    }

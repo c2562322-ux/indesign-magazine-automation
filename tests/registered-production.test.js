@@ -1,6 +1,47 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const P=require('../src/package-xml'),Z=require('../src/docxZip'),D=require('../src/docx-media'),N=require('../src/registered-native'),Match=require('../src/design-matching');
 const png=(w,h)=>{const b=Buffer.alloc(24);Buffer.from([137,80,78,71,13,10,26,10]).copy(b);b.writeUInt32BE(13,8);b.write('IHDR',12);b.writeUInt32BE(w,16);b.writeUInt32BE(h,20);return b;};
+test('page cleanup compares line and Bezier paths relative to actual page origin, preserving real drift',()=>{
+ const F=require('../src/registered-fidelity');
+ const path=[[10,20],[[30,40],[50,60],[70,80]]],shift=p=>p.length===2&&p.every(Number.isFinite)?[p[0]+612.283465,p[1]+100]:p.map(shift);
+ assert.deepEqual(F.pagePath(shift(path),[100,612.283465,900,1224]),path);
+ const make=(bounds,points)=>({parentPage:{bounds},geometricBounds:[bounds[0]+20,bounds[1]+10,bounds[0]+80,bounds[1]+70],paths:[{entirePath:points}]});
+ const a=F.frameSnapshot(make([0,0,800,612],path)),b=F.frameSnapshot(make([100,612.283465,900,1224],shift(path)));
+ assert.equal(F.preservation({objects:{x:a}},{objects:{x:b}}).equal,true);
+ b.paths[0][1][0][0]+=1;assert.equal(F.preservation({objects:{x:a}},{objects:{x:b}}).equal,false);
+ assert.throws(()=>F.pagePath([[NaN,1]],[0,0,1,1]),/UNSUPPORTED/);
+});
+test('shading and border origin enums compare semantically, including CJK em-box, without accepting different origins',()=>{
+ const F=require('../src/registered-fidelity');
+ const token=name=>({toString:()=>name});
+ for(const family of ['Shading','Border'])for(const edge of ['Top','Bottom']){
+  const key='Paragraph'+family+edge+'Origin',hostKey=key[0].toLowerCase()+key.slice(1),name='EmBox'+edge+'Origin',member='EM_BOX_'+edge.toUpperCase()+'_ORIGIN',native=token(member),ID={[key+'Enum']:{[member]:native}};
+  assert.equal(F.directCompare({[hostKey]:native},{[key]:name},ID).comparison.equal,true);
+  assert.equal(F.directCompare({[hostKey]:token(member)},{[key]:name},{}).comparison.equal,true);
+  const different=token('BASELINE_'+edge.toUpperCase()+'_ORIGIN');
+  assert.equal(F.directCompare({[hostKey]:different},{[key]:name},ID).comparison.equal,false);
+  assert.throws(()=>F.directCompare({[hostKey]:token('UNKNOWN')},{[key]:name},ID),/UNSUPPORTED/);
+ }
+});
+test('native special Character enum becomes its exact Unicode, never a literal enum-looking string',()=>{
+ const F=require('../src/registered-fidelity'),SpecialCharacters={FORCED_LINE_BREAK:1397124194,DOUBLE_LEFT_QUOTE:1396984945,DOUBLE_RIGHT_QUOTE:1396986481};
+ assert.equal(F.characterText(SpecialCharacters.FORCED_LINE_BREAK,{SpecialCharacters}),'\u2028');
+ assert.equal(F.characterText(SpecialCharacters.DOUBLE_LEFT_QUOTE,{SpecialCharacters}),'“');
+ assert.equal(F.characterText(SpecialCharacters.DOUBLE_RIGHT_QUOTE,{SpecialCharacters}),'”');
+ assert.equal(F.characterText('DOUBLE_LEFT_QUOTE',{SpecialCharacters}),'DOUBLE_LEFT_QUOTE');
+ assert.notEqual(F.characterText(SpecialCharacters.DOUBLE_LEFT_QUOTE,{SpecialCharacters}),'”');
+ assert.equal(F.characterText(99,{SpecialCharacters}),'99');
+});
+test('HSB readback compares equivalent RGB without conflating color spaces or channel differences',()=>{
+ const F=require('../src/registered-fidelity'),ID={ColorSpace:{HSB:1,RGB:2,CMYK:3}},doc={};
+ const actual=v=>F.colorActual({space:1,colorValue:v},ID,doc);
+ assert.equal(F.compare({space:'RGB',values:[183.6,183.6,183.6]},actual([0,0,72])).equal,true);
+ for(const [h,rgb] of [[0,[255,0,0]],[120,[0,255,0]],[240,[0,0,255]],[360,[255,0,0]]])assert.deepEqual(actual([h,100,100]),{space:'RGB',values:rgb});
+ assert.equal(F.compare({space:'RGB',values:[183.6,183.6,183.6]},actual([0,0,70])).equal,false);
+ assert.equal(F.compare({space:'CMYK',values:[0,0,0,0]},actual([0,0,100])).equal,false);
+ assert.throws(()=>actual([0,101,50]),/UNSUPPORTED/);
+ assert.throws(()=>F.colorActual({space:99,colorValue:[1,2,3]},ID,doc),/99.*1,2,3/);
+});
 const drawing=id=>`<w:drawing><wp:inline><a:blip r:embed="${id}"/></wp:inline></w:drawing>`;
 function word(body,rels){return P.zip([['word/document.xml',`<w:document><w:body><w:p><w:r><w:t>제목</w:t></w:r></w:p>${body}<w:p><w:r><w:t>본문입니다.</w:t></w:r></w:p></w:body></w:document>`],['word/_rels/document.xml.rels',`<Relationships>${rels}</Relationships>`],['word/media/a.png',png(1200,800)],['word/media/b.png',png(600,900)],['word/media/unused.png',png(1,1)]]);}
 const rel=(id,name)=>`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${name}"/>`;
@@ -42,6 +83,16 @@ function host(entry,{drift=false,originalOverflow=false,contentOverflow=false,on
  const doc={pages,spreads:[{}],recompose(){recomposes++;},allPageItems:frames,swatches:{item:()=>none}};
  return {ID,doc,frames,env:{ID,open:async()=>doc,guard(){},inspect:()=>({errors:originalOverflow?['source overflow']:[],warnings:[],issues:[]})},get recomposes(){return recomposes;}};
 }
+test('native proof and original recheck share enum/character canonicalization and still block real typography drift',async()=>{
+ const e=fixture();for(const story of e.original.stories)for(const p of story.paragraphs){p.properties.ParagraphShadingTopOrigin='EmBoxTopOrigin';for(const r of p.runs)r.tokens=[{type:'Content',text:'“가\u2028”'}];}
+ const h=host(e),member={toString:()=> 'EM_BOX_TOP_ORIGIN'};
+ h.ID.ParagraphShadingTopOriginEnum={EM_BOX_TOP_ORIGIN:member};h.ID.SpecialCharacters={DOUBLE_LEFT_QUOTE:1,DOUBLE_RIGHT_QUOTE:2,FORCED_LINE_BREAK:3};
+ let drift=false;
+ for(const frame of h.frames.filter(f=>f.parentStory)){const chars=frame.parentStory.characters,original=chars.item;chars.item=i=>{const r=original(i),v={'“':1,'”':2,'\u2028':3}[r.contents];return Object.create(r,{contents:{value:v===undefined?r.contents:v},paragraphShadingTopOrigin:{value:member},pointSize:{value:r.pointSize+(drift?1:0)}});};}
+ const c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_PASSED',JSON.stringify(c.baseline.records.filter(r=>!r.comparison.equal)));
+ assert.equal(N.check(c,h.ID).length,0);
+ drift=true;assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
+});
 test('native pipeline compares original first, replaces uniform text, retains original model and bounds',async()=>{const entry=fixture(),before=JSON.stringify(entry.original),h=host(entry),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(h.recomposes,2);assert.equal(N.check(c,h.ID).length,0);assert.equal(JSON.stringify(entry.original),before);assert.equal(h.frames.find(f=>f.extractLabel()==='body').parentStory.contents,'새 본문');});
 test('source mismatch or original overflow leaves content untouched and blocks output',async()=>{for(const option of [{drift:true},{originalOverflow:true}]){const entry=fixture(),h=host(entry,option),text=h.frames[0].parentStory.contents,c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'FIDELITY_FAILED');assert.equal(c.autoFixAllowed,false);assert.equal(h.frames[0].parentStory.contents,text);assert.ok(N.check(c,h.ID).length);}});
 test('post replacement overflow is content issue, never silently auto-fitted',async()=>{const entry=fixture(),h=host(entry,{contentOverflow:true}),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID)[0].cause,'CONTENT_OVERFLOW');assert.equal(c.autoFixAllowed,false);});
