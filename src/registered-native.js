@@ -107,7 +107,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[]}={}){
      // Read every character, including paragraph breaks; never certify only the first.
      for(let index=0;index<text.length;index++){
      const range=f.parentStory.characters.item(offset+index),got=readType(range,ID);
-     const direct=F.directCompare(range,{...p.properties,...r.properties},ID);
+     const direct=F.directCompare(range,{...p.properties,...r.properties},ID,entry.original,doc);
      const colorsExpected={},colorsActual={};for(const key of ['FillColor','StrokeColor'])if(source[key]!==undefined){colorsExpected[key]=F.colorExpected(entry.original,source[key]);colorsActual[key]=F.colorActual(range[key[0].toLowerCase()+key.slice(1)],ID,doc);}
      expected.runs.push({text:text[index],...want,direct:direct.expected,colors:colorsExpected});actual.runs.push({text:F.characterText(range.contents,ID),...Object.fromEntries(Object.keys(want).map(k=>[k,got[k]])),direct:direct.actual,colors:colorsActual});
      }offset+=text.length;

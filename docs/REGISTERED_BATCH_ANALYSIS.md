@@ -1,3 +1,14 @@
+# 두 번째 실제 Adobe batch — 2026-10-01 01:14Z
+
+- 실제 결과25: 통과5 / 실패4 / 미지원16. 신규 통과 original/u3356, original/u3d6. 기존 u1ba/u335e/u3d5 통과 유지. 이전 path120/특수문자12/색상2 차이는 새 결과에서 없음.
+- 남은 baseline21건은 KinsokuSet readback 미지원 한 유형: original/u577b8, u577c8, u853e2, central/u1cf3. 원본은 모두 KoreanKinsoku. 문단 origin 검사를 통과한 후 다음 direct override에서 드러난 오류.
+- 공통 directCompare에 기본 KinsokuSet enum/string canonical 비교 추가. Korean/Hard/Soft/None/중국어 금칙 구분 유지. 사용자 정의 KinsokuTable은 이름만으로 동등 처리하지 않고 차단. Adobe DOM은 enum/table/string 반환 가능: https://developer.adobe.com/indesign/uxp/dom/api/p/paragraph-style/ ; https://developer.adobe.com/indesign/uxp/dom/api/k/kinsoku-set/ . 실제 JSON에는 반환값의 raw type이 없어 enum 반환이라는 원인은 API/원본/기존 비교 코드에 근거한 해석이며 재실기 필요.
+- 전체 모델 direct string 속성을 조사하여 FillColor/StrokeColor의 다음 object readback 위험도 기존 colorExpected/colorActual 비교로 연결. 원본 ref 문자열과 Swatch object를 직접 비교하지 않으며 색상 변화는 계속 차단. 다른 미지 값/커스텀 금칙은 통과시키지 않음.
+- 신규 금칙 동등/비동등/custom 차단, 직접 색상 override 변화 테스트 및 proof→original recheck 통합 유지. Node275/Python16 전체 통과. 생성기/원본/추천/콘텐츠 치환 정책 변경 없음.
+- NEXT STEP: Reload → 동일 DOCX/25페이지 Library → 전체 등록 디자인 일괄 검증 → 전체 페이지 검증 결과 저장. 개별 페이지 테스트 불필요. 수정4페이지는 Adobe 재검증 필요, 미지원16 제한 유지.
+
+---
+
 # 실제 Adobe 25페이지 batch 분석 — 2026-10-01
 
 사용자가 전달한 actual Adobe run(00:56:48Z–00:58:37Z)을 분석했다. 개인정보/원고/원본 파일은 저장소에 포함하지 않는다.

@@ -189,11 +189,23 @@ function characterText(v,ID){
  }
  return String(v);
 }
-function directCompare(source,properties,ID){
+const kinsokuNames={Nothing:'NOTHING',HardKinsoku:'HARD_KINSOKU',SoftKinsoku:'SOFT_KINSOKU',KoreanKinsoku:'KOREAN_KINSOKU',SimplifiedChineseKinsoku:'SIMPLIFIED_CHINESE_KINSOKU',TraditionalChineseKinsoku:'TRADITIONAL_CHINESE_KINSOKU'};
+function kinsokuValue(v,ID){
+ for(const [name,member] of Object.entries(kinsokuNames)){
+  const native=(ID.KinsokuSet||{})[member];
+  if(stripKey(v)===name||(native!==undefined&&enumEqual(v,native))||String(v)===member)return name;
+ }
+ // A custom KinsokuTable cannot be certified from its display name alone:
+ // its prohibited-character lists may differ from the built-in set.
+ throw new Error('UNSUPPORTED KinsokuSet readback: '+String(v));
+}
+function directCompare(source,properties,ID,model,doc){
  const expected={},actual={};for(const k of directKeys(properties)){
   const v=properties[k],got=source[hostKey(k)];
   // Numeric/boolean overrides are compared against their source, without defaults.
   if(typeof v==='number'||typeof v==='boolean'){expected[k]=v;actual[k]=value(got);}
+  else if(k==='KinsokuSet'){expected[k]=kinsokuValue(v,ID);actual[k]=kinsokuValue(got,ID);}
+  else if(['FillColor','StrokeColor'].includes(k)&&model){expected[k]=colorExpected(model,v);actual[k]=colorActual(got,ID,doc);}
   else if(originTypes[k]){expected[k]=originValue(k,v,ID);actual[k]=originValue(k,got,ID);}
   else if(k==='AppliedFont'){expected[k]=v;actual[k]=got&&got.fontFamily;}
   else if(k==='AppliedLanguage'||k==='KerningMethod'){const pair=canonicalPair(k,v,got,ID);expected[k]=pair.expected;actual[k]=pair.actual;}

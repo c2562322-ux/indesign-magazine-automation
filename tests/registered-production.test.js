@@ -83,12 +83,24 @@ function host(entry,{drift=false,originalOverflow=false,contentOverflow=false,on
  const doc={pages,spreads:[{}],recompose(){recomposes++;},allPageItems:frames,swatches:{item:()=>none}};
  return {ID,doc,frames,env:{ID,open:async()=>doc,guard(){},inspect:()=>({errors:originalOverflow?['source overflow']:[],warnings:[],issues:[]})},get recomposes(){return recomposes;}};
 }
+test('Kinsoku built-in enums stay distinct and custom table names cannot impersonate them',()=>{
+ const F=require('../src/registered-fidelity'),ID={KinsokuSet:{KOREAN_KINSOKU:1263692659,HARD_KINSOKU:1248357235,NOTHING:1851876449}};
+ for(const got of [1263692659,'KoreanKinsoku','$ID/KoreanKinsoku',{toString:()=> 'KOREAN_KINSOKU'}])assert.equal(F.directCompare({kinsokuSet:got},{KinsokuSet:'KoreanKinsoku'},ID).comparison.equal,true);
+ for(const got of [1248357235,1851876449])assert.equal(F.directCompare({kinsokuSet:got},{KinsokuSet:'KoreanKinsoku'},ID).comparison.equal,false);
+ for(const got of [99,null,{name:'KoreanKinsoku',cantBeginLineChars:'custom'}])assert.throws(()=>F.directCompare({kinsokuSet:got},{KinsokuSet:'KoreanKinsoku'},ID),/UNSUPPORTED/);
+});
+test('direct color overrides use source color definitions and reject actual paint changes',()=>{
+ const F=require('../src/registered-fidelity'),model={colors:[{id:'Color/example',type:'Color',properties:{Space:'RGB',ColorValue:'10 20 30'}}]},ID={ColorSpace:{RGB:1}},doc={};
+ const compare=values=>F.directCompare({fillColor:{space:1,colorValue:values}},{FillColor:'Color/example'},ID,model,doc);
+ assert.equal(compare([10,20,30]).comparison.equal,true);assert.equal(compare([10,20,31]).comparison.equal,false);
+ assert.throws(()=>F.directCompare({fillColor:{}},{FillColor:'Color/missing'},ID,model,doc),/UNSUPPORTED/);
+});
 test('native proof and original recheck share enum/character canonicalization and still block real typography drift',async()=>{
- const e=fixture();for(const story of e.original.stories)for(const p of story.paragraphs){p.properties.ParagraphShadingTopOrigin='EmBoxTopOrigin';for(const r of p.runs)r.tokens=[{type:'Content',text:'“가\u2028”'}];}
+ const e=fixture();for(const story of e.original.stories)for(const p of story.paragraphs){p.properties.ParagraphShadingTopOrigin='EmBoxTopOrigin';p.properties.KinsokuSet='KoreanKinsoku';for(const r of p.runs)r.tokens=[{type:'Content',text:'“가\u2028”'}];}
  const h=host(e),member={toString:()=> 'EM_BOX_TOP_ORIGIN'};
  h.ID.ParagraphShadingTopOriginEnum={EM_BOX_TOP_ORIGIN:member};h.ID.SpecialCharacters={DOUBLE_LEFT_QUOTE:1,DOUBLE_RIGHT_QUOTE:2,FORCED_LINE_BREAK:3};
- let drift=false;
- for(const frame of h.frames.filter(f=>f.parentStory)){const chars=frame.parentStory.characters,original=chars.item;chars.item=i=>{const r=original(i),v={'“':1,'”':2,'\u2028':3}[r.contents];return Object.create(r,{contents:{value:v===undefined?r.contents:v},paragraphShadingTopOrigin:{value:member},pointSize:{value:r.pointSize+(drift?1:0)}});};}
+ h.ID.KinsokuSet={KOREAN_KINSOKU:1263692659};let drift=false;
+ for(const frame of h.frames.filter(f=>f.parentStory)){const chars=frame.parentStory.characters,original=chars.item;chars.item=i=>{const r=original(i),v={'“':1,'”':2,'\u2028':3}[r.contents];return Object.create(r,{contents:{value:v===undefined?r.contents:v},paragraphShadingTopOrigin:{value:member},kinsokuSet:{value:1263692659},pointSize:{value:r.pointSize+(drift?1:0)}});};}
  const c=await N.create(e,null,{...h.env,mode:'proof'});assert.equal(c.phase,'FIDELITY_PASSED',JSON.stringify(c.baseline.records.filter(r=>!r.comparison.equal)));
  assert.equal(N.check(c,h.ID).length,0);
  drift=true;assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
