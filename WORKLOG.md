@@ -1244,3 +1244,15 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 
 ---
 
+
+
+# 추천 카드 직접 제작 차단 표시 — 2026-10-01
+
+- 실제 Adobe에서 Load/패널/DOCX/추천은 성공, 직접 제작 후 문서 미생성 보고. 특정 선택 ID/Host 오류가 없어 이번 실행의 제작 차단 원인은 미확정이다.
+- 코드상 직접/수동 경로 모두 studio.createRegistered → auto-indesign.createRegistered → registered-native.create → IDML app.open. 두 번째 엔진 또는 documents.add 경로를 추가하지 않았다.
+- 확인된 표시 결함: failed(message) 이후 generate의 null 처리에서 상세 오류를 일반 문구로 덮어씀; 검사 실패 보고서도 일반 완료 안내로 표시; busy/등록 차단 이벤트는 무응답 반환. 카드별 진행/차단/실패 표시와 null 오류 보존을 수정했다. 정적 unsupported는 기존 비활성화 정책과 함께 구체 사유를 카드에 표시한다.
+- 회귀: 자동 Library에서 선택 ID/production 전달, null/실패 report/throw 상세 보존, unsupported/busy 차단. Node297/297, Python18/18. Adobe 문서 생성 성공은 미검증.
+- NEXT: UDT Reload → DOCX → 추천 → 이 디자인으로 제작. 실패 시 카드에 표시된 디자인 ID와 전체 오류를 전달. 기존 Fidelity JSON 저장 유지. main/원본/개인 Library 변경 없음.
+
+---
+

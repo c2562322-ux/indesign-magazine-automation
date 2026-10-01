@@ -175,3 +175,16 @@ test('recommendation color input is optional and passes only confirmed theme val
  x.studio.createRegistered=async(e,a,mode,colors)=>{theme=colors;assert.equal(a,article);return {errors:[],issues:[],fidelity:{phase:'CONTENT_APPLIED',records:[]}};};await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.deepEqual(theme,{});
  x.nodes().find(n=>n.tagName==='input').value='#1256ab';await x.click('이 디자인으로 제작');assert.deepEqual(theme,{ACCENT:{space:'RGB',values:[18,86,171]}});
 });
+
+
+test('direct card retains engine failure after null, rejected report, and thrown exception',async()=>{
+ const e=registered(),x=setup({loadDefault:async()=>R.pack([e])});let called;
+ x.studio.createRegistered=async(entry,a,mode)=>{called=[entry.descriptor.id,mode];x.ui.failed('EXTERNAL_ASSET_UNAVAILABLE: source.png');return null;};
+ await x.ui.articleLoaded();await x.click('이 디자인으로 제작');assert.deepEqual(called,[e.descriptor.id,'production']);assert.match(x.ui.state.selected.feedback.textContent,/EXTERNAL_ASSET_UNAVAILABLE: source.png/);
+ x.studio.createRegistered=async()=>({errors:['SOURCE_OVERFLOW story-a'],fidelity:{phase:'FIDELITY_FAILED'}});await x.click('이 디자인으로 제작');assert.match(x.ui.state.selected.feedback.textContent,/SOURCE_OVERFLOW story-a/);
+ x.studio.createRegistered=async()=>{throw new Error('registered.package.open: Host rejected');};await x.click('이 디자인으로 제작');assert.match(x.ui.state.selected.feedback.textContent,/registered.package.open: Host rejected/);
+});
+test('unsupported and busy cards explain blocks without invoking production',async()=>{
+ const e=registered(),blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['mixed typography'],fidelityReasons:[]}}),x=setup({loadDefault:async()=>R.pack([blocked])});await x.ui.articleLoaded();assert.ok(x.nodes().some(n=>String(n.textContent).includes('제작 차단: mixed typography')));
+ const y=setup({loadDefault:async()=>R.pack([e])});await y.ui.articleLoaded();y.studio.state.busy=true;let calls=0;y.studio.createRegistered=async()=>{calls++;};await y.click('이 디자인으로 제작');assert.equal(calls,0);assert.ok(y.nodes().some(n=>String(n.textContent).includes('다른 작업이 진행 중')));
+});
