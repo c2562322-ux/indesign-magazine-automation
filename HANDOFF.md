@@ -1,3 +1,15 @@
+# central/u3356 metadata 지원 조사 — 2026-10-01
+
+- 실제 역할: TITLE u8955 / BODY u89a3,u89d2 / SUBTITLE u896c 확정. 이미지 u899e는 기사/배경 용도 미확정, IMAGE 슬롯 없음. 임의 등록 변경하지 않음.
+- TITLE 실제 resolved Tracking -20/-40 및 FillColor Black/u8a00 혼합. 언어 locale 차이가 아니므로 새 제목 강조 구간 대응 정책 없이 평탄화 금지. 기존 혼합 Typography 차단 유지.
+- MetadataPacketPreference의 Contents는 Photoshop CreatorTool/DocumentID/InstanceID/DerivedFrom XMP. 비시각 패키지 정보로 분리. 공통 Image 지원에서는 Contents 문자열 구조만 허용, 알 수 없는 metadata 속성은 차단. 원본 XML → 출력 XML의 파일별 전체 packet 및 중복 개수 보존을 검사하여 누락 시 차단. Host의 시각 geometry/link/crop/transform/color/overflow 비교는 유지. XMP를 삭제하거나 NOT_APPLICABLE로 처리하지 않음.
+- 원본 IDML 규격: https://community.adobe.com/havfw69955/attachments/havfw69955/indesign/632652/1/idml-specification.pdf (MetadataPacketPreference Contents). XMP DOM: https://developer.adobe.com/indesign/uxp/reference/uxp-api/reference-js/modules/uxp/xmp/xmp-classes/xmp-meta
+- 실제 개인 모델 packagePlan(allowUnmapped proof)에서 metadata packet13 보존 확인. Adobe 실기 아님. 재평가 결과 남은 Fidelity 제한은 Profile=$ID/Use Document Default (custom image color management 미지원). 이를 임의 None으로 바꾸지 않음.
+- Node298/298, Python18/18. packet 누락/중복 보존 및 PNG metadata를 포함한 기존 geometry/link/clipping/color mismatch 회귀 통과.
+- NEXT: Reload → 동일 DOCX → 추천. MetadataPacketPreference 차단은 없어져야 하며 위 남은 실제 제약은 계속 표시. 현재 이 카드의 제작 성공은 약속하지 않음. 제목 강조 구간의 대응 정책 및 사진 용도 확인 후 공통 색 관리 readback 지원 필요. 기존 Library/원본/main 보존.
+
+---
+
 # 추천 카드 직접 제작 차단 표시 — 2026-10-01
 
 - 실제 Adobe에서 Load/패널/DOCX/추천은 성공, 직접 제작 후 문서 미생성 보고. 특정 선택 ID/Host 오류가 없어 이번 실행의 제작 차단 원인은 미확정이다.

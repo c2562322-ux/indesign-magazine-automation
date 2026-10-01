@@ -487,6 +487,7 @@ test('mixed language policy preserves source character classes, rejects unseen o
 test('PNG Fidelity compares source transform, bounds, link state, clipping and color management',()=>{
  const G=require('../src/registered-graphics'),F=require('../src/registered-fidelity'),ID={CoordinateSpaces:{PARENT_COORDINATES:1},LinkStatus:{NORMAL:2},ClippingPathType:{NONE:3},Profile:{NO_CMS:4},RenderingIntent:{USE_COLOR_SETTINGS:5}};
  const source={type:'Image',properties:{ItemTransform:'2 0 0 2 10 20',GraphicBounds:{Left:0,Top:0,Right:100,Bottom:50},ImageTypeName:'PNG',Space:'$ID/#Links_RGB',Profile:'$ID/None',ImageRenderingIntent:'UseColorSettings',Visible:true},details:{Link:{StoredState:'Normal',LinkResourceURI:'file:C:/a.png'},ClippingPathSettings:{ClippingType:'None'},TextWrapPreference:{TextWrapMode:'None'}}};
+ source.details.MetadataPacketPreference={Contents:'<x:xmpmeta>source identity</x:xmpmeta>'};assert.equal(G.reason(source),null);
  const e={pageCandidates:['p'],spreadTransform:[1,0,0,1,0,0],image:[source]},model={pages:[{id:'p',transform:[1,0,0,1,0,0],bounds:[0,0,500,500]}]},g={constructor:{name:'Image'},transformValuesOf:()=>[{matrixValues:[2,0,0,2,10,20]}],geometricBounds:[20,10,120,210],itemLink:{filePath:'C:/a.png',status:2},clippingPath:{clippingType:3},space:'RGB',profile:4,imageRenderingIntent:5,visible:true},frame={parentPage:{bounds:[0,0,500,500]},allGraphics:[g]};
  const check=()=>{const c=G.compare(model,e,frame,ID);return F.compare(c.expected,c.actual,ID).equal;};assert.equal(check(),true);
  for(const mutate of [()=>g.itemLink.status=99,()=>g.geometricBounds[0]++,()=>g.clippingPath.clippingType=99,()=>g.space='CMYK',()=>g.itemLink.filePath='C:/other.png',()=>g.profile=99,()=>g.imageRenderingIntent=99]){const saved={...g,itemLink:{...g.itemLink},clippingPath:{...g.clippingPath},geometricBounds:g.geometricBounds.slice()};mutate();assert.equal(check(),false);Object.assign(g,saved);}
@@ -530,4 +531,11 @@ test('COLOR_SLOT changes only confirmed fills after Fidelity; original option an
  const h=setup(),c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.equal(N.check(c,h.ID).length,0,JSON.stringify(N.check(c,h.ID)));assert.deepEqual(h.frames.find(f=>f.extractLabel()===shape.id).fillColor.colorValue,[12,45,90]);const f=h.frames.find(f=>f.extractLabel()===shape.id);f.fillColor.colorValue=[12,45,91];assert.ok(N.check(c,h.ID).some(i=>i.cause==='GENERATOR_MISMATCH'));assert.deepEqual(entry.original.elements.find(e=>e.id===shape.id).properties.FillColor,shape.properties.FillColor);
  const failed=host(entry,{originalOverflow:true});let writes=0;failed.doc.colors={add:()=>{writes++;}};const blocked=await N.create(entry,article,failed.env);assert.equal(blocked.phase,'FIDELITY_FAILED');assert.equal(writes,0);
  const proof=setup(),p=await N.create(entry,article,{...proof.env,mode:'proof'});assert.equal(p.edits.length,0);
+});
+
+
+test('metadata packet package preservation rejects loss and retains duplicate packets',()=>{
+ const G=require('../src/registered-graphics'),P=require('../src/package-xml');const packet={tag:'MetadataPacketPreference',attributes:{},text:'',children:[{tag:'Properties',attributes:{},text:'',children:[{tag:'Contents',attributes:{},text:'<x:xmpmeta>identity</x:xmpmeta>',children:[]}]}]};const tree={tag:'Spread',attributes:{},children:[packet,packet]};const xml=P.serialize(tree);
+ assert.equal(G.validateMetadata({'Spreads/a.xml':tree},[['Spreads/a.xml',xml]]).packetCount,2);
+ assert.throws(()=>G.validateMetadata({'Spreads/a.xml':tree},[['Spreads/a.xml',xml.replace(P.serialize(packet).replace(/^<\?xml[^?]*\?>/,''),'')]]),/serialization loss/);
 });

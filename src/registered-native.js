@@ -43,8 +43,8 @@ function packagePlan(entry,{allowUnmapped=false}={}){
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!trees[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));
  if(unknown.length)throw new Error('원본 바이너리 리소스가 모델에 없어 재현 불가: '+unknown.map(x=>x.name).join(', '));
  const entries=[['mimetype','application/vnd.adobe.indesign-idml-package'],['META-INF/container.xml','<?xml version="1.0" encoding="UTF-8"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="designmap.xml" media-type="application/vnd.adobe.indesign-idml-package"/></rootfiles></container>'],...Object.entries(trees).filter(([name])=>name!=='META-INF/container.xml'&&name!=='mimetype').map(([name,tree])=>[name,name==='designmap.xml'?IDML.designmap(tree,m.metadata.aidProcessingInstruction):Package.serialize(tree)])];
- const markerValidation=Markers.validateSerialized(trees,entries);
- const bytes=Package.zip(entries),validation={...IDML.validate(bytes),markerValidation};
+ const markerValidation=Markers.validateSerialized(trees,entries),metadataValidation=Graphics.validateMetadata(m.sourceXml,entries);
+ const bytes=Package.zip(entries),validation={...IDML.validate(bytes),markerValidation,metadataValidation};
  return {bytes,validation,packagingNotes:m.metadata.aidProcessingInstruction===undefined?['Legacy model omitted processing instructions; standard IDML document aid declaration restored (not a typography fallback).']:[],sourceHash:m.metadata.sourceSha256,pageIds:entry.descriptor.pageIds.slice(),normalPageIds:[...normal]};
 }
 function items(collection){if(Array.isArray(collection))return collection;const out=[];for(let i=0;i<collection.length;i++)out.push(collection.item(i));return out;}

@@ -8,7 +8,8 @@ function reason(g){
  if(g.type!=='Image')return 'UNSUPPORTED graphic type: '+g.type;
  if(!/PNG|JPEG|TIFF|Portable Network Graphics/i.test(g.properties.ImageTypeName||''))return 'UNSUPPORTED bitmap format';
  if(!g.properties.GraphicBounds||nums(g.properties.ItemTransform).length!==6||nums(g.properties.ItemTransform).some(n=>!Number.isFinite(n)))return 'UNSUPPORTED graphic geometry';
- for(const k of Object.keys(g.details||{}))if(!['Link','ClippingPathSettings','TextWrapPreference','ImageIOPreference'].includes(k))return 'UNSUPPORTED graphic detail: '+k;
+ const metadata=g.details?.MetadataPacketPreference;if(metadata&&(Object.keys(metadata).some(k=>k!=='Contents')||typeof metadata.Contents!=='string'))return 'UNSUPPORTED graphic metadata structure';
+ for(const k of Object.keys(g.details||{}))if(!['Link','ClippingPathSettings','TextWrapPreference','ImageIOPreference','MetadataPacketPreference'].includes(k))return 'UNSUPPORTED graphic detail: '+k;
  if(g.details?.ClippingPathSettings?.ClippingType!=='None')return 'UNSUPPORTED active graphic clipping';
  if(g.details?.TextWrapPreference?.TextWrapMode!=='None')return 'UNSUPPORTED graphic text wrap';
  if(g.details?.Link?.StoredState!=='Normal'||!g.details.Link.LinkResourceURI)return 'UNSUPPORTED source link state';
@@ -38,4 +39,15 @@ function compare(model,e,frame,ID){
  }
  return {expected,actual};
 }
-module.exports={reason,compare,path,assets};
+// XMP packets are package content, not a visual DOM property. Preserve their
+// serialized representation; do not substitute NOT_APPLICABLE for graphic checks.
+function validateMetadata(trees,entries){
+ const serialize=require('./package-xml').serialize,outputs=new Map(entries);let count=0;
+ for(const [file,tree] of Object.entries(trees)){const packets=[];function visit(n){if(n.tag?.replace(/^\{[^}]+\}/,'')==='MetadataPacketPreference')packets.push(serialize(n).replace(/^<\?xml[^?]*\?>/,''));for(const c of n.children||[])visit(c);}visit(tree);
+ const required=new Map();for(const packet of packets)required.set(packet,(required.get(packet)||0)+1);
+ for(const [packet,n] of required)if(typeof outputs.get(file)!=='string'||outputs.get(file).split(packet).length-1<n)throw new Error('FIDELITY metadata packet serialization loss: '+file);
+ count+=packets.length;
+ }
+ return {state:'PACKAGE_PRESERVED_NONVISUAL_METADATA',packetCount:count,hostReadback:'not-compared-as-visual-property'};
+}
+module.exports={reason,compare,path,assets,validateMetadata};
