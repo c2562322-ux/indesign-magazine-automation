@@ -190,3 +190,7 @@ The native replacement policy supports one enlarged first letter only when the r
 Fully confirmed article roles may declare `magazine-content-contract/v1` with absent optional subtitle and `omit-with-warning`. Source identity, absent effective subtitle, no unresolved mapping and confirmed TITLE/BODY are validated; role edits invalidate the contract. A nonempty DOCX subtitle remains explicitly unapplied and visible in diagnostics. No implicit BODY merge or additional frame is permitted.
 
 A visually uniform TITLE whose sample differs only by language may inherit its resolved original base language. Native first-point replacement preserves that language; arbitrary emphasis/size/style changes still require semantic correspondence. BODY remains on the existing strict policies. See [latest22 audit and actual Production](LATEST_CONTENT_ROLES.md).
+
+## Bounded content Typography Auto-fit
+
+Registered Production may proportionally reduce BODY up to10% and SUBTITLE up to4%, only after actual content overset; full content/geometry and source Fidelity remain mandatory. All BODY Stories share a ratio, preserving per-character relative sizes and style/language. Auto leading and tracking remain unchanged. Runtime diagnostics record source and permitted typography; adjusted content still requires native overset0 and strict checks. See [policy and actual Host results](BOUNDED_AUTO_FIT.md).

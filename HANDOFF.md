@@ -1,3 +1,10 @@
+# Bounded content Auto-fit — 2026-10-02
+
+- New user authorization: after original Typography insertion and strict non-overflow checks, BODY98/96/94/92/90%, SUBTITLE98/96%; TITLE/tracking/geometry unchanged. Relative mixed-initial sizes and shared BODY distribution retained. Original source overset still blocks.
+- Actual same-DOCX Host21.4.1.4: 3 safe candidates attempted (u335e/u8e19/u3356), entire content/images applied; 0 PASS. All reach bounded minima but actual content overflow remains. Final typography/geometry/Fidelity mismatch0. No combined document fabricated.
+- Source/adjusted typography ledger and per-step native diagnostics: docs/BOUNDED_AUTO_FIT.md. Full Node360/Python18 pass. Actual early-success and adjusted-option combination still unverified.
+- Do not claim 3/3 production success. Next requires a larger safely confirmed CONTENT layout or an explicit designer/content decision; do not exceed limits, truncate article or invent photo roles. Original files, old Library/history, main and existing untracked INDD preserved.
+
 # CONTENT-role candidate entry and actual Production — 2026-10-02
 
 - Baseline d6e3374 preserved; existing untracked sample/magazine-design.indd untouched. Latest22 complete baseline frame/Story/role/overset/exclusion table: docs/LATEST_CONTENT_ROLES.md; source-proof PASS13 remains distinct from Production.
