@@ -10,6 +10,32 @@ const freeze=x=>{if(x&&typeof x==='object'&&!Object.isFrozen(x)){Object.values(x
 const originals=new WeakSet();
 function immutable(model){if(originals.has(model))return model;const value=freeze(clone(model));originals.add(value);return value;}
 const count=text=>Array.from(String(text||'')).length;
+// Rectangular minimum-cost assignment; source order is a deterministic tie breaker.
+// Unknown dimensions retain source order rather than inventing image geometry.
+function imageAssignment(slots,images){
+ if(images.length>slots.length)throw new Error('사진 수보다 IMAGE 슬롯이 적습니다.');
+ const required=slots.map((s,i)=>s.requirement==='required'?i:null).filter(i=>i!==null);
+ if(required.length>images.length)throw new Error('필수 IMAGE 슬롯에 필요한 사진이 없습니다.');
+ if(!images.length)return slots.map(()=>null);
+ const profiles=images.map(imageProfile);
+ if(profiles.some(p=>!p.known)){const result=slots.map(()=>null),order=required.concat(slots.map((s,i)=>i).filter(i=>!required.includes(i)));for(let i=0;i<images.length;i++)result[order[i]]=i;return result;}
+ if(profiles.some(p=>!Number.isFinite(p.aspectRatio)||p.aspectRatio<=0))throw new Error('사진 비율이 유효하지 않습니다.');
+ if(slots.some(s=>!Number.isFinite(s.aspectRatio)||s.aspectRatio<=0))throw new Error('IMAGE 슬롯 비율이 유효하지 않습니다.');
+ const n=images.length,m=slots.length,u=Array(n+1).fill(0),v=Array(m+1).fill(0),p=Array(m+1).fill(0),way=Array(m+1).fill(0);
+ const loss=(i,j)=>Math.abs(Math.log(profiles[i].aspectRatio)-Math.log(slots[j].aspectRatio));
+ let maxLoss=0;for(let i=0;i<n;i++)for(let j=0;j<m;j++)maxLoss=Math.max(maxLoss,loss(i,j));
+ const requiredPriority=maxLoss*(n+1)+1;
+ const cost=(i,j)=>loss(i,j)-(slots[j].requirement==='required'?requiredPriority:0);
+ for(let i=1;i<=n;i++){p[0]=i;let j0=0;const min=Array(m+1).fill(Infinity),used=Array(m+1).fill(false);
+  do{used[j0]=true;const i0=p[j0];let delta=Infinity,j1=0;for(let j=1;j<=m;j++)if(!used[j]){const cur=cost(i0-1,j-1)-u[i0]-v[j];if(cur<min[j]){min[j]=cur;way[j]=j0;}if(min[j]<delta){delta=min[j];j1=j;}}
+   for(let j=0;j<=m;j++)if(used[j]){u[p[j]]+=delta;v[j]-=delta;}else min[j]-=delta;j0=j1;
+  }while(p[j0]!==0);
+  do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0);
+ }
+ const result=slots.map(()=>null);for(let j=1;j<=m;j++)if(p[j])result[j-1]=p[j]-1;
+ if(required.some(i=>result[i]===null))throw new Error('필수 IMAGE 슬롯 매칭 실패');
+ return result;
+}
 function imageProfile(image={}){
     const width=image.width||image.widthPx,height=image.height||image.heightPx;
     if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return {known:false,width:null,height:null,aspectRatio:null,orientation:'unknown'};
@@ -115,7 +141,7 @@ function libraryEntry(model,descriptor){
         const b=e.pageBounds[e.pageCandidates[0]],width=b[3]-b[1],height=b[2]-b[0],page=pages.find(p=>p.id===e.pageCandidates[0]);
         const declared=d.images&&d.images[e.id],fitting=e.details&&e.details.FrameFittingOption;
         if(declared&&!['required','optional'].includes(declared))throw new Error('Image policy must be explicit required/optional');
-        return {elementId:e.id,role,width,height,aspectRatio:width/height,orientation:width===height?'square':width>height?'landscape':'portrait',
+        return {elementId:e.id,sourceId:e.id,pageId:e.pageCandidates[0],pageSetId:d.pageSet?.id||d.id,role,width,height,area:width*height,relativeArea:width*height/(page.width*page.height),aspectRatio:width/height,orientation:width===height?'square':width>height?'landscape':'portrait',
             prominence:width*height/(page.width*page.height),requirement:declared||'unknown',fitting:fitting||null};
     });
     const issues=[...(d.mappingReview||[])];
@@ -169,7 +195,8 @@ function evaluate(entry,article,{installedFonts=null}={}){
     if(a.subtitlePresent&&!p.supportedRoles.includes('subtitle'))add(p.readyForMatching?hard:review,'SUBTITLE_UNSUPPORTED','부제를 넣을 확정 영역이 없습니다.');
     if(a.captionPresent&&!p.supportedRoles.includes('caption'))add(p.readyForMatching?hard:review,'CAPTION_UNSUPPORTED','캡션을 넣을 확정 영역이 없습니다.');
     if(a.imageCount>p.imageSlots.length)add(p.readyForMatching?hard:review,'EXTRA_IMAGES','사진 수보다 확인된 이미지 슬롯이 적습니다.');
-    for(const slot of p.imageSlots){const index=Number(slot.role.slice(5))-1,image=a.images[index];
+    const imageOrder=entry.descriptor.imageMatching==='minimum-crop/v1'&&a.images.length<=p.imageSlots.length&&p.imageSlots.filter(s=>s.requirement==='required').length<=a.images.length?imageAssignment(p.imageSlots,a.images):p.imageSlots.map(s=>Number(s.role.slice(5))-1);
+    for(const [slotIndex,slot] of p.imageSlots.entries()){const index=imageOrder[slotIndex],image=index===null?null:a.images[index];
         if(!image&&slot.requirement==='required')add(hard,'MISSING_IMAGE',slot.role+' 필수 사진이 없습니다.');
         if(image){if(!image.known)add(review,'IMAGE_DIMENSIONS_UNKNOWN','사진 비율 확인 필요');
             else {const ppi=Math.min(image.width/(slot.width/72),image.height/(slot.height/72));if(ppi<150)add(soft,'IMAGE_RESOLUTION','사진 '+(index+1)+' 해상도가 슬롯 크기에 비해 낮습니다 (추정 '+Math.round(ppi)+' ppi).',10);const retained=Math.min(image.aspectRatio/slot.aspectRatio,slot.aspectRatio/image.aspectRatio);
@@ -260,7 +287,8 @@ function bindContent(entry,article,options){
             b.text=chars.slice(offset,end).join('');offset=end;total-=weight;
         }
     }
-    for(const slot of entry.profile.imageSlots){const image=(article.images||[])[Number(slot.role.slice(5))-1];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null});}
+    const slots=entry.profile.imageSlots,images=article.images||[],assignment=entry.descriptor.imageMatching==='minimum-crop/v1'?imageAssignment(slots,images):slots.map(slot=>Number(slot.role.slice(5))-1);
+    for(const [index,slot] of slots.entries()){const image=assignment[index]===null?null:images[assignment[index]];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null,imageSourceIndex:assignment[index]});}
     return {original:entry.original,content:bindings,runtimeAdjustments:[],suitability,productionReady:false,
         reason:'원본 Fidelity 검사 후 registered-native에서 콘텐츠만 교체합니다. 바인딩만으로 출력 승인하지 않습니다.'};
 }
@@ -288,6 +316,6 @@ function calibration(estimate,observed){
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-return {productionAssessment,isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {imageAssignment,productionAssessment,isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
 
 });

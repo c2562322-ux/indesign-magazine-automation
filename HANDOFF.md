@@ -1,3 +1,13 @@
+# Latest final layout page-set foundation — 2026-10-02
+
+- Source is now `3매거진자동화템플릿 (1).idml`, SHA 7e5b49257d3e3661...; original unchanged. Prior file analysis does not confer validation.
+- Added offline shared-object/Story/Group page-set registration, dependency fingerprints/change reporting and opt-in minimum-crop image matching. Legacy single production/binding unchanged; no ID-specific permission exceptions.
+- 31 pages → 22 design units (13 singles, 9 pairs). Static READY0/WARN2/REVIEW5/BLOCK15; page counts READY0/WARN2/REVIEW7/BLOCK22. All actual Adobe PASS counts remain zero for this new source.
+- Private standalone Library/audit generated in working assets. Existing active Library/55 versions preserved; default activation deferred until three suitable real Production PASS results.
+- BLOCKED milestone: actual COM open failed 0x80080005; existing-app attachment unavailable 0x800401E3. No new overset/font/Fidelity/production/merge PASS claimed. Two unblocked static units have 0 and4 IMAGE slots; they cannot provide three one-photo candidates.
+- Multiple independent TITLEs need semantic role decisions. Table/Cell and source effect comparisons remain unsupported; mixed visual emphasis is not flattened or position-mapped. Current parsers and safety gates preserved.
+- NEXT: restore actual Host access; batch source inspection using standalone Library; confirm ambiguous roles/Table semantics, then extend only supported common policies. See docs/FINAL_LAYOUT_PAGE_SETS.md. This is not completion of three-option E2E.
+
 # UDT 3안 실패 후속 — 2026-10-02
 
 - HEAD 작업 기준 b0c1d4c. 기존 미추적 sample/magazine-design.indd 보존. 추천/Library/원본/parser/binding 변경 없음.

@@ -12,9 +12,10 @@ function validatePageStories(entry){
  const spreads=new Set(entry.original.pages.filter(p=>selected.has(p.id)).map(p=>p.spreadId));
  for(const e of entry.original.elements){
   const children=entry.original.elements.filter(c=>c.groupId===e.id);
-  const retainedGroup=e.type==='Group'&&children.length&&children.every(c=>c.pageCandidates.length===1&&selected.has(c.pageCandidates[0]))&&new Set(children.map(c=>c.pageCandidates[0])).size===1;
+  const retainedGroup=e.type==='Group'&&children.length&&children.every(c=>c.pageCandidates.length&&c.pageCandidates.every(id=>selected.has(id)));
   const removedGroup=e.type==='Group'&&children.length&&children.every(c=>c.pageCandidates.length===1&&!selected.has(c.pageCandidates[0]));
-  if((e.pageCandidates.some(id=>selected.has(id))&&e.pageCandidates.length!==1)||(!e.pageCandidates.length&&spreads.has(e.spreadId)&&!removedGroup&&!retainedGroup))throw new Error('UNSUPPORTED 페이지 귀속/공유 객체: '+e.id);
+  const sharedPreserve=e.pageCandidates.length>1&&e.pageCandidates.every(id=>selected.has(id))&&!entry.descriptor.roles[e.id]&&!e.textFrame;
+  if((e.pageCandidates.some(id=>selected.has(id))&&e.pageCandidates.length!==1&&!sharedPreserve)||(!e.pageCandidates.length&&spreads.has(e.spreadId)&&!removedGroup&&!retainedGroup))throw new Error('UNSUPPORTED 페이지 귀속/공유 객체: '+e.id);
  }
  for(const e of entry.original.elements){if(!e.textFrame)continue;const id=e.textFrame.storyRef;if(!stories.has(id))stories.set(id,[]);stories.get(id).push(e);}
  for(const frames of stories.values()){
@@ -74,12 +75,14 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
   record('group',group.id,expected,actual);
  }
  for(const pageId of entry.descriptor.pageIds){const expected=entry.original.pages.find(p=>p.id===pageId),page=pages.find(p=>p.extractLabel(KEY)===pageId);record('page',pageId,{width:expected.width,height:expected.height},page?{width:page.bounds[3]-page.bounds[1],height:page.bounds[2]-page.bounds[0]}:null);}
- for(const e of entry.original.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
+ for(const e of entry.original.elements.filter(e=>e.pageCandidates.length&&e.pageCandidates.every(id=>entry.descriptor.pageIds.includes(id)))){
   if(e.type==='Group')continue; // Container checked via structure and child records, not scalar paint.
   const f=frames.get(e.id),role=entry.descriptor.roles[e.id]?.role||'keep';if(!f){record(role,e.id,{present:true},{present:false});continue;}
   try{
    if((e.image||[]).length&&!ignoreStories.includes('image:'+e.id))externalAssets.push(...Graphics.assets(e,f,ID).filter(a=>a.state!=='AVAILABLE'));
-   const expected={bounds:e.pageBounds[e.pageCandidates[0]],page:e.pageCandidates[0]},actual={bounds:relative(f),page:F.ref(f.parentPage)};
+   const hostPage=F.ref(f.parentPage);
+   if(!e.pageCandidates.includes(hostPage))throw new Error('원본 page-set 밖 객체 Parent: '+e.id);
+   const expected={bounds:e.pageBounds[hostPage],page:hostPage},actual={bounds:relative(f),page:hostPage};
    const props=F.objectProperties(entry.original,e);expected.appearance={};actual.appearance={};
    for(const [key,v] of Object.entries(props)){expected.appearance[key]=/Color$/.test(key)?F.colorExpected(entry.original,v):v;const inactive=(key==='FillTint'&&props.FillColor==='Swatch/None'&&F.noPaint(f.fillColor,doc))||(key==='StrokeTint'&&(props.StrokeColor==='Swatch/None'||props.StrokeWeight===0)&&(F.noPaint(f.strokeColor,doc)||f.strokeWeight===0));if(inactive){expected.appearance[key]=F.na('source and generated paint inactive');actual.appearance[key]=F.na('source and generated paint inactive');continue;}const got=f[key[0].toLowerCase()+key.slice(1)];actual.appearance[key]=/Color$/.test(key)?F.colorActual(got,ID,doc):got;}
    if(colorOverrides[e.id]){expected.appearance.FillColor=colorOverrides[e.id];actual.appearance.FillColor=F.colorActual(f.fillColor,ID,doc);}
@@ -141,6 +144,7 @@ function support(entry){
  const fidelity=[],production=[];
  try{validatePageStories(entry);}catch(e){fidelity.push(e.message);}
  const m=entry.original;
+ for(const story of m.stories.filter(s=>m.elements.some(e=>e.textFrame?.storyRef===s.id&&e.pageCandidates.some(id=>entry.descriptor.pageIds.includes(id)))))if(story.paragraphs.some(p=>p.runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)))))fidelity.push('복합 Story/Table readback 미지원: '+story.id);
  try{if(!supportedMarkerSources.has(m)){Markers.validateSource(m);if(Match.isImmutable(m))supportedMarkerSources.add(m);}}catch(e){fidelity.push(e.message);}
  if(!m.sourceXml||!m.sourceXml['designmap.xml'])fidelity.push('원본 IDML XML 없음');
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!m.sourceXml?.[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));if(unknown.length)fidelity.push('원본 바이너리 리소스 미보존: '+unknown.map(x=>x.name).join(', '));

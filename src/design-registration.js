@@ -90,6 +90,7 @@ function gate(entry){
 }
 function register(model,descriptor){Colors.validate(model,descriptor);const entry=Match.libraryEntry(model,descriptor);return {...entry,fidelity:gate(entry)};}
 function recommendations(entries,article,fonts){
+ entries=entries.filter(e=>e.descriptor.designSet?.active!==false);
  const assessments=entries.map(e=>Match.productionAssessment(e,article,{installedFonts:fonts}));
  const candidates=assessments.filter(r=>r.status==='candidate').sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
  return {assessments,reviewRequired:assessments.filter(r=>r.status==='review-required'),excluded:assessments.filter(r=>r.status==='excluded'),allCandidates:candidates,candidates:candidates.slice(0,3),selectedId:null};

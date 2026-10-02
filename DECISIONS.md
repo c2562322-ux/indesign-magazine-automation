@@ -617,3 +617,6 @@ PI는 일반 XML 노드로 보존하고 원본 ZIP의 독립 파서 증거와 �
 A source FillProportionally policy invokes the explicit Adobe Fill command for replacement content. Previous-image crop distances must not be restored afterward: actual Host experiments proved underfill for small raster images and extreme zoom for Smoke. Preserve source frame/alignment/mode/autoFit, record Adobe-calculated new crop and enforce readback. Non-Fill paths unchanged. No source/proof design change or gate relaxation.
 
 Batch UI completion requires three PASS and outputReady with no errors. A returned blocked report is not successful completion. Prior explicitly selected old-template merge tests are not evidence of active-panel candidate availability; never reactivate superseded designs or pad BLOCK candidates to get3/3.
+
+## 2026-10-02 — page-set identity and crop assignment
+Group source pages by actual shared/Story/Group relationships; do not duplicate furniture into single pages. Dependency fingerprints are change evidence, never Adobe approval. New registered sets opt into global crop-loss matching; legacy sequential binding stays intact. Unknown semantic emphasis and multiple independent titles require review rather than flattening or positional mapping.

@@ -1376,3 +1376,5 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 - 실기: 실제 등록UI handler(화면DOM harness)+실제Host+55Library+설치폰트 사용. 로컬01 DOCX → 후보1/검사30/제외10, 글·사진6targets 교체/fitting 통과 후 콘텐츠넘침5건으로0/3차단. Smoke → 새u577b PASS/한페이지, UI미완료1/3/출력차단. 구형3개 직접지정 회귀 →3PASS/한INDD3페이지/저장후검사0오류/PDF파일생성, API afterExport미관측 구분. 이는 사용자UDT3/3 성공이 아님.
 - Node331/331, Python18/18. docs/UDT_OPTIONS_FITTING.md에 활성41개 제외사유 및 실기수치.
 - NEXT: UDT Reload → 같은DOCX → N/3 확인 → 추천3안으로 제작. 현재Library에서3개를 억지로 채우지 않음. 정확한사용DOCX 또는 새진단 제공시 같은입력 재확인 가능. 새디자인지원/Library확대는 이번범위밖. 기존단일버튼 유지.
+## 2026-10-02 — latest final-layout foundation (E2E blocked)
+Shared page-set registration, dependency fingerprints and opt-in crop assignment implemented. Latest 31 pages grouped into22 units; no Adobe PASS. COM unavailable and ambiguous independent titles/visual emphasis/Table semantics prevent the three-PASS milestone. Existing active Library preserved. See docs/FINAL_LAYOUT_PAGE_SETS.md.

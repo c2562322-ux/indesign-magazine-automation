@@ -8,6 +8,37 @@ const base=JSON.parse(output.stdout),copy=x=>JSON.parse(JSON.stringify(x));
 function model(){const m=copy(base),body=copy(m.elements[0]),story=copy(m.stories[0]);body.id='body';body.role.confirmed=null;body.textFrame.storyRef='bs';body.pageBounds.p1=[150,20,700,420];story.id='bs';for(const r of story.paragraphs.flatMap(p=>p.runs))Object.assign(r.resolvedProperties,{PointSize:10,Leading:14});m.elements.push(body);m.stories.push(story);return m;}
 function registered(){const m=model(),d=R.draft(m,'p1');R.confirm(d,'body','body');for(const e of R.frames(m,'p1'))if(!d.roles[e.id])R.confirm(d,e.id,'keep');return R.register(m,d);}
 const article={title:'제목',body:'본문',images:[]},fonts=[{family:'Design Test',style:'9 Black'}];
+test('page-set registration follows shared objects and threads; fingerprints invalidate dependencies',()=>{
+ const S=require('../tools/design-set-registration'),m=model();
+ m.pages=m.pages.filter(p=>p.id!=='p2');const other=copy(m.pages.find(p=>p.id==='p1'));other.id='p2';other.documentIndex=1;m.pages.push(other);
+ const shape={id:'shared',type:'Rectangle',pageCandidates:['p1','p2'],properties:{},pageBounds:{p1:[0,0,10,10],p2:[0,-10,10,0]}};m.elements.push(shape);
+ assert.deepEqual(S.pageSets(m),[['p1','p2']]);
+ const original=S.fingerprint(m,['p1','p2']);m.pages.reverse();assert.equal(S.fingerprint(m,['p1','p2'])===original,false); // scope ordering is composition evidence
+ assert.notEqual(S.fingerprint(m,['p1','p2'],{roles:{body:'body'}}),S.fingerprint(m,['p1','p2'],{roles:{body:'keep'}}));
+ m.pages.reverse();m.elements.find(e=>e.id==='body').pageBounds.p1[0]++;assert.notEqual(S.fingerprint(m,['p1','p2']),original);
+ const d={pageSet:{id:'stable',fingerprint:'a'}};assert.deepEqual(S.changes([d],[{pageSet:{id:'stable',fingerprint:'b'}}]),[{id:'stable',state:'CHANGED'}]);
+ assert.equal(S.changes([d],[d])[0].state,'UNCHANGED');assert.equal(S.changes([], [d])[0].state,'ADDED');assert.equal(S.changes([d],[])[0].state,'REMOVED');
+});
+test('shared PRESERVE shape requires all intersecting pages and cannot become shared content',()=>{
+ const N=require('../src/registered-native'),m=model(),d=R.draft(m,'p1'),shared={...copy(m.elements[0]),id:'shared',type:'Rectangle',textFrame:null,role:{confirmed:null},pageCandidates:['p1','p2'],properties:{},details:{},image:[],spreadId:m.pages.find(p=>p.id==='p1').spreadId,pageBounds:{p1:[0,0,10,10],p2:[0,-10,10,0]}};m.elements.push(shared);
+ assert.ok(N.support(R.register(m,d)).fidelityReasons.some(x=>x.includes('shared')));
+ d.pageIds=['p1','p2'];assert.equal(N.support(R.register(m,d)).fidelityReasons.some(x=>x.includes('shared')),false);
+ d.roles.shared={role:'image1',confirmed:true};d.images.shared='required';assert.throws(()=>R.register(m,d),/outside selected/);
+});
+test('global crop matching preserves required slots, unique images, and unknown-dimension gates',()=>{
+ const slots=[{aspectRatio:.5,requirement:'required'},{aspectRatio:2,requirement:'required'}],images=[{widthPx:200,heightPx:100},{widthPx:100,heightPx:200}];
+ assert.deepEqual(Match.imageAssignment(slots,images),[1,0]);
+ assert.deepEqual(Match.imageAssignment([{aspectRatio:1,requirement:'optional'},slots[0]],[images[1]]),[null,0]);
+ assert.deepEqual(Match.imageAssignment([{aspectRatio:1,requirement:'optional'},slots[0]],[{}]),[null,0]);
+ assert.throws(()=>Match.imageAssignment(slots,[images[0]]),/필수/);
+ assert.throws(()=>Match.imageAssignment([slots[0]],images),/사진 수/);
+ assert.throws(()=>Match.imageAssignment([{aspectRatio:NaN,requirement:'required'}],[images[0]]),/비율/);
+ const many=Array.from({length:9},(_,i)=>({widthPx:i+1,heightPx:1}));assert.equal(new Set(Match.imageAssignment(many.map((im)=>({aspectRatio:im.widthPx,requirement:'required'})),many)).size,9);
+});
+test('inactive legacy design sets remain registered but cannot enter user recommendations',()=>{
+ const e=registered(),legacy=R.register(e.original,{...e.descriptor,designSet:{id:'legacy',version:'1',active:false}});
+ assert.equal(R.unpack(R.pack([legacy])).entries.length,1);assert.equal(R.recommendations([legacy],article,fonts).assessments.length,0);
+});
 test('role evidence retains priority; geometry never auto-confirms',()=>{const m=model(),e=m.elements.find(e=>e.id==='body');e.properties.Name='BODY';const c=R.candidates(m,e);assert.equal(c[0].role,'title');assert.ok(c.some(c=>c.role==='body'));assert.equal(c[0].confirmed,false);assert.equal(R.candidates(m,m.elements[0])[0].confirmed,true);});
 test('role confirmation, preserve, capability, original immutability and gate',()=>{const e=registered();assert.equal(e.profile.readyForMatching,true);assert.equal(e.fidelity.state,'READY_FOR_FIDELITY_TEST');assert.equal(e.fidelity.productionReady,false);assert.ok(Object.isFrozen(e.original));});
 test('saved file cannot self-authorize fidelity; corrupt entries isolated',()=>{const e=registered(),p=copy(R.pack([e]));p.designs[0].descriptor.productionReady=true;p.designs.push({});const out=R.unpack(p);assert.equal(out.entries.length,1);assert.equal(out.errors.length,1);assert.equal(out.entries[0].fidelity.productionReady,false);});
