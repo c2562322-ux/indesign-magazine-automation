@@ -1,3 +1,10 @@
+# Sequential actual-PASS search — 2026-10-02
+
+- Complete safe ranked pool now replaces frozen top three. Existing single Production tries candidates in order, records failures, stops after three independent PASS and uses existing merge/recheck. Distinct page-set identity, attempt history and final approval remain separate. Fewer successes remain incomplete N/3.
+- Native general UI hides UXP INDD/PDF buttons; final inspected document stays open for InDesign manual output. Internal outputReady/latest/registeredContexts/optionContexts and developer diagnostics retained. Parser/binding/fitting/Library and original files unchanged this turn.
+- Full Node350/350, Python18/18. Actual Adobe21.4.1.4 + same19/77/1061+one439x349 DOCX + default latest22 + existing UI-handler harness: safe0, attempted0, ProductionPASS0; merge not run. No claimed3/3. Source-proof13 remains distinct.
+- Closest one-photo source-PASS units: u335e blocked by ambiguous TITLE language; u3356/u8e19 have no confirmed subtitle slot. Earlier u3356 actual BODY overflow persists as evidence. Capacity estimates/aspect mismatch already WARN, not the cause of zero candidates. Detailed current evidence/limits: docs/SEQUENTIAL_PRODUCTION.md.
+- Next: safe role/language policy or designer-confirmed subtitle destinations; never remove article content or use old designs as filler. Existing untracked sample/magazine-design.indd preserved.
 # Latest-set default recommendation and actual input Production — 2026-10-02
 
 - Baseline9319012; old active-library55 was preferred over latest22. Explicit active-set selection now points to regenerated private latest22, preserving old/source/remembered data. Missing explicit selection fails visibly; no stale legacy fallback.

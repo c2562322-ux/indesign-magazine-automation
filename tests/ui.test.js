@@ -2,6 +2,9 @@
 // Minimal DOM double for controller state/event tests, not a real browser rendering test.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const Studio=require('../src/studio-ui');
+test('manual Adobe output hides UXP save/PDF buttons while keeping document inspection and diagnostics',async()=>{
+ const x=setup(true,{manualOutput:true,createRegisteredOptions:async()=>({pageCount:3,errors:[],warnings:[],options:Array.from({length:3},(_,i)=>({optionId:'OPTION_'+i,status:'PASS'})),outputReady:true})});await x.app.createRegisteredOptions([{descriptor:{id:'d'}}],x.app.read().article);assert.equal(x.e.btnSaveIndd.style.display,'none');assert.equal(x.e.btnExportPdf.style.display,'none');assert.equal(x.e.btnCheckAuto.disabled,false);assert.match(x.e.pdfReason.textContent,/InDesign/);assert.equal(x.app.state.hasDocument,true);assert.equal(x.app.state.pdfReady,true);
+});
 class Element{
  constructor(id='',tag='div'){this.id=id;this.tagName=tag.toLowerCase();this.value='';this.children=[];this.style={display:''};this.className='';this.disabled=false;this.listeners={};this.handlers={};this.attributes={};this.clientWidth=440;this._text='';}
  set textContent(v){this._text=String(v);this.children.forEach(c=>c.parentNode=null);this.children=[];}get textContent(){return this._text;}
