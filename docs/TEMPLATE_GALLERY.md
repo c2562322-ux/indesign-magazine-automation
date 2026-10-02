@@ -1,0 +1,33 @@
+# Active template gallery — 2026-10-02
+
+Default native workflow: **DOCX → original template gallery → choose one → selected design Production**. The current active source is `5583fa2bb92b5405d28bb6ad1ee9c1a0b6c6be1c31159e73819181dc4bb5979d`: 22 designs/page-sets covering 31 pages. No archived Library fallback. Recommendation/sequential/three-option tools remain available in the collapsed developer area; they do not select or replace a gallery choice.
+
+## Selection and safety
+
+Cards display original native JPEG previews, page-set size, image slots, BODY regions, subtitle support and photo count differences. All active designs remain visible, including structurally blocked designs. Selecting a blocked card explains its conditions and disables Production. Estimated text capacity does not grant or prevent actual Production; existing engine checks remain authoritative.
+
+A choice captures the registered entry, article snapshot and full design/source provenance. Production calls the existing `createRegistered(..., 'production')` once. Result design ID and provenance must match the captured selection. Mismatch invalidates output; failure never invokes another design automatically. Changing the article invalidates the choice. Originals, roles, Library and Production algorithms are unchanged.
+
+## Native previews and cache
+
+`registered-thumbnails.js` opens the original packaged source in a temporary hidden document and exports each selected source page via native JPEG export. Page-set cards display their pages together in source order. Absolute document offsets avoid duplicate displayed page numbers. Export settings and interaction level are restored; the temporary document is closed without saving.
+
+Local cache: `assets/templates/working/gallery-previews.private/` (ignored/private). Identity includes full source filename/SHA, set/version, fingerprint, ordered source pages, design ID, Host version and renderer/export settings. Full manifest identity and valid JPEG data are checked before persistent reuse. No DOCX-specific thumbnail is cached: these are original design previews, not production output. A missing/corrupt/outdated cache is regenerated. Normal reopening reuses the session cache; a fresh renderer uses the persistent cache without opening InDesign documents. First use may take longer and shows progress.
+
+## Evidence and limits
+
+Actual InDesign 21.4.1.4 executed the same gallery mount, selection-button handler and single Production handler with `02_소아근시_매거진.docx` (SHA `adaf7ffde162610185a5420f4f0961e8895ff8dc43b459c541fa8f245e4de2d0`). Native render produced 22 previews/31 page JPEGs; a new renderer read all 22 with zero source opens. The u3356 card is **디자인 07**; its original preview has a wide image above two BODY regions. Direct selection called only that design, mode=production, source=5583fa2b... .
+
+Actual Production: title22 and BODY878 preserved (566+312, native paragraph breaks), internal image placed/link NORMAL, BODY92% (12→11.04pt, 20→18.4pt), overset0, errors0, outputReady=true, source/design identity matches. Existing image72ppi warning and optional subtitle75 omission remain visible; this design has no subtitle slot. No safety threshold was changed. Private evidence: `gallery-host.private.json`, `gallery-inspect.private.json` under working/.
+
+Node372/372 and Python18/18 pass. Gallery tests cover all-design display, exact selection, no fallback after failure, output identity rejection and cache invalidation. Actual Host used the UI handlers with a DOM harness; visual UDT panel rendering/clicks still require user confirmation. Single selection only; multi-selection is not implemented in this prototype. Existing three-option engine remains preserved.
+
+## Minimal UDT check
+
+1. UDT Reload → load the same DOCX.
+2. In the template gallery, visually select **디자인 07** (wide photo above two BODY columns) using **이 디자인 선택**.
+3. Click **선택한 디자인으로 제작**. Confirm the new editable document has the DOCX title, full BODY and internal photo. Inspect warnings; save/export using InDesign itself.
+
+No Library import, manual Fidelity approval or automatic recommendation is required in the default flow.
+
+Final native-window rerun also passed: document166 (registered-1790925488603-awpd39s3dig), one page/one visible window, titleMatches=true, fullBODYMatches=true, BODY878, all content Story overflows=false, image link NORMAL. The editable unsaved result is left open. Gallery cache reused all22; source mixing0.

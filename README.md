@@ -1,5 +1,8 @@
 # 매거진 스튜디오 1.1 — InDesign 자동 디자인
 
+**현재 일반 사용자 흐름:** DOCX 불러오기 → 최신 템플릿 원본 갤러리 → 하나 선택 → 선택한 디자인으로 제작. Active source 5583fa2b...의22개만 표시합니다. 자동추천/3안 도구는 개발자 영역에 유지합니다. [갤러리 사용법·실제 Host 검증](docs/TEMPLATE_GALLERY.md). Node372/Python18 통과; 실제 UDT 화면 확인은 별도로 필요합니다.
+
+
 기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
 최신 등록 세트 선택은 `assets/templates/working/active-design-set.private.json`의 set/version과 Library 경로로 구형 Library와 분리합니다. 개인 등록 파일은 Git에 포함되지 않습니다. 현재 실제 원고(19/77/1061자·사진1장)의 최신22 추천/Production 검사 결과와 남은 차단: [실제 입력 결과](docs/LATEST_PRODUCTION_INPUT.md). 3안 Production 성공 상태가 아닙니다.

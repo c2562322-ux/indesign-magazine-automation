@@ -197,3 +197,6 @@ Registered Production may proportionally reduce BODY up to10% and SUBTITLE up to
 # Active source identity
 
 New registrations store model metadata.sourceFilename/sourceSha256 and descriptor.provenance: designSetId, designSetVersion, sourceFilename, sourceSha256, sourcePageIds, sourceSpreadIds, pageSetId, fingerprint. The active selection stores an explicit sources allowlist. General native load/recommendation/Production and combined OPTION checks validate these fields; equal page IDs do not transfer prior roles or approvals. Source frame/image geometry and fitting remain in the extracted model and existing computed profile. No source geometry or role is inferred from an archived registration.
+
+## Gallery selection contract
+Gallery identity is designId plus full descriptor.provenance, captured with the article snapshot. Single Production reports fidelity.designId and provenance; both must exactly match the selected entry after active-source validation. Native preview manifest magazine-native-preview/v1 stores source-ordered page files and renderer/Host identity; cached preview is not Fidelity/Production approval. See TEMPLATE_GALLERY.md.

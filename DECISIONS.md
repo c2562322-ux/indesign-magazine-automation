@@ -644,3 +644,6 @@ User explicitly authorized limited content Typography adjustment after actual ov
 # Active source provenance boundary — 2026-10-02
 
 Only the explicitly selected source filename/full SHA allowlist may enter general native recommendations, preview and Production. Set/version labels and matching page IDs alone are insufficient identity. Carry page/spread/page-set/fingerprint provenance to final OPTION validation. Reject remembered/packaged legacy fallback when selection is missing/broken; preserve archived sources and engines. A new source starts with fresh roles and unverified proof; actual source proof does not grant content Production readiness. See docs/ACTIVE_SOURCE_5583.md.
+
+## Default single template gallery (2026-10-02)
+User chooses a native original preview from the explicit active set. Recommendation and sequential3-option logic stay as developer/auxiliary tools; selection cannot silently fall back. Match assessment explains structural BLOCK without hiding the design; actual Production still owns overflow/Fidelity decisions. Cache full source/fingerprint/page-order/Host/export identity; previews grant no approval. Compare selected designId/provenance to the result and invalidate any mismatch. Implement single choice first; defer multi-selection until UDT confirmation.

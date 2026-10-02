@@ -46,3 +46,11 @@ body{margin:0;padding:0;background:#f3f1eb;color:#202724;font-family:Arial,sans-
 .registered-map { position:relative; background:#fff; color:#222; margin:8px 0; overflow:hidden; }
 #registeredDesigns select { max-width:100%; margin:4px; }
 #registeredDesigns pre { white-space:pre-wrap; max-height:220px; overflow:auto; }
+.registered-gallery { display:flex; flex-wrap:wrap; gap:10px; }
+.gallery-card { box-sizing:border-box; width:calc(50% - 5px); padding:8px; border:1px solid #ccc; background:#fff; }
+.gallery-card h4 { margin:4px 0; }
+.gallery-card p { font-size:12px; line-height:1.4; margin:6px 0; }
+.gallery-card button { width:100%; }
+.gallery-selected { border:2px solid #b64c23; background:#fff8f3; }
+.gallery-preview { display:flex; align-items:center; justify-content:center; min-height:150px; background:#eee; }
+.gallery-preview img { display:block; min-width:0; width:100%; max-height:230px; object-fit:contain; }

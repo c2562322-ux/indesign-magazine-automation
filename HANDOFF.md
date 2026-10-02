@@ -701,3 +701,10 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 - New-source u3356 PASS (BODY566+312 at92%, overset0; final combined-check PASS). u335e fails BODY90% and subtitle96% overflow; u8e19 fails BODY90% overflow. u9ba6 has no IMAGE; uaa27 requires4; neither attempted. Mixing0.
 - Result `무제-141`, one page/OPTION_1, is open/unsaved; title/fullBODY/image link verified read-only. Subtitle75 unapplied under optional contract;72ppi image WARN. outputReady=false, batch1/3, not3-design completion.
 - Full evidence/ratios/source IDs: docs/ACTIVE_SOURCE_5583_PRODUCTION.md. Private reports remain local. Node367/367; no engine changes. Do not claim latest-source3PASS or silently widen fit/borrow old layouts.
+
+# Latest single-selection gallery — 2026-10-02
+- Default native UI now shows all22 active-source designs as native original JPEG cards after DOCX import. Recommendation/sequential/3-option engines are retained in developer tools; no automatic substitute after selection/failure.
+- Direct gallery selection u3356 (디자인07) passed actual Host UI-handler Production: source5583fa2b..., title22/BODY878/image applied, BODY92%, overset0/errors0. Subtitle75 remains unapplied under optional contract; image72ppi WARN. This is single-design success, not3PASS.
+-22 native previews/31 pages generated; persistent cache reused22 with0source opens. Source identity checked selection→Production→result. Node372/372, Python18/18. UDT visual/click confirmation remains required. See docs/TEMPLATE_GALLERY.md.
+- Existing originals/private Libraries/sample untracked INDD preserved. Next: user UDT single-selection check before any multi-selection expansion.
+- Final gallery single Production rerun leaves document166 (registered-1790925488603-awpd39s3dig) open with one visible window. Read-only final title/fullBODY match and overset0 verified. This supersedes earlier partial3-option result as the latest single-choice evidence.

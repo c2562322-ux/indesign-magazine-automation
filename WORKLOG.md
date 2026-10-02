@@ -1410,3 +1410,8 @@ Implemented bounded relative CONTENT Auto-fit after actual overflow only, preser
 - Current article admits3 of5 capability-ready designs: actual attempts u335e/u3356/u8e19 in score order;1PASS u3356, two content-overflow failures. No source/Fidelity/geometry mismatch caused those failures; source mixing0.
 - Corrected only ignored diagnostic harness cleanup/readback, repeated identical actual job, same result. Final one-page partial document stays open; read-only title/BODY878/image link/overset checks confirm result. Subtitle optional omission and72ppi warnings explicitly recorded.
 - Node367/367. Source/Library/production algorithms and safety limits unchanged. See docs/ACTIVE_SOURCE_5583_PRODUCTION.md. 3/3 not obtained, not reported as completed.
+
+## 2026-10-02 — Single active-template gallery
+- Added native JPEG source preview cache and all-active-design cards; blocked cards remain visible with conditions. Captured exact choice and result provenance; no ranking/fallback in default flow.
+- Reused existing single Production; changed engine report only to include designId. Actual Host gallery handler u3356 PASS with unchanged92% Auto-fit and BODY566+312. Cache22/31 JPEGs validated; fresh renderer0source opens.
+- Regression Node372, Python18; docs/TEMPLATE_GALLERY.md contains scope and UDT limitations. No model/Library/source or parser changes; no multi-selection.

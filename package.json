@@ -4,7 +4,7 @@
   "private": true,
   "description": "Original magazine layouts with an optional AI planner for InDesign UXP",
   "scripts": {
-    "test": "node --test tests/core.test.js tests/host.test.js tests/ui.test.js tests/json-design.test.js tests/design-model.test.js tests/design-matching.test.js tests/design-registration.test.js tests/registered-production.test.js tests/registered-auto-fit.test.js tests/host-article-input.test.js tests/active-design-set.test.js tests/idml-package.test.js tests/registered-options.test.js"
+    "test": "node --test tests/core.test.js tests/host.test.js tests/ui.test.js tests/json-design.test.js tests/design-model.test.js tests/design-matching.test.js tests/design-registration.test.js tests/registered-production.test.js tests/registered-auto-fit.test.js tests/host-article-input.test.js tests/active-design-set.test.js tests/idml-package.test.js tests/registered-options.test.js tests/registered-gallery.test.js"
   },
   "engines": {
     "node": ">=20"
