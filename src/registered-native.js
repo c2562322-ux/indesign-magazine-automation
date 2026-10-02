@@ -133,13 +133,13 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
 }
 function replacementPlan(entry,article){const binding=Match.bindContent(entry,article,{installedFonts:entry.profile.requiredFonts});
  const edits=[];for(const b of binding.content){if(b.storyId){const story=entry.original.stories.find(s=>s.id===b.storyId),runs=story.paragraphs.flatMap(p=>p.runs);
-   const textPolicy=TextPolicy.policy(story),normalized=b.text.replace(/\r\n?|\n/g,'\r');if(textPolicy.mode==='language-by-source-character-class')textPolicy.assignments=TextPolicy.assignments(textPolicy,normalized);
+   const textPolicy=TextPolicy.policy(story,{role:b.role}),normalized=b.text.replace(/\r\n?|\n/g,'\r');if(textPolicy.mode==='language-by-source-character-class')textPolicy.assignments=TextPolicy.assignments(textPolicy,normalized);
    if(textPolicy.mode==='enlarged-story-initial'&&(!normalized.length||!['hangul','latin','han'].includes(TextPolicy.kind(normalized[0]))))throw new Error('UNSUPPORTED 확대 첫 글자에 대응하는 원고 시작 문자 없음');
    const frames=entry.original.elements.filter(e=>e.textFrame&&e.textFrame.storyRef===b.storyId);if(frames.some(e=>e.pageCandidates.length!==1||!entry.descriptor.pageIds.includes(e.pageCandidates[0])))throw new Error('선택 페이지 밖 Story 연결');
    const baseRun=textPolicy.mode==='enlarged-story-initial'?runs[1]:runs[0];
    edits.push({...b,textPolicy,elementId:frames[0].id,typography:baseRun.resolvedProperties,paragraphOverrides:story.paragraphs[0].properties,characterOverrides:baseRun.properties});
   }else edits.push(b);}
- return edits;
+ edits.unappliedContent=binding.unappliedContent;return edits;
 }
 const supportedMarkerSources=new WeakSet();
 function support(entry){
@@ -156,7 +156,7 @@ function support(entry){
   const role=entry.descriptor.roles[e.id]?.role;
   if(e.textFrame&&['title','subtitle','body','caption'].includes(role)){
    const story=m.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?.paragraphs.flatMap(p=>p.runs)||[];
-   try{TextPolicy.policy(story);}catch(error){production.push(role+' '+error.message);}
+   try{TextPolicy.policy(story,{role});}catch(error){production.push(role+' '+error.message);}
   }
  }
  return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};
@@ -202,24 +202,25 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],contentWarnings:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure=baseline.externalAssets.length?'템플릿 원본 외부 이미지 검증 불가 · EXTERNAL_ASSET_UNAVAILABLE/UNVERIFIED · DOCX 사진과 별개 · 콘텐츠 미교체':'원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
-  progress('registered.content.plan.start');const edits=replacementPlan(entry,article),placeholders=Match.imagePlaceholders(entry);context.edits=edits;context.requiredContent=edits.map(e=>({role:e.role,elementId:e.elementId,image:!!e.image}));progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
+  progress('registered.content.plan.start');const edits=replacementPlan(entry,article),placeholders=Match.imagePlaceholders(entry);context.unappliedContent=edits.unappliedContent;context.contentWarnings.push(...context.unappliedContent.map(c=>c.message));context.edits=edits;context.requiredContent=edits.map(e=>({role:e.role,elementId:e.elementId,image:!!e.image}));progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
   // Read every destination and direct override before the first write.
   const targets=edits.map(edit=>{
    const f=baseline.frames.get(edit.elementId);if(!f)throw new Error('교체 프레임 식별 실패');if(edit.image&&!edit.image.path)throw new Error('Word 이미지 파일 위치 없음');
    const target={edit,f,bounds:relative(f)};
    if(edit.storyId){const initial=edit.textPolicy.mode==='enlarged-story-initial',mixedLanguage=edit.textPolicy.mode==='language-by-source-character-class',first=f.parentStory.characters.item(initial?edit.textPolicy.baseIndex:0),para=f.parentStory.paragraphs.item(0);Object.assign(target,{paragraphStyle:para.appliedParagraphStyle,characterStyle:first.appliedCharacterStyle,paragraph:F.directSnapshot(para,mixedLanguage?TextPolicy.withoutLanguage(edit.paragraphOverrides):edit.paragraphOverrides),character:F.directSnapshot(first,mixedLanguage?TextPolicy.withoutLanguage(edit.characterOverrides):edit.characterOverrides),hostType:readType(first,ID)});if(mixedLanguage)target.languages=TextPolicy.capture(f.parentStory,edit.textPolicy);if(initial)target.initial={pointSize:f.parentStory.characters.item(0).pointSize,typography:readType(f.parentStory.characters.item(0),ID)};}
+   if(edit.textPolicy?.mode==='source-base-title-language'){target.character.appliedLanguage=f.parentStory.characters.item(0).appliedLanguage;context.contentWarnings.push(edit.role+' 원본 기본 문단 언어 사용: 샘플의 부분 언어 위치는 새 제목에 복사하지 않습니다.');}
    if(edit.image){target.fitting={};for(const k of F.FIT){const v=f.frameFittingOptions&&f.frameFittingOptions[k];if(v===undefined)throw new Error('UNSUPPORTED 이미지 fitting readback: '+k);target.fitting[k]=v;}}
    return target;
   });
   for(const target of targets){const {edit,f,bounds}=target;guard();
-   if(edit.storyId){const story=f.parentStory;operation('registered.content.'+edit.role+'.replace',story,'contents',{characters:edit.text.length},()=>{story.contents=edit.text.replace(/\r\n?|\n/g,'\r');});const text=story.texts.item(0);
+   if(edit.storyId){const story=f.parentStory;operation('registered.content.'+edit.role+'.replace',story,'contents',{characters:edit.text.length},()=>{TextPolicy.replaceContents(story,edit.text.replace(/\r\n?|\n/g,'\r'),edit.textPolicy);});const text=story.texts.item(0);
     text.appliedParagraphStyle=target.paragraphStyle;text.appliedCharacterStyle=target.characterStyle;
     // Restore only explicit source overrides, using native values captured
     // before replacement. Style inheritance is left in the imported styles.
     F.restore(text,target.paragraph);F.restore(text,target.character);
     if(target.languages)TextPolicy.apply(story,edit.textPolicy.assignments,target.languages);
     if(target.initial)operation('registered.content.'+edit.role+'.initial',story.characters.item(0),'pointSize',target.initial.pointSize,()=>{story.characters.item(0).pointSize=target.initial.pointSize;});
-    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,initial:target.initial||null,languagePlan:target.languages?edit.textPolicy.assignments:null,languages:target.languages?Object.fromEntries(Object.entries(target.languages).map(([k,v])=>[k,F.value(v)])):null,paragraphStyle:F.value(target.paragraphStyle),characterStyle:F.value(target.characterStyle),typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
+    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,textPolicy:edit.textPolicy,initial:target.initial||null,languagePlan:target.languages?edit.textPolicy.assignments:null,languages:target.languages?Object.fromEntries(Object.entries(target.languages).map(([k,v])=>[k,F.value(v)])):null,paragraphStyle:F.value(target.paragraphStyle),characterStyle:F.value(target.characterStyle),typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
     operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));const beforeFit=imageFitReadback(f);const appliedFitting=fitReplacement(f,target.fitting,ID,(command,name)=>operation('registered.content.'+edit.role+'.fit',f,'fit()',name,()=>f.fit(command)));
     const graphics=F.list(f.allGraphics),normalizePath=p=>String(p||'').replace(/\\/g,'/');

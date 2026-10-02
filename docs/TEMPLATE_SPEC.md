@@ -185,3 +185,8 @@ PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기
 An automatically inferred author/job-title/name line is PRESERVE, not a subtitle destination based solely on its position. Existing explicit role confirmations are retained. BODY inference uses the dominant source character size, without resizing a frame or font. A unique heading above article prose can be a TITLE candidate even with a modest source size; ambiguous headings still need review.
 
 The native replacement policy supports one enlarged first letter only when the rest of the source Story is uniform and all other styles/languages/overrides match. Its original size is applied to the new first letter, the original base to the rest, with per-character verification. Other emphasis and ambiguous language ranges require a deliberate registration policy. Actual source/content overflow remains blocking.
+
+## Optional content contracts and TITLE base language (2026-10-02)
+Fully confirmed article roles may declare `magazine-content-contract/v1` with absent optional subtitle and `omit-with-warning`. Source identity, absent effective subtitle, no unresolved mapping and confirmed TITLE/BODY are validated; role edits invalidate the contract. A nonempty DOCX subtitle remains explicitly unapplied and visible in diagnostics. No implicit BODY merge or additional frame is permitted.
+
+A visually uniform TITLE whose sample differs only by language may inherit its resolved original base language. Native first-point replacement preserves that language; arbitrary emphasis/size/style changes still require semantic correspondence. BODY remains on the existing strict policies. See [latest22 audit and actual Production](LATEST_CONTENT_ROLES.md).

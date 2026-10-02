@@ -34,9 +34,19 @@ function draft(model,pageId,name){
 function confirm(d,id,role,requirement){
  if(!ROLES.includes(role)&&!/^image[1-9]\d*$/.test(role))throw new Error('지원하지 않는 역할');
  if(/^image/.test(role)&&!['required','optional'].includes(requirement))throw new Error('사진 필수/선택 확인 필요');
+ delete d.contentContract; // A role edit invalidates the old absence assertion.
  delete d.roles[id];delete d.images[id];d.preserveElementIds=d.preserveElementIds.filter(x=>x!==id);
  if(role==='keep')d.preserveElementIds.push(id);
  else {d.roles[id]={role,confirmed:true};if(/^image/.test(role)){if(!['required','optional'].includes(requirement))throw new Error('사진 필수/선택 확인 필요');d.images[id]=requirement;}}
+ return d;
+}
+function contentContract(model,descriptor){
+ const d=copy(descriptor),roles=Object.values(d.roles||{}).map(r=>r.role);
+ delete d.contentContract;
+ // Explicitly recorded omission, never a fabricated subtitle destination.
+ // Ambiguous mapping remains review-required and cannot receive this contract.
+ if(!d.mappingReview?.length&&roles.includes('title')&&roles.includes('body')&&!roles.includes('subtitle'))
+  d.contentContract={schema:'magazine-content-contract/v1',sourceSha256:model.metadata.sourceSha256,subtitle:{support:'absent',optional:true,handling:'omit-with-warning',evidence:'confirmed TITLE/BODY; no registered SUBTITLE; other objects preserved'}};
  return d;
 }
 function autoDraft(model,pageId,name){
@@ -60,7 +70,7 @@ function autoDraft(model,pageId,name){
  images.forEach((e,i)=>assign(e,'image'+(i+1),.95,'원본 이미지 자리표시 문구를 포함한 프레임'));
  const placed=all.filter(e=>(e.image||[]).length&&!images.includes(e));if(placed.length)review.push('배치 이미지 '+placed.length+'개: 기사 사진/설명·배경 여부 확인 (현재 유지)');
  const captions=text.filter(t=>!d.roles[t.e.id]&&/^(캡션|caption)[:：]/i.test(t.content.trim()));if(captions.length===1)assign(captions[0],'caption',.9,'명시적 캡션 라벨');else if(captions.length>1)review.push('캡션 여러 개: 분배 확인');
- d.mappingReview=review;d.mappingEvidence=evidence;return d;
+ d.mappingReview=review;d.mappingEvidence=evidence;return contentContract(model,d);
 }
 function resolveClearRoles(model,descriptor){
  const d=copy(descriptor),pageId=d.pageIds[0],proposal=autoDraft(model,pageId),all=frames(model,pageId),evidence=[];
@@ -141,5 +151,5 @@ function diagnose({comparison,originalOverflow,currentOverflow,missingFonts=fals
 }
 function pack(entries){const models={};return {schema:'magazine-registered-library/v1',models,designs:entries.map(e=>{const key=e.original.metadata.sourceSha256;models[key]=e.original;return {modelKey:key,descriptor:copy(e.descriptor)};})};}
 function unpack(data){if(!data||data.schema!=='magazine-registered-library/v1'||!Array.isArray(data.designs))throw new Error('등록 라이브러리 JSON이 아닙니다.');const entries=[],errors=[],ids=new Set(),cache=new Map();for(const row of data.designs)try{const model=cache.get(row.modelKey)||data.models&&data.models[row.modelKey]||row.model;const entry=register(model,row.descriptor);if(ids.has(entry.descriptor.id))throw new Error('중복 디자인 ID');ids.add(entry.descriptor.id);if(row.modelKey)cache.set(row.modelKey,entry.original);entries.push(entry);}catch(e){errors.push(String(e.message));}return {entries,errors};}
-return {resolveClearRoles,Colors,ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
+return {contentContract,resolveClearRoles,Colors,ROLES,batchReport,lifecycle,groupFailures,autoDraft,frames,candidates,draft,confirm,gate,register,recommendations,selection,diagnose,pack,unpack};
 });

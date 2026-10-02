@@ -18,6 +18,16 @@ function design({bodyHeight=400,titleHeight=100,imageRatio=1.5,required='optiona
 }
 const article={title:'짧은 제목',subtitle:'',body:'본문 '.repeat(20),images:[]};
 const fonts=[{family:'Design Test',style:'9 Black'}];
+test('explicit absent optional subtitle contract warns, records unapplied content, never merges or invents a frame',()=>{
+ const R=require('../src/design-registration'),{m,d}=design();d.roles[m.elements[0].id]={role:'title',confirmed:true};d.preserveElementIds=m.elements.filter(e=>!d.roles[e.id]).map(e=>e.id);
+ const contracted=R.contentContract(m,d),entry=Match.libraryEntry(m,contracted),a={...article,subtitle:'원고 부제'};
+ const result=Match.productionAssessment(entry,a,{installedFonts:fonts});assert.notEqual(result.decision,'BLOCK');assert.ok(result.diagnostics.some(d=>d.code==='SUBTITLE_NOT_APPLIED'&&d.severity==='WARN'));
+ const binding=Match.bindContent(entry,a,{installedFonts:fonts});assert.equal(binding.content.filter(c=>c.role==='subtitle').length,0);assert.equal(binding.content.find(c=>c.role==='body').text,a.body);assert.equal(binding.unappliedContent[0].role,'subtitle');assert.equal(binding.unappliedContent[0].characters,a.subtitle.length);
+ const wrong=copy(contracted);wrong.contentContract.sourceSha256='different';assert.throws(()=>Match.libraryEntry(m,wrong),/contract/);
+ const changed=copy(contracted);R.confirm(changed,'new-subtitle','subtitle');assert.equal(changed.contentContract,undefined);
+ const conflicted=copy(m),implicit=conflicted.elements.find(e=>e.id==='body'),other=copy(implicit);other.id='other';conflicted.elements.push(other);implicit.role.confirmed='subtitle';const conflictDescriptor=copy(contracted);delete conflictDescriptor.roles.body;conflictDescriptor.roles.other={role:'body',confirmed:true};assert.throws(()=>Match.libraryEntry(conflicted,conflictDescriptor),/conflicts with source SUBTITLE/);
+ const review=R.contentContract(m,{...d,mappingReview:['ambiguous subtitle']});assert.equal(review.contentContract,undefined);assert.equal(Match.productionAssessment(Match.libraryEntry(m,d),a,{installedFonts:fonts}).decision,'BLOCK');
+});
 test('DOCX uses existing parser and provides measured counts, not invented category/images',()=>{
     const file=path.join(__dirname,'../sample/article-eye-clinic-with-photo.docx');
     const x=Match.parseArticle('article.docx',fs.readFileSync(file));

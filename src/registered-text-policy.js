@@ -2,7 +2,7 @@
 const M=require('./design-model');
 const withoutLanguage=o=>Object.fromEntries(Object.entries(o||{}).filter(([k])=>k!=='AppliedLanguage'));
 function kind(c){if(/[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/u.test(c))return 'hangul';if(/[A-Za-z]/u.test(c))return 'latin';if(/[0-9]/u.test(c))return 'number';if(/\s/u.test(c))return 'space';if(/\p{P}|\p{S}/u.test(c))return 'punctuation';if(/\p{Script=Han}/u.test(c))return 'han';return 'other';}
-function policy(story){
+function policy(story,{role=null}={}){
  const runs=story?.paragraphs.flatMap(p=>p.runs)||[],first=runs[0];
  const fail=()=>{const paths=[...new Set(runs.flatMap(r=>M.compare(first?.resolvedProperties||{},r.resolvedProperties||{}).differences.map(d=>d.path)))];throw new Error('UNSUPPORTED 혼합 Typography: 원본 스타일/언어 패턴을 안전하게 대응할 수 없습니다.'+(paths.length?' 실제 속성 차이: '+paths.join(', '):' 문단/문자 스타일·특수 콘텐츠 구조 확인 필요'));};
  if(!first||runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)||t.contentTree)))return fail();
@@ -20,6 +20,14 @@ function policy(story){
   runs.slice(1).every(r=>M.compare(r.resolvedProperties,base.resolvedProperties).equal&&M.compare(r.properties,base.properties).equal))
   return {mode:'enlarged-story-initial',baseIndex:1,initialSize:first.resolvedProperties.PointSize};
  if(runs.some(r=>r.styleRef!==first.styleRef||!M.compare(withoutLanguage(r.properties),withoutLanguage(first.properties)).equal||!M.compare(withoutLanguage(r.resolvedProperties),withoutLanguage(first.resolvedProperties)).equal))return fail();
+ // A replacement TITLE inherits its original paragraph/base character language,
+ // not the old sample's arbitrary substring offsets. This is a content contract,
+ // never source Fidelity normalization. Require otherwise identical effective
+ // typography/style and an inherited, resolved first-run language. BODY keeps
+ // its existing character-class policy; meaningful visual emphasis still fails.
+ const inherited=story.paragraphs[0].resolvedProperties?.AppliedLanguage;
+ if(role==='title'&&first.properties.AppliedLanguage===undefined&&typeof inherited==='string'&&inherited&&inherited===first.resolvedProperties.AppliedLanguage&&runs.every(r=>typeof r.resolvedProperties.AppliedLanguage==='string'&&r.resolvedProperties.AppliedLanguage))
+  return {mode:'source-base-title-language',language:inherited,sourceLanguages:[...new Set(runs.map(r=>r.resolvedProperties.AppliedLanguage))]};
  const classes={},samples={};let offset=0;
  for(const r of runs){const language=r.resolvedProperties.AppliedLanguage;if(typeof language!=='string')return fail();const text=r.tokens.map(t=>t.type==='Br'?'\r':t.text).join('');
   for(const c of text){if(c.length!==1)return fail();const k=kind(c);if(classes[k]&&classes[k]!==language)return fail();classes[k]=language;if(samples[language]===undefined)samples[language]=offset;offset++;}
@@ -29,4 +37,15 @@ function policy(story){
 function assignments(p,text){return Array.from(text,c=>{const language=p.classes[kind(c)];if(c.length!==1||!language)throw new Error('UNSUPPORTED 원고 문자 종류의 원본 언어 패턴 없음: '+kind(c));return language;});}
 function capture(story,p){return Object.fromEntries(Object.entries(p.samples).map(([language,index])=>{const char=story.characters.item(index);if(char.appliedLanguage==null)throw new Error('원본 언어 readback 실패');return [language,char.appliedLanguage];}));}
 function apply(story,plan,values){for(let start=0;start<plan.length;){let end=start+1;while(end<plan.length&&plan[end]===plan[start])end++;story.characters.itemByRange(start,end-1).appliedLanguage=values[plan[start]];start=end;}}
-module.exports={policy,assignments,capture,apply,withoutLanguage,kind};
+function replaceContents(story,text,p){
+ if(p.mode!=='source-base-title-language'){story.contents=text;return;}
+ // Story.contents inherits the old trailing run in the actual UXP Host. Insert
+ // at the source base insertion point before removing the entire old sample.
+ // Native character counts, not UTF-16 text offsets, identify that old range.
+ const oldCount=story.characters.length;if(!oldCount)throw new Error('원본 TITLE 기본 삽입점 서식 없음');
+ story.insertionPoints.item(0).contents=text;
+ const count=story.characters.length;if(count<oldCount)throw new Error('TITLE 삽입 후 문자 범위 불일치');
+ story.characters.itemByRange(count-oldCount,count-1).remove();
+ if(String(story.contents)!==text)throw new Error('TITLE 기본 서식 교체 후 원고 불일치');
+}
+module.exports={policy,assignments,capture,apply,replaceContents,withoutLanguage,kind};

@@ -17,6 +17,9 @@ function pageSets(model){
  return [...sets.values()];
 }
 function fingerprint(model,pageIds,contentPolicy={}){
+ // Source identity validates the contract at registration; it is not a page
+ // dependency. A change elsewhere in the package must not invalidate this page.
+ contentPolicy={...contentPolicy};if(contentPolicy.contentContract){const {sourceSha256,...semantic}=contentPolicy.contentContract;contentPolicy.contentContract=semantic;}
  const pages=model.pages.filter(p=>pageIds.includes(p.id)),parents=new Set(pages.map(p=>p.parentRef).filter(x=>x&&x!=='n'));
  const parentPages=model.pages.filter(p=>parents.has(p.spreadId)),scope=new Set(pageIds.concat(parentPages.map(p=>p.id)));
  const elements=model.elements.filter(e=>e.pageCandidates.some(id=>scope.has(id))||e.type==='Group'&&model.elements.some(c=>c.groupId===e.id&&c.pageCandidates.some(id=>scope.has(id))));
@@ -46,7 +49,7 @@ function register(model,{setId,version,previous=[]}){
   const stableId=setId+':'+pageIds.slice().sort().join('+');d.id=stableId+'@'+version;d.designSet={id:setId,version,active:true};d.imageMatching='minimum-crop/v1';d.pageSet={id:stableId,pageIds:pageIds.slice(),fingerprint:fingerprint(model,pageIds,{roles:d.roles,images:d.images,bodyFlow:d.bodyFlow,imageMatching:d.imageMatching}),fingerprintVersion:1};
   const tables=model.issues.filter(i=>i.code==='COMPLEX_STORY_TOKEN'&&model.elements.some(e=>e.textFrame?.storyRef===i.ref&&e.pageCandidates.some(id=>pageIds.includes(id))));
   if(tables.length)d.mappingReview.push('복합 Story/Table의 PRESERVE 또는 CONTENT 의미 및 Host 검증 필요');
-  d.mappingReview=[...new Set(d.mappingReview)];d.capability=N.support(R.register(model,d));entries.push(R.register(model,d));
+  d.mappingReview=[...new Set(d.mappingReview)];const contracted=R.contentContract(model,d);Object.assign(d,contracted);if(!contracted.contentContract)delete d.contentContract;d.pageSet.fingerprint=fingerprint(model,pageIds,{roles:d.roles,images:d.images,bodyFlow:d.bodyFlow,imageMatching:d.imageMatching,contentContract:d.contentContract});d.capability=N.support(R.register(model,d));entries.push(R.register(model,d));
  }
  const descriptors=entries.map(e=>e.descriptor);return {library:R.pack(entries),entries,changes:changes(previous,descriptors)};
 }

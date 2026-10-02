@@ -126,6 +126,9 @@ function libraryEntry(model,descriptor){
     if(!descriptor||!descriptor.id||descriptor.sourceSha256!==model.metadata.sourceSha256)throw new Error('Design identity/source hash mismatch');
     if(!Array.isArray(descriptor.pageIds)||!descriptor.pageIds.length||new Set(descriptor.pageIds).size!==descriptor.pageIds.length||descriptor.pageIds.some(id=>!model.pages.some(p=>p.id===id&&p.kind==='Spread')))throw new Error('Explicit normal-page scope required');
     const original=immutable(model),d=clone(descriptor),pages=model.pages.filter(p=>d.pageIds.includes(p.id));
+    if(d.contentContract){const c=d.contentContract,s=c.subtitle;
+        if(c.schema!=='magazine-content-contract/v1'||c.sourceSha256!==model.metadata.sourceSha256||s?.support!=='absent'||s.optional!==true||s.handling!=='omit-with-warning'||d.mappingReview?.length||Object.values(d.roles||{}).some(r=>r.role==='subtitle')||!['title','body'].every(role=>Object.values(d.roles||{}).some(r=>r.role===role)))throw new Error('Invalid/ambiguous optional content contract');
+    }
     const elements=model.elements.filter(e=>e.pageCandidates.length===1&&d.pageIds.includes(e.pageCandidates[0]));
     for(const id of Object.keys(d.roles||{}))if(!elements.some(e=>e.id===id))throw new Error('Role mapping is outside selected pages: '+id);
     const mapped=elements.map(e=>{
@@ -136,6 +139,7 @@ function libraryEntry(model,descriptor){
         return {element:e,role:role||null};
     });
     const text=mapped.filter(x=>x.element.textFrame),requiredFonts=[];
+    if(d.contentContract&&mapped.some(x=>x.role==='subtitle'))throw new Error('Optional content contract conflicts with source SUBTITLE role');
     for(const {element:e} of text){const s=model.stories.find(s=>s.id===e.textFrame.storyRef);for(const r of s?s.paragraphs.flatMap(p=>p.runs):[]){const t=r.resolvedProperties;if(t.AppliedFont&&t.FontStyle&&!requiredFonts.some(f=>f.family===t.AppliedFont&&f.style===t.FontStyle))requiredFonts.push({family:t.AppliedFont,style:t.FontStyle});}}
     const imageSlots=mapped.filter(x=>/^image[1-9]\d*$/.test(x.role||'')).map(({element:e,role})=>{
         const b=e.pageBounds[e.pageCandidates[0]],width=b[3]-b[1],height=b[2]-b[0],page=pages.find(p=>p.id===e.pageCandidates[0]);
@@ -192,7 +196,10 @@ function evaluate(entry,article,{installedFonts=null}={}){
     for(const message of p.issues)add(review,'DESIGN_REVIEW',message);
     if(installedFonts===null)add(review,'FONT_STATUS_UNKNOWN','설치 폰트 확인 필요');
     else for(const f of p.requiredFonts)if(!installedFonts.some(x=>x.family===f.family&&x.style===f.style))add(hard,'MISSING_FONT','필수 폰트 없음: '+f.family+' / '+f.style);
-    if(a.subtitlePresent&&!p.supportedRoles.includes('subtitle'))add(p.readyForMatching?hard:review,'SUBTITLE_UNSUPPORTED','부제를 넣을 확정 영역이 없습니다.');
+    if(a.subtitlePresent&&!p.supportedRoles.includes('subtitle')){
+        if(p.readyForMatching&&entry.descriptor.contentContract?.subtitle?.handling==='omit-with-warning')add(soft,'SUBTITLE_NOT_APPLIED','이 디자인에는 SUBTITLE 슬롯이 없어 DOCX 부제는 미적용됩니다. TITLE/BODY에 합치지 않습니다.',12);
+        else add(p.readyForMatching?hard:review,'SUBTITLE_UNSUPPORTED','부제를 넣을 확정 영역이 없습니다.');
+    }
     if(a.captionPresent&&!p.supportedRoles.includes('caption'))add(p.readyForMatching?hard:review,'CAPTION_UNSUPPORTED','캡션을 넣을 확정 영역이 없습니다.');
     if(a.imageCount>p.imageSlots.length)add(p.readyForMatching?hard:review,'EXTRA_IMAGES','사진 수보다 확인된 이미지 슬롯이 적습니다.');
     const imageOrder=entry.descriptor.imageMatching==='minimum-crop/v1'&&a.images.length<=p.imageSlots.length&&p.imageSlots.filter(s=>s.requirement==='required').length<=a.images.length?imageAssignment(p.imageSlots,a.images):p.imageSlots.map(s=>Number(s.role.slice(5))-1);
@@ -289,7 +296,8 @@ function bindContent(entry,article,options){
     }
     const slots=entry.profile.imageSlots,images=article.images||[],assignment=entry.descriptor.imageMatching==='minimum-crop/v1'?imageAssignment(slots,images):slots.map(slot=>Number(slot.role.slice(5))-1);
     for(const [index,slot] of slots.entries()){const image=assignment[index]===null?null:images[assignment[index]];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null,imageSourceIndex:assignment[index]});}
-    return {original:entry.original,content:bindings,runtimeAdjustments:[],suitability,productionReady:false,
+    const unappliedContent=suitability.diagnostics.filter(d=>d.code==='SUBTITLE_NOT_APPLIED').map(d=>({role:'subtitle',characters:String(article.subtitle||'').length,reason:'NO_REGISTERED_SLOT',handling:'omit-with-warning',message:d.message}));
+    return {original:entry.original,content:bindings,unappliedContent,runtimeAdjustments:[],suitability,productionReady:false,
         reason:'원본 Fidelity 검사 후 registered-native에서 콘텐츠만 교체합니다. 바인딩만으로 출력 승인하지 않습니다.'};
 }
 // A relation, not a page/text deletion rule: a unique empty IMAGE slot must

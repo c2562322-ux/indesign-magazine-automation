@@ -19,6 +19,11 @@ test('page-set registration follows shared objects and threads; fingerprints inv
  const d={pageSet:{id:'stable',fingerprint:'a'}};assert.deepEqual(S.changes([d],[{pageSet:{id:'stable',fingerprint:'b'}}]),[{id:'stable',state:'CHANGED'}]);
  assert.equal(S.changes([d],[d])[0].state,'UNCHANGED');assert.equal(S.changes([], [d])[0].state,'ADDED');assert.equal(S.changes([d],[])[0].state,'REMOVED');
 });
+test('page fingerprint includes optional content semantics but excludes whole-package provenance',()=>{
+ const S=require('../tools/design-set-registration'),m=model(),contract={schema:'magazine-content-contract/v1',sourceSha256:'first',subtitle:{support:'absent',optional:true,handling:'omit-with-warning'}};
+ assert.equal(S.fingerprint(m,['p1'],{contentContract:contract}),S.fingerprint(m,['p1'],{contentContract:{...contract,sourceSha256:'second'}}));
+ assert.notEqual(S.fingerprint(m,['p1'],{contentContract:contract}),S.fingerprint(m,['p1'],{contentContract:{...contract,subtitle:{...contract.subtitle,handling:'block'}}}));
+});
 test('shared PRESERVE shape requires all intersecting pages and cannot become shared content',()=>{
  const N=require('../src/registered-native'),m=model(),d=R.draft(m,'p1'),shared={...copy(m.elements[0]),id:'shared',type:'Rectangle',textFrame:null,role:{confirmed:null},pageCandidates:['p1','p2'],properties:{},details:{},image:[],spreadId:m.pages.find(p=>p.id==='p1').spreadId,pageBounds:{p1:[0,0,10,10],p2:[0,-10,10,0]}};m.elements.push(shared);
  assert.ok(N.support(R.register(m,d)).fidelityReasons.some(x=>x.includes('shared')));
