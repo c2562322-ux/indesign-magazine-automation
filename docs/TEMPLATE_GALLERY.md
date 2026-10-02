@@ -31,3 +31,7 @@ Node372/372 and Python18/18 pass. Gallery tests cover all-design display, exact 
 No Library import, manual Fidelity approval or automatic recommendation is required in the default flow.
 
 Final native-window rerun also passed: document166 (registered-1790925488603-awpd39s3dig), one page/one visible window, titleMatches=true, fullBODYMatches=true, BODY878, all content Story overflows=false, image link NORMAL. The editable unsaved result is left open. Gallery cache reused all22; source mixing0.
+
+## Busy/gate UI correction (2026-10-02)
+The legacy manual-proof button was still in general actions and its unmet registrationDisabled gate used the same message as an actual busy operation. Move that button to collapsed developer controls in gallery mode; distinguish a real Studio/registration busy lock from unmet manual-proof conditions. Thumbnail pending/finally and Production safety remain unchanged.
+Actual Host rerun now includes Studio.mount, the DOCX load-button handler, thumbnail/cache, selection and Studio.production wrapper (earlier gallery harness used a simplified Studio adapter). Assertions checked busy=false after load, selection and Production. u3356 only was called, CONTENT_APPLIED/outputReady=true/errors0/BODY92%. Document167 is open/visible; full title/BODY878 and image NORMAL verified. Private gallery-busy-host/inspect reports. Node374/374, Python18/18. UDT visual confirmation still required; no claim of literal automated UDT clicks.

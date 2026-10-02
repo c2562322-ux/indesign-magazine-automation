@@ -537,3 +537,12 @@ test('production status distinguishes zero, partial and complete batch results',
   assert.equal(x.e.btnExportPdf.disabled,passed!==3);assert.equal(x.e.btnSaveIndd.disabled,passed!==3);
  }
 });
+
+test('gallery DOCX load releases Studio busy after thumbnail work, including failure, before selection Production',async()=>{
+ for(const fail of [false,true]){
+  let release,app,busyDuring;
+  const pending=new Promise(r=>release=r),x=setup(true,{registeredOnly:true,galleryMode:true,load:async()=>({article:{title:'제목',body:'본문',images:[]}}),registration:api=>{app=api;return {refresh(){},invalidate(){},report(){},failed(){},destroy(){},articleLoaded:async()=>{busyDuring=api.state.busy;await pending;if(fail)throw Error('preview export failed');}};},createRegistered:async()=>({pageCount:1,errors:[],warnings:[],outputReady:true,fidelity:{phase:'CONTENT_APPLIED'}})});
+  x.e.btnLoadAuto.click();await tick();assert.equal(busyDuring,true);assert.equal(app.state.busy,true);release();await tick();await tick();assert.equal(app.state.busy,false);
+  const report=await app.createRegistered({descriptor:{id:'chosen'},profile:{name:'Chosen'},original:{metadata:{sourceSha256:'fixture'}}},app.read().article);assert.equal(report.outputReady,true);assert.equal(app.state.busy,false);
+ }
+});

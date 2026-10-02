@@ -708,3 +708,7 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 -22 native previews/31 pages generated; persistent cache reused22 with0source opens. Source identity checked selection→Production→result. Node372/372, Python18/18. UDT visual/click confirmation remains required. See docs/TEMPLATE_GALLERY.md.
 - Existing originals/private Libraries/sample untracked INDD preserved. Next: user UDT single-selection check before any multi-selection expansion.
 - Final gallery single Production rerun leaves document166 (registered-1790925488603-awpd39s3dig) open with one visible window. Read-only final title/fullBODY match and overset0 verified. This supersedes earlier partial3-option result as the latest single-choice evidence.
+
+## Latest gallery busy/gate correction
+- Manual-proof ‘선택한 등록 디자인으로 제작’ moved to developer area in gallery mode. General path uses ‘선택한 디자인으로 제작’; unmet proof gate no longer says another operation is busy.
+- Actual Host tested full Studio DOCX-load/production wrapper plus gallery handlers: busy false after load/selection/Production; exact u3356 PASS, BODY92%, title22/BODY878/image applied/overflow0/errors0. New visible document167 left open. Node374/Python18. No engine/Library/thumbnail-lock change. See docs/TEMPLATE_GALLERY.md.

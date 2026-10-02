@@ -325,3 +325,9 @@ test('gallery Production failure does not choose another design or call sequenti
 test('gallery rejects a result from another design and invalidates output instead of reporting success',async()=>{
  const x=gallerySetup([galleryEntry('selected')]);let invalidations=0;x.studio.invalidateRegistered=()=>invalidations++;x.studio.createRegistered=async e=>({errors:[],warnings:[],outputReady:true,fidelity:{phase:'CONTENT_APPLIED',designId:'other',provenance:e.descriptor.provenance}});await x.ui.articleLoaded();await x.nodes().find(n=>n.attributes['aria-label']==='디자인 01 선택').click();await x.click('선택한 디자인으로 제작');assert.equal(invalidations,2);assert.ok(x.nodes().some(n=>n.textContent.includes('GALLERY_RESULT_SOURCE_MISMATCH')));
 });
+test('gallery manual proof button stays in developer controls and unmet gate is not reported as busy',async()=>{
+ const x=gallerySetup([galleryEntry('selected')]);await x.ui.articleLoaded();await x.nodes().find(n=>n.attributes['aria-label']==='디자인 01 선택').click();
+ const manual=x.nodes().find(n=>n.textContent==='선택한 등록 디자인으로 제작'),developer=x.nodes().find(n=>n.className==='registered-developer');
+ const walk=e=>[e,...e.children.flatMap(walk)];assert.ok(walk(developer).includes(manual));assert.equal(manual.registrationDisabled,true);assert.equal(x.studio.state.busy,false);assert.equal(x.ui.state.busy,false);await manual.handlers.click();assert.ok(x.nodes().some(n=>n.textContent.includes('개발자 검증용 제작')));assert.equal(x.nodes().some(n=>n.textContent.includes('다른 작업이 진행 중')),false);
+ const produce=x.nodes().find(n=>n.textContent==='선택한 디자인으로 제작');assert.equal(produce.disabled,false);
+});

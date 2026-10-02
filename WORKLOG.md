@@ -1415,3 +1415,8 @@ Implemented bounded relative CONTENT Auto-fit after actual overflow only, preser
 - Added native JPEG source preview cache and all-active-design cards; blocked cards remain visible with conditions. Captured exact choice and result provenance; no ranking/fallback in default flow.
 - Reused existing single Production; changed engine report only to include designId. Actual Host gallery handler u3356 PASS with unchanged92% Auto-fit and BODY566+312. Cache22/31 JPEGs validated; fresh renderer0source opens.
 - Regression Node372, Python18; docs/TEMPLATE_GALLERY.md contains scope and UDT limitations. No model/Library/source or parser changes; no multi-selection.
+
+## 2026-10-02 — Gallery busy message and legacy button isolation
+- Confirmed thumbnail finally releases pending. Identified unmet manual-proof gate misreported as busy and duplicate manual production action in general gallery UI.
+- Changed only registration UI guard messaging and button parent. Added load success/failure lock-release tests and developer gate separation regression.
+- Full Studio wrapper actual Host u3356 direct choice PASS, both locks clear, source5583fa2b..., BODY92%/878chars, overset0. Node374/Python18. Original source/Library/Production safety unchanged.
