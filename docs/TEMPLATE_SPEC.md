@@ -180,3 +180,8 @@
 ## 특수 마커 모델 갱신 (2026-10-01)
 
 PI 보존 모델은 extractorVersion2 / markerPreservationVersion1입니다. 기존 모델은 원본에서 재추출해야 하며 과거 Fidelity 승인을 승계하지 않습니다. 기존 Library/역할/검증 기록은 보존됩니다. 새 Library 및 Parent 자동 번호 확인 절차: [특수 마커 안내](SPECIAL_MARKERS.md). Node282/Python18 통과, 새 모델 Adobe 재검증 필요.
+# Common registration / source typography — 2026-10-02
+
+An automatically inferred author/job-title/name line is PRESERVE, not a subtitle destination based solely on its position. Existing explicit role confirmations are retained. BODY inference uses the dominant source character size, without resizing a frame or font. A unique heading above article prose can be a TITLE candidate even with a modest source size; ambiguous headings still need review.
+
+The native replacement policy supports one enlarged first letter only when the rest of the source Story is uniform and all other styles/languages/overrides match. Its original size is applied to the new first letter, the original base to the rest, with per-character verification. Other emphasis and ambiguous language ranges require a deliberate registration policy. Actual source/content overflow remains blocking.

@@ -1,6 +1,19 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const P=require('../src/package-xml'),Z=require('../src/docxZip'),D=require('../src/docx-media'),N=require('../src/registered-native'),Match=require('../src/design-matching');
 const png=(w,h)=>{const b=Buffer.alloc(24);Buffer.from([137,80,78,71,13,10,26,10]).copy(b);b.writeUInt32BE(13,8);b.write('IHDR',12);b.writeUInt32BE(w,16);b.writeUInt32BE(h,20);return b;};
+test('enlarged Story initial retains its source size; arbitrary emphasis and language ambiguity stay blocked',()=>{
+ const T=require('../src/registered-text-policy'),base={styleRef:'plain',properties:{PointSize:12},resolvedProperties:{PointSize:12,FontStyle:'Regular',AppliedLanguage:'Korean'},tokens:[{type:'Content',text:'일반 본문'}]},initial={...base,properties:{PointSize:16},resolvedProperties:{...base.resolvedProperties,PointSize:16},tokens:[{type:'Content',text:'눈'}]},s={paragraphs:[{styleRef:'body',properties:{},runs:[initial,base]}]};
+ assert.deepEqual(T.policy(s),{mode:'enlarged-story-initial',baseIndex:1,initialSize:16});
+ initial.tokens[0].text='강조';assert.throws(()=>T.policy(s),/UNSUPPORTED/);initial.tokens[0].text='눈';
+ initial.resolvedProperties.FontStyle='Bold';assert.throws(()=>T.policy(s),/UNSUPPORTED/);initial.resolvedProperties.FontStyle='Regular';
+ initial.resolvedProperties.AppliedLanguage='None';assert.throws(()=>T.policy(s),/UNSUPPORTED/);initial.resolvedProperties.AppliedLanguage='Korean';
+ initial.resolvedProperties.PointSize=10;assert.throws(()=>T.policy(s),/UNSUPPORTED/);
+});
+test('initial and every replacement character are checked independently; size drift and overflow still block',()=>{
+ const chars=[16,12,12].map(pointSize=>({pointSize,leading:20,appliedFont:{fontFamily:'Source Font'},fontStyle:'Regular',appliedParagraphStyle:'P',appliedCharacterStyle:'C'})),type=size=>({PointSize:size,Leading:20,AppliedFont:'Source Font',FontStyle:'Regular',Justification:'LeftAlign'}),story={contents:'새본문',characters:{item:i=>chars[i]},overflows:false},frame={parentStory:story,parentPage:{bounds:[0,0,100,100]},geometricBounds:[0,0,90,90]},ID={app:{scriptPreferences:{measurementUnit:'mm'}},MeasurementUnits:{POINTS:'pt'},Leading:{AUTO:'auto'},Justification:{}},context={phase:'CONTENT_APPLIED',contentChecks:[{role:'body',elementId:'content',frame,bounds:[0,0,90,90],text:'새본문',initial:{pointSize:16,typography:type(16)},typography:type(12),paragraphStyle:'P',characterStyle:'C',overrides:{pointSize:12}}]};
+ assert.equal(N.check(context,ID).length,0,JSON.stringify(N.check(context,ID)));chars[1].pointSize=13;assert.ok(N.check(context,ID).some(i=>i.cause==='GENERATOR_MISMATCH'&&i.characterIndex===1));chars[1].pointSize=12;chars[0].pointSize=12;assert.ok(N.check(context,ID).some(i=>i.characterIndex===0));chars[0].pointSize=16;
+ story.overflows=true;assert.ok(N.check(context,ID).some(i=>i.cause==='CONTENT_OVERFLOW'));story.overflows=false;frame.geometricBounds[2]=91;assert.ok(N.check(context,ID).some(i=>i.cause==='GENERATOR_MISMATCH'));
+});
 test('CJK composer and Roman-only kerning normalize in both run and direct paths without merging modes',()=>{
  const F=require('../src/registered-fidelity');
  const expected={runs:[{KerningMethod:'$ID/Metrics - Roman Only',direct:{Composer:'HL Composer J',KerningMethod:'Metrics - Roman Only'}}]},actual={runs:[{KerningMethod:'메트릭 - 로마자 전용',direct:{Composer:'Adobe CJK 단락 컴포저',KerningMethod:'메트릭 - 로마자 전용'}}]};

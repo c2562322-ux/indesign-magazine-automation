@@ -1,3 +1,14 @@
+# Latest-set default recommendation and actual input Production — 2026-10-02
+
+- Baseline9319012; old active-library55 was preferred over latest22. Explicit active-set selection now points to regenerated private latest22, preserving old/source/remembered data. Missing explicit selection fails visibly; no stale legacy fallback.
+- Identified actual DOCX: Desktop01_안과_정기검진_매거진.docx,19/77/1061 chars, one439×349 image. Current parser/extraction reused unchanged.
+- Common role fixes: dominant prose size ignores enlarged-initial outlier; unique small heading above prose can be TITLE; author/job-title/name lines stay KEEP, not inferred SUBTITLE. No page/frame ID exceptions.
+- Common enlarged-first-letter policy captures initial/base source typography, preserves it during replacement and checks every character. Arbitrary emphasis and language ambiguity still block.
+- Actual Adobe21.4.1.4 + existing UI-handler DOM harness: latest u3356 CONTENT_APPLIED, source differences0, all DOCX targets replaced, fitting/style checks clean, but BODY684/377 and formerly inferred SUBTITLE77 overset. Visible counts473/287/15; TITLE19 fits. Source itself is not overset. Subsequent options handler0/3 BLOCK, no combined INDD. Author-line inference then corrected to KEEP; the latest registration no longer offers it as a subtitle destination.
+- Final actual UI default-loader check: latest22 loaded, cards0/review12/excluded10. Within existing13 source-PASS subset: exact one-photo designs u335e/u3356/u8e19; language policy, missing subtitle destinations and real post-content overflow remain. Production PASS0. This is NOT3/3 completion; no extra photo slots or legacy results used as filler.
+- Node346/346, Python18/18. Original/source files and four pre-existing open documents untouched; owned temporary docs closed without saving. Untracked sample/magazine-design.indd preserved.
+- Next decisions: intended long-subtitle destinations, u3356 BODY capacity and u335e replacement-language policy; optional image slots only with an explicit unused-content policy. Detailed evidence and13-candidate table: docs/LATEST_PRODUCTION_INPUT.md. No need to ask user to repeat known overflow.
+
 # Actual Adobe Host restored and latest22 verified — 2026-10-02
 
 - Started from85dcc9e. Outside-sandbox registered COM server connection works with InDesign21.4.1.4 and real UXP scripts; GetActiveObject still reports0x800401E3. Previous0x80080005 not reproduced here; no registry repair/restart or engine replacement. tools/adobe-host.ps1 waits for fresh complete JSON because DoScript return is asynchronous.

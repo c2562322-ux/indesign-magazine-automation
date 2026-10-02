@@ -11,6 +11,14 @@ function policy(story){
  // key is resolved, effective values match, and named style identity is unchanged.
  const uniform=runs.every(r=>r.styleRef===first.styleRef&&M.compare(r.resolvedProperties,first.resolvedProperties).equal&&M.compare(r.properties,first.properties).differences.every(d=>{const key=d.path.slice(2);return Object.prototype.hasOwnProperty.call(first.resolvedProperties,key)&&Object.prototype.hasOwnProperty.call(r.resolvedProperties,key);}));
  if(uniform)return {mode:'uniform'};
+ // A single enlarged initial has a semantic destination: the new first letter.
+ // Other visual emphasis and ambiguous language patterns remain unsupported.
+ const base=runs[1],initialText=first.tokens.map(t=>t.type==='Br'?'\r':t.text).join('');
+ const omitSize=o=>Object.fromEntries(Object.entries(o||{}).filter(([k])=>k!=='PointSize'));
+ if(base&&story.paragraphs.length===1&&initialText.length===1&&['hangul','latin','han'].includes(kind(initialText))&&first.resolvedProperties.PointSize>base.resolvedProperties.PointSize&&
+  runs.every(r=>r.styleRef===base.styleRef&&M.compare(omitSize(r.resolvedProperties),omitSize(base.resolvedProperties)).equal&&M.compare(omitSize(r.properties),omitSize(base.properties)).equal)&&
+  runs.slice(1).every(r=>M.compare(r.resolvedProperties,base.resolvedProperties).equal&&M.compare(r.properties,base.properties).equal))
+  return {mode:'enlarged-story-initial',baseIndex:1,initialSize:first.resolvedProperties.PointSize};
  if(runs.some(r=>r.styleRef!==first.styleRef||!M.compare(withoutLanguage(r.properties),withoutLanguage(first.properties)).equal||!M.compare(withoutLanguage(r.resolvedProperties),withoutLanguage(first.resolvedProperties)).equal))return fail();
  const classes={},samples={};let offset=0;
  for(const r of runs){const language=r.resolvedProperties.AppliedLanguage;if(typeof language!=='string')return fail();const text=r.tokens.map(t=>t.type==='Br'?'\r':t.text).join('');

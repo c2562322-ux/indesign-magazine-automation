@@ -2,6 +2,8 @@
 
 기사에서 새로운 지면을 만드는 InDesign UXP 플러그인입니다. 기존 템플릿 자동 입력 기능도 `기존 양식 모드`에서 사용할 수 있습니다.
 
+최신 등록 세트 선택은 `assets/templates/working/active-design-set.private.json`의 set/version과 Library 경로로 구형 Library와 분리합니다. 개인 등록 파일은 Git에 포함되지 않습니다. 현재 실제 원고(19/77/1061자·사진1장)의 최신22 추천/Production 검사 결과와 남은 차단: [실제 입력 결과](docs/LATEST_PRODUCTION_INPUT.md). 3안 Production 성공 상태가 아닙니다.
+
 **상태: 개발 검증판. Node 자동 테스트 173개 통과 (기존 160개 회귀 포함, Python 15개 검사 포함 실행).** 사용자 PC에서 패널·원고 입력·무료 3안·미리보기 글자 크기·스크롤은 확인했습니다. 이후 사용자 PC에서 새 문서 생성·PDF 출력 성공도 보고됐습니다. 이후 폰트 스타일 생성 오류가 보고되어 순차 적용과 실제 설치 폰트 선택을 보완했습니다. 이번 안정화는 초기화/세션/폰트 캐시를 보강했으며 실제 InDesign 검증은 남아 있습니다. 먼저 [5~10분 Smoke Test](docs/STABILITY.md)를 진행해주세요. [전체 UI/폰트/템플릿 감사](docs/STUDIO_AUDIT.md)를 보세요. [렌더링 비교/실기 절차](docs/RENDER_PARITY.md)를 보세요. 버튼별 절차와 진단 안내는 [PRODUCTION_TESTS.md](docs/PRODUCTION_TESTS.md), 기존 실기 기록은 HANDOFF.md를 보세요.
 
 외부 JSON 디자인 3종을 별도 **IDML 기반 디자인** 목록에서 선택할 수 있습니다. 원본 수치/누락값 정책과 새 파일 추가 방법: [JSON 디자인 안내](docs/JSON_DESIGNS.md). 최신 표시: `Studio ready [stability-01] [json-design-01]`. 실제 Adobe 재현 검증은 남아 있습니다.
