@@ -1404,3 +1404,9 @@ Implemented bounded relative CONTENT Auto-fit after actual overflow only, preser
 - Actual InDesign21.4.1.4 proof through registration UI batch:22 reports,13 PASS,7 FAIL,2 unsupported; no cancellation/mock approval. Native job completed after wrapper timeout; no overlapping job started. Full data private; aggregate source audit in docs/ACTIVE_SOURCE_5583.md.
 - Source/input identity helper and regressions from the preceding interrupted work are preserved alongside this work; helper reuses existing DOCX extraction/normalization and does not replace parser.
 - Tests: Node367/367, Python18/18; active-only UI startup/load regression, source mismatch and final OPTION mismatch regressions. General UDT panel reload still requires user confirmation; current-source DOCX Production/merge is the next milestone, not verified here.
+# 2026-10-02 — Actual fresh-source sequential Production
+
+- Used the explicit current DOCX through existing extract/normalize helper, active selection and registration UI recommendation/options handlers in actual InDesign21.4.1.4. No alternate binder or candidate IDs were injected.
+- Current article admits3 of5 capability-ready designs: actual attempts u335e/u3356/u8e19 in score order;1PASS u3356, two content-overflow failures. No source/Fidelity/geometry mismatch caused those failures; source mixing0.
+- Corrected only ignored diagnostic harness cleanup/readback, repeated identical actual job, same result. Final one-page partial document stays open; read-only title/BODY878/image link/overset checks confirm result. Subtitle optional omission and72ppi warnings explicitly recorded.
+- Node367/367. Source/Library/production algorithms and safety limits unchanged. See docs/ACTIVE_SOURCE_5583_PRODUCTION.md. 3/3 not obtained, not reported as completed.

@@ -695,3 +695,9 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 - Filename/SHA/set/version/pages/spreads/fingerprint enforced from Library/recommendation through Production/final OPTION. No remembered/legacy fallback. Native general UI hides legacy generated/JSON paths; engines retained.
 - Next: user milestone review, then actual DOCX sequential Production on the new set only. Five source-proof overflow failures need source-vs-reconstruction evidence; two gradient readbacks remain unsupported. Do not weaken checks or assume designer faults.
 - Existing untracked sample/magazine-design.indd is preserved. Original source files and main are unchanged.
+# Latest actual Production evidence — 2026-10-02
+
+- Active source remains5583fa2b... only. Existing engines/roles/Library unchanged. Actual panel-handler sequential Host execution on02_소아근시_매거진.docx (22/75/878, one440×349 image): five capability-ready entries evaluated, three article-safe attempts, one PASS.
+- New-source u3356 PASS (BODY566+312 at92%, overset0; final combined-check PASS). u335e fails BODY90% and subtitle96% overflow; u8e19 fails BODY90% overflow. u9ba6 has no IMAGE; uaa27 requires4; neither attempted. Mixing0.
+- Result `무제-141`, one page/OPTION_1, is open/unsaved; title/fullBODY/image link verified read-only. Subtitle75 unapplied under optional contract;72ppi image WARN. outputReady=false, batch1/3, not3-design completion.
+- Full evidence/ratios/source IDs: docs/ACTIVE_SOURCE_5583_PRODUCTION.md. Private reports remain local. Node367/367; no engine changes. Do not claim latest-source3PASS or silently widen fit/borrow old layouts.
