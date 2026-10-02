@@ -87,13 +87,13 @@ function preservation(before,after,edits=[]){
  const a=JSON.parse(JSON.stringify(before)),b=JSON.parse(JSON.stringify(after));
  // Only authorized IMAGE content replacement may add/remove its graphic child.
  // Frame order, unidentified objects and graphics in KEEP frames stay strict.
- const imageFrames=new Set(edits.filter(e=>e.image).map(e=>e.elementId));
+ const imageFrames=new Set(edits.filter(e=>e.image||e.clearImage).map(e=>e.elementId));
  for(const state of [a,b])for(const page of state.pages||[])page.order=page.order.filter(id=>!(id&&typeof id==='object'&&imageFrames.has(id.placedGraphicOf)));
  for(const edit of edits)if(edit.colorFill&&a.objects[edit.elementId])a.objects[edit.elementId].object.fillColor=edit.colorFill;
  for(const edit of edits)if(edit.hidePlaceholder&&a.objects[edit.elementId])a.objects[edit.elementId].object.visible=false;
  for(const edit of edits)for(const state of [a,b]){
   if(edit.storyId)for(const obj of Object.values(state.objects))if(obj.storyRef===edit.storyId)delete obj.story;
-  const obj=state.objects[edit.elementId];if(obj&&edit.image){delete obj.graphics;delete obj.fitting;}
+  const obj=state.objects[edit.elementId];if(obj&&(edit.image||edit.clearImage)){delete obj.graphics;if(edit.image)delete obj.fitting;}
  }
  return Model.compare(a,b);
 }

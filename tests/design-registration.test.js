@@ -316,7 +316,7 @@ test('gallery displays blocked and safe designs without recommendation and produ
  const first=galleryEntry('first'),chosen=galleryEntry('chosen'),blocked=galleryEntry('review',true),x=gallerySetup([first,chosen,blocked]),calls=[];
  x.studio.createRegistered=async(e,a,mode)=>{calls.push({id:e.descriptor.id,article:a,mode});return {errors:[],warnings:[],outputReady:true,fidelity:{phase:'CONTENT_APPLIED',designId:e.descriptor.id,provenance:e.descriptor.provenance}};};
  await x.ui.articleLoaded();assert.equal(x.nodes().filter(n=>n.className==='gallery-card').length,3);assert.equal(x.nodes().filter(n=>n.tagName==='img').length,3);assert.equal(x.nodes().some(n=>n.textContent==='추천 3안으로 제작'),false);
- await x.nodes().find(n=>n.attributes['aria-label']==='디자인 02 선택').click();await x.click('선택한 디자인으로 제작');assert.deepEqual(calls,[{id:'chosen',article,mode:'production'}]);assert.equal(x.ui.state.selected.entry.descriptor.id,'chosen');
+ await x.nodes().find(n=>n.attributes['aria-label']==='디자인 02 선택').click();await x.click('선택한 디자인으로 제작');assert.deepEqual(calls,[{id:'chosen',article,mode:'direct'}]);assert.equal(x.ui.state.selected.entry.descriptor.id,'chosen');
  await x.nodes().find(n=>n.attributes['aria-label']==='디자인 03 선택').click();assert.equal(x.nodes().find(n=>n.textContent==='선택한 디자인으로 제작').disabled,true);assert.ok(x.nodes().some(n=>n.textContent.includes('역할 확인 필요')));
 });
 test('gallery Production failure does not choose another design or call sequential Production',async()=>{

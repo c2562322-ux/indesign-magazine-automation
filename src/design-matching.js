@@ -270,18 +270,26 @@ async function loadLibrary(manifest,read){
     return {entries,errors};
 }
 function storyWeight(model,id){const s=model.stories.find(s=>s.id===id);return Math.max(1,s.paragraphs.flatMap(p=>p.runs).flatMap(r=>r.tokens).reduce((n,t)=>n+(t.type==='Content'?t.text.length:t.type==='Br'?1:0),0));}
+// Direct selection has its own explicit CONTENT contract. Recommendation keeps
+// its original required-slot policy; no unregistered/PRESERVE object is edited.
+function directAssessment(entry,article,options){
+    const row=productionAssessment(entry,article,options),clearable=new Set(['MISSING_IMAGE','SUBTITLE_UNSUPPORTED','CAPTION_UNSUPPORTED','IMAGE_DIMENSIONS_UNKNOWN']);
+    const clearedReasons=new Set((entry.descriptor.capability?.productionIssues||[]).filter(i=>entry.profile.supportedRoles.includes(i.role)&&!String(article[i.role]||'').trim()).map(i=>i.message));
+    const diagnostics=row.diagnostics.map(d=>d.origin==='capability'&&clearedReasons.has(d.message)?{...d,severity:'INFO',message:d.message+' · 빈 CONTENT 슬롯에는 이 서식을 적용하지 않고 비움'}:clearable.has(d.code)?{...d,severity:'WARN',message:d.code==='MISSING_IMAGE'?d.message+' · 직접 선택 정책: 남는 확정 CONTENT 이미지 슬롯 비움':d.code==='SUBTITLE_UNSUPPORTED'||d.code==='CAPTION_UNSUPPORTED'?d.message+' · 슬롯 없음: 원고 미적용 경고':d.message}:d);
+    return {...row,diagnostics,decision:diagnostics.some(d=>d.severity==='BLOCK')?'BLOCK':'WARN'};
+}
 function bindContent(entry,article,options){
     if(!entry.profile.readyForMatching)throw new Error('Confirm roles and source references before binding');
-    const suitability=productionAssessment(entry,article,options);
+    const direct=options?.directSelection===true,suitability=direct?directAssessment(entry,article,options):productionAssessment(entry,article,options);
     if(suitability.decision==='BLOCK')throw new Error('Content violates constraints: '+suitability.diagnostics.filter(x=>x.severity==='BLOCK').map(x=>x.code).join(', '));
     const bindings=[];
     for(const t of entry.profile.textFrames.filter(t=>['title','subtitle','body','caption'].includes(t.role))){
-        if(t.role==='caption'&&!String(article.caption||'').trim())continue; // An absent DOCX caption does not erase fixed source text.
+        if(!direct&&t.role==='caption'&&!String(article.caption||'').trim())continue;
         const e=entry.original.elements.find(e=>e.id===t.elementId);
         if(!bindings.some(b=>b.storyId===e.textFrame.storyRef))bindings.push({storyId:e.textFrame.storyRef,role:t.role,text:String(article[t.role]||'')});
     }
     const body=bindings.filter(b=>b.role==='body');
-    if(body.length>1){
+    if(body.length>1&&String(article.body||'').length){
         const ordered=entry.descriptor.bodyFlow.map(id=>body.find(b=>b.storyId===id));
         const chars=String(article.body||'').match(/\r\n|[\s\S]/gu)||[];if(chars.length<ordered.length)throw new Error('본문이 독립 BODY 영역 수보다 짧습니다. 다른 템플릿을 선택해주세요.');
         let offset=0,total=ordered.reduce((n,b)=>n+storyWeight(entry.original,b.storyId),0);
@@ -294,9 +302,10 @@ function bindContent(entry,article,options){
             b.text=chars.slice(offset,end).join('');offset=end;total-=weight;
         }
     }
-    const slots=entry.profile.imageSlots,images=article.images||[],assignment=entry.descriptor.imageMatching==='minimum-crop/v1'?imageAssignment(slots,images):slots.map(slot=>Number(slot.role.slice(5))-1);
-    for(const [index,slot] of slots.entries()){const image=assignment[index]===null?null:images[assignment[index]];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null,imageSourceIndex:assignment[index]});}
-    const unappliedContent=suitability.diagnostics.filter(d=>d.code==='SUBTITLE_NOT_APPLIED').map(d=>({role:'subtitle',characters:String(article.subtitle||'').length,reason:'NO_REGISTERED_SLOT',handling:'omit-with-warning',message:d.message}));
+    const slots=entry.profile.imageSlots,images=article.images||[],assignment=direct?imageAssignment(slots.map(s=>({...s,requirement:'optional'})),images):entry.descriptor.imageMatching==='minimum-crop/v1'?imageAssignment(slots,images):slots.map(slot=>Number(slot.role.slice(5))-1);
+    for(const [index,slot] of slots.entries()){const image=assignment[index]===null?null:images[assignment[index]];bindings.push({elementId:slot.elementId,role:slot.role,image:image?clone(image):null,imageSourceIndex:assignment[index],...(direct&&!image?{clearImage:true}:{})});}
+    if(direct)for(const b of bindings)b.action=b.clearImage||b.storyId&&!b.text?'clear':'replace';
+    const unappliedContent=suitability.diagnostics.filter(d=>['SUBTITLE_NOT_APPLIED','SUBTITLE_UNSUPPORTED','CAPTION_UNSUPPORTED'].includes(d.code)).map(d=>{const role=d.code==='CAPTION_UNSUPPORTED'?'caption':'subtitle';return {role,characters:String(article[role]||'').length,reason:'NO_REGISTERED_SLOT',handling:'omit-with-warning',message:d.message};});
     return {original:entry.original,content:bindings,unappliedContent,runtimeAdjustments:[],suitability,productionReady:false,
         reason:'원본 Fidelity 검사 후 registered-native에서 콘텐츠만 교체합니다. 바인딩만으로 출력 승인하지 않습니다.'};
 }
@@ -324,6 +333,6 @@ function calibration(estimate,observed){
     return {estimate:clone(estimate),observed:clone(observed),insideEstimatedRange:observed.characters>=estimate.estimatedCharacters.low&&observed.characters<=estimate.estimatedCharacters.high,
         note:'한 관측값으로 최대 수용량이나 자동 보정 계수를 확정하지 않습니다.'};
 }
-return {imageAssignment,productionAssessment,isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
+return {imageAssignment,productionAssessment,directAssessment,isImmutable:model=>originals.has(model),imagePlaceholders,imageProfile,articleProfile,parseArticle,framePreferences,capacity,roleSuggestions,libraryEntry,evaluate,rank,loadLibrary,bindContent,calibration};
 
 });

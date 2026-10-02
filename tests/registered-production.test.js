@@ -632,3 +632,31 @@ test('Fill replacement invokes source policy and keeps newly computed crops, not
  assert.throws(()=>N.fitReplacement(frame,source,ID,()=>{frame.frameFittingOptions.fittingAlignment='center';}),/정책 불일치/);
  const other={...source,fittingOnEmptyFrame:'none'};N.fitReplacement(frame,other,ID,command=>{assert.equal(command,'apply');frame.frameFittingOptions.topCrop=99;});assert.equal(frame.frameFittingOptions.topCrop,427);
 });
+
+test('direct default Fill validates Adobe policy readback without changing the stored source',()=>{
+ const source={autoFit:false,fittingOnEmptyFrame:'none',fittingAlignment:'center'},frame={frameFittingOptions:{...source}},ID={EmptyFrameFittingOptions:{NONE:'none',FILL_PROPORTIONALLY:'fill'},FitOptions:{FILL_PROPORTIONALLY:'fill-command'}};
+ const actual=N.fitReplacement(frame,source,ID,command=>{assert.equal(command,'fill-command');frame.frameFittingOptions.fittingOnEmptyFrame='fill';},{defaultFill:true});
+ assert.equal(actual.fittingOnEmptyFrame,'fill');assert.equal(source.fittingOnEmptyFrame,'none');
+ assert.throws(()=>N.fitReplacement(frame,source,ID,()=>{frame.frameFittingOptions.autoFit=true;},{defaultFill:true}),/정책 불일치/);
+});
+
+test('direct clearing exempts only structured absent-role Typography issues, never source Fidelity issues',()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),article={title:'title',body:'body',images:[]},message='caption unsupported typography';
+ e.descriptor.capability={productionReasons:[message],productionIssues:[{role:'caption',message}],fidelityReasons:[]};e.profile.supportedRoles.push('caption');
+ assert.notEqual(Match.directAssessment(e,article,{installedFonts:e.profile.requiredFonts}).decision,'BLOCK');
+ assert.equal(Match.directAssessment(e,{...article,caption:'caption'},{installedFonts:e.profile.requiredFonts}).decision,'BLOCK');
+ e.descriptor.capability.fidelityReasons=['source structure unsupported'];assert.equal(Match.directAssessment(e,article,{installedFonts:e.profile.requiredFonts}).decision,'BLOCK');
+});
+
+test('direct CONTENT contract clears absent caption/subtitle, preserves unassigned text and detects residual text',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),base=e.original.elements[0],story=e.original.stories.find(s=>s.id===base.textFrame.storyRef);
+ for(const role of ['subtitle','caption']){const frame=structuredClone(base),s=structuredClone(story);frame.id=role;frame.textFrame.storyRef=role+'Story';s.id=frame.textFrame.storyRef;e.original.elements.push(frame);e.original.stories.push(s);e.descriptor.roles[frame.id]={role,confirmed:true};}
+ const entry=R.register(e.original,e.descriptor),h=host(entry),c=await N.create(entry,{title:'새 제목',body:'새 본문',images:[]},{...h.env,mode:'direct'});
+ assert.equal(c.phase,'CONTENT_APPLIED');for(const role of ['subtitle','caption']){const clear=c.contentChecks.find(x=>x.role===role);assert.equal(clear.text,'');assert.equal(clear.frame.parentStory.contents,'');assert.equal(clear.action,'clear');}
+ assert.equal(N.check(c,h.ID).length,0);c.contentChecks.find(x=>x.role==='caption').frame.parentStory.contents='residual sample';assert.ok(N.check(c,h.ID).some(i=>i.message.includes('새 원고와 실제 Story')));
+});
+test('direct image matching uses one source once and clears spare CONTENT slots without changing recommendation policy',async()=>{
+ const e=JSON.parse(JSON.stringify(fixture())),base=e.original.elements.find(e=>e.type==='Rectangle');for(let i=1;i<=2;i++){const f=structuredClone(base);f.id='photo'+i;f.pageCandidates=['p1'];f.pageBounds={p1:[10*i,450,100+10*i,590]};f.properties={};f.details={};f.image=[];f.groupId=null;e.original.elements.push(f);e.descriptor.roles[f.id]={role:'image'+i,confirmed:true};e.descriptor.images[f.id]='required';}
+ const entry=R.register(e.original,e.descriptor),article={title:'새 제목',body:'새 본문',images:[{path:'internal.png',source:'docx',widthPx:1200,heightPx:800}]};assert.equal(Match.productionAssessment(entry,article,{installedFonts:entry.profile.requiredFonts}).decision,'BLOCK');assert.notEqual(Match.directAssessment(entry,article,{installedFonts:entry.profile.requiredFonts}).decision,'BLOCK');
+ const h=host(entry),c=await N.create(entry,article,{...h.env,mode:'direct'});assert.equal(c.contentChecks.filter(x=>x.imagePath).length,1);assert.equal(c.contentChecks.filter(x=>x.clearImage).length,1);assert.equal(N.check(c,h.ID).length,0);const cleared=c.contentChecks.find(x=>x.clearImage);cleared.frame.allGraphics=[{geometricBounds:cleared.frame.geometricBounds,itemLink:{filePath:'old-sample.png'}}];assert.ok(N.check(c,h.ID).some(i=>i.cause==='CONTENT_REPLACEMENT_INCOMPLETE'));
+});

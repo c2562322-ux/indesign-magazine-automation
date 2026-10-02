@@ -716,3 +716,11 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 ## Latest gallery guard diagnosis
 - Current selection entry/article now drives the same common guard for button enablement and Production click. Exact false guard/reasons shown in UI and GALLERY_GUARD progress log; stale galleryCanProduce cannot authorize or block by itself.
 - Actual full Studio handler: design12 structurally BLOCK (assessment=false), no Production call; design07 u3356 all true, Production PASS/title22/BODY878/image/92%/overset0. Visible document168 left open. Node376/Python18. User still needs UDT click confirmation. No safety/Library/engine changes.
+
+
+## Direct gallery CONTENT contract — 2026-10-02
+
+- Implemented runtime replace/clear/preserve in the existing registered-native engine; gallery uses direct eligibility, recommendation policy unchanged. Confirmed absent text and spare image slots clear; unknown196 texts remain preserved/review. Active Library and original files unchanged.
+- Strict source proof and post-content design preservation remain separate. Actual residual CONTENT overflow returns editable open result + 조판 미완료/outputReady false, never PASS or automatic design substitution. BODY10%/SUBTITLE4% limits unchanged.
+- Actual Adobe21.4.1.4 Studio UI-handler path: same22/75/878/one-image DOCX → design07/u3356 PASS at92%, BODY566+312. Design06/u335e preserves878+75 with residual overflow at90%/96%, incomplete/open. Design11/uaa27 absent-subtitle runtime variant clears subtitle and three spare IMAGE slots/instructions; BODY878 remains overflow/incomplete. Fidelity/geometry errors0 in all three. Literal UDT clicks still require user acceptance; no blanket22-page PASS.
+- Full Node381/Python18 pass. Details, limitations and UDT steps: docs/DIRECT_CONTENT_POLICY.md.

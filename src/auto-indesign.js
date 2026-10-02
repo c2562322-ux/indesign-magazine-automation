@@ -243,7 +243,7 @@ async function createRegistered(entry,article,open,progress,mode='production'){
   if(progress)progress('registered.production.blocked '+JSON.stringify({phase:context.phase,errors:report.errors,contentApplied:report.fidelity?.contentApplied}));
   context.doc.close(ID.SaveOptions.NO);latest=null;return report;
  }
- latest=context.doc;return report;}
+ if(mode==='direct'&&report.errors.length&&report.issues?.length&&report.issues.every(i=>i.cause==='CONTENT_OVERFLOW'))report.outcome='incomplete';if(mode==='direct'){report.slotContract=context.slotContract;report.layoutStatus=report.outcome==='incomplete'?'조판 미완료':report.errors.length?'검사 미완료':'조판 완료';}latest=context.doc;return report;}
  catch(e){const doc=e.registeredDocument||created;if(doc&&doc.isValid)try{doc.close(ID.SaveOptions.NO);}catch(ignore){/* Only this new document; original is never opened. */}latest=null;throw e;}
 }
 async function createRegisteredOptions(entries,article,open,progress=()=>{}){

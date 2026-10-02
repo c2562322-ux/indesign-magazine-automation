@@ -200,3 +200,11 @@ New registrations store model metadata.sourceFilename/sourceSha256 and descripto
 
 ## Gallery selection contract
 Gallery identity is designId plus full descriptor.provenance, captured with the article snapshot. Single Production reports fidelity.designId and provenance; both must exactly match the selected entry after active-source validation. Native preview manifest magazine-native-preview/v1 stores source-ordered page files and renderer/Host identity; cached preview is not Fidelity/Production approval. See TEMPLATE_GALLERY.md.
+
+
+## Direct gallery CONTENT contract — 2026-10-02
+
+- Implemented runtime replace/clear/preserve in the existing registered-native engine; gallery uses direct eligibility, recommendation policy unchanged. Confirmed absent text and spare image slots clear; unknown196 texts remain preserved/review. Active Library and original files unchanged.
+- Strict source proof and post-content design preservation remain separate. Actual residual CONTENT overflow returns editable open result + 조판 미완료/outputReady false, never PASS or automatic design substitution. BODY10%/SUBTITLE4% limits unchanged.
+- Actual Adobe21.4.1.4 Studio UI-handler path: same22/75/878/one-image DOCX → design07/u3356 PASS at92%, BODY566+312. Design06/u335e preserves878+75 with residual overflow at90%/96%, incomplete/open. Design11/uaa27 absent-subtitle runtime variant clears subtitle and three spare IMAGE slots/instructions; BODY878 remains overflow/incomplete. Fidelity/geometry errors0 in all three. Literal UDT clicks still require user acceptance; no blanket22-page PASS.
+- Full Node381/Python18 pass. Details, limitations and UDT steps: docs/DIRECT_CONTENT_POLICY.md.

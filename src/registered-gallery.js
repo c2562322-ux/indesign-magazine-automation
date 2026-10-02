@@ -2,7 +2,7 @@
 'use strict';
 function identity(entry){if(Guard)Guard.assertEntry(entry);const d=entry.descriptor;if(!d.provenance)throw new Error('갤러리 디자인의 원본 출처 정보가 없습니다.');return JSON.stringify({designId:d.id,provenance:d.provenance});}
 function describe(entry,article,index){
- const selectedIdentity=identity(entry),assessment=Match.productionAssessment(entry,article,{installedFonts:null});
+ const selectedIdentity=identity(entry),assessment=Match.directAssessment(entry,article,{installedFonts:null});
  const blocks=assessment.diagnostics.filter(d=>d.severity==='BLOCK').map(d=>d.message||d.code);
  return {entry,identity:selectedIdentity,name:'디자인 '+String(index+1).padStart(2,'0'),pageCount:entry.descriptor.pageIds.length,imageCount:entry.profile.imageSlots.length,bodyCount:Object.values(entry.descriptor.roles).filter(r=>r.role==='body').length,subtitle:entry.profile.supportedRoles.includes('subtitle'),articleImages:(article.images||[]).length,canProduce:assessment.decision!=='BLOCK',blocks};
 }

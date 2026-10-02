@@ -132,8 +132,8 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
 
  return {frames,records,externalAssets,equal:records.every(r=>r.comparison.equal),fallbacks:[]};
 }
-function replacementPlan(entry,article){const binding=Match.bindContent(entry,article,{installedFonts:entry.profile.requiredFonts});
- const edits=[];for(const b of binding.content){if(b.storyId){const story=entry.original.stories.find(s=>s.id===b.storyId),runs=story.paragraphs.flatMap(p=>p.runs);
+function replacementPlan(entry,article,direct=false){const binding=Match.bindContent(entry,article,{installedFonts:entry.profile.requiredFonts,directSelection:direct});
+ const edits=[];for(const b of binding.content){if(b.storyId&&direct&&b.action==='clear'){const frames=entry.original.elements.filter(e=>e.textFrame?.storyRef===b.storyId);edits.push({...b,elementId:frames[0].id,textPolicy:{mode:'clear'}});continue;}if(b.storyId){const story=entry.original.stories.find(s=>s.id===b.storyId),runs=story.paragraphs.flatMap(p=>p.runs);
    const textPolicy=TextPolicy.policy(story,{role:b.role}),normalized=b.text.replace(/\r\n?|\n/g,'\r');if(textPolicy.mode==='language-by-source-character-class')textPolicy.assignments=TextPolicy.assignments(textPolicy,normalized);
    if(textPolicy.mode==='enlarged-story-initial'&&(!normalized.length||!['hangul','latin','han'].includes(TextPolicy.kind(normalized[0]))))throw new Error('UNSUPPORTED 확대 첫 글자에 대응하는 원고 시작 문자 없음');
    const frames=entry.original.elements.filter(e=>e.textFrame&&e.textFrame.storyRef===b.storyId);if(frames.some(e=>e.pageCandidates.length!==1||!entry.descriptor.pageIds.includes(e.pageCandidates[0])))throw new Error('선택 페이지 밖 Story 연결');
@@ -144,7 +144,7 @@ function replacementPlan(entry,article){const binding=Match.bindContent(entry,ar
 }
 const supportedMarkerSources=new WeakSet();
 function support(entry){
- const fidelity=[],production=[];
+ const fidelity=[],production=[],productionIssues=[];
  try{validatePageStories(entry);}catch(e){fidelity.push(e.message);}
  const m=entry.original;
  for(const story of m.stories.filter(s=>m.elements.some(e=>e.textFrame?.storyRef===s.id&&e.pageCandidates.some(id=>entry.descriptor.pageIds.includes(id)))))if(story.paragraphs.some(p=>p.runs.some(r=>r.tokens.some(t=>!['Content','Br'].includes(t.type)))))fidelity.push('복합 Story/Table readback 미지원: '+story.id);
@@ -157,24 +157,24 @@ function support(entry){
   const role=entry.descriptor.roles[e.id]?.role;
   if(e.textFrame&&['title','subtitle','body','caption'].includes(role)){
    const story=m.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?.paragraphs.flatMap(p=>p.runs)||[];
-   try{TextPolicy.policy(story,{role});}catch(error){production.push(role+' '+error.message);}
+   try{TextPolicy.policy(story,{role});}catch(error){const message=role+' '+error.message;production.push(message);productionIssues.push({role,elementId:e.id,message});}
   }
  }
- return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};
+ return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],productionIssues,fidelityTestable:!fidelity.length};
 }
 function imageFitReadback(frame){const g=F.list(frame.allGraphics)[0];return {frameBounds:Array.from(frame.geometricBounds,Number),fitting:F.read(frame.frameFittingOptions,F.FIT),graphic:g?F.read(g,['geometricBounds','horizontalScale','verticalScale','actualPpi','effectivePpi']):null};}
 // A new graphic has a new intrinsic size. Historical crop distances are not
 // the Fill policy: reapplying them can create whitespace or extreme zoom.
-function fitReplacement(frame,source,ID,operation){
+function fitReplacement(frame,source,ID,operation,{defaultFill=false}={}){
  const fill=ID.EmptyFrameFittingOptions?.FILL_PROPORTIONALLY;
- const isFill=fill!==undefined&&sameEnum(source.fittingOnEmptyFrame,fill);
+ const isFill=fill!==undefined&&(sameEnum(source.fittingOnEmptyFrame,fill)||defaultFill&&ID.EmptyFrameFittingOptions?.NONE!==undefined&&sameEnum(source.fittingOnEmptyFrame,ID.EmptyFrameFittingOptions.NONE));
  F.restore(frame.frameFittingOptions,source);
  const command=isFill?ID.FitOptions.FILL_PROPORTIONALLY:ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS;
  if(command===undefined)throw new Error('UNSUPPORTED 이미지 fitting 명령');
  operation(command,isFill?'FILL_PROPORTIONALLY':'APPLY_FRAME_FITTING_OPTIONS');
  if(!isFill)F.restore(frame.frameFittingOptions,source);
  const actual=F.read(frame.frameFittingOptions,F.FIT);
- for(const key of ['autoFit','fittingOnEmptyFrame','fittingAlignment'])if(!F.compare(F.value(source[key]),actual[key],ID).equal)throw new Error('이미지 fitting 정책 불일치: '+key);
+ for(const key of ['autoFit','fittingOnEmptyFrame','fittingAlignment'])if(!F.compare(F.value(key==='fittingOnEmptyFrame'&&isFill?fill:source[key]),actual[key],ID).equal)throw new Error('이미지 fitting 정책 불일치: '+key);
  return actual;
 }
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
@@ -204,18 +204,19 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
   const context={doc,entry,baseline,snapshot,notApplicable:F.applicability(snapshot),packageValidation:plan.validation,packagingNotes:plan.packagingNotes,phase:'FIDELITY_FAILED',contentChecks:[],contentWarnings:[],edits:[],autoFixAllowed:false,proofOnly:mode==='proof',originalInspection:before};
   if(!baseline.equal||before.errors.length){context.failure=baseline.externalAssets.length?'템플릿 원본 외부 이미지 검증 불가 · EXTERNAL_ASSET_UNAVAILABLE/UNVERIFIED · DOCX 사진과 별개 · 콘텐츠 미교체':'원본 재현 검사 실패 · 콘텐츠 미교체 · Auto Fix 금지';return context;}
   context.phase='FIDELITY_PASSED';if(mode==='proof')return context;
-  progress('registered.content.plan.start');const edits=replacementPlan(entry,article),placeholders=Match.imagePlaceholders(entry);context.unappliedContent=edits.unappliedContent;context.contentWarnings.push(...context.unappliedContent.map(c=>c.message));context.edits=edits;context.requiredContent=edits.map(e=>({role:e.role,elementId:e.elementId,image:!!e.image}));progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
+  progress('registered.content.plan.start');const edits=replacementPlan(entry,article,mode==='direct'),placeholders=Match.imagePlaceholders(entry);context.unappliedContent=edits.unappliedContent;context.contentWarnings.push(...context.unappliedContent.map(c=>c.message));context.edits=edits;context.requiredContent=edits.map(e=>({role:e.role,elementId:e.elementId,image:!!e.image,clearImage:!!e.clearImage,action:e.action||'replace'}));context.slotContract={schema:'magazine-content-actions/v1',mode,slots:context.requiredContent.map(e=>({...e})).concat(placeholders.filter(p=>edits.some(e=>e.elementId===p.imageElementId&&(e.image||e.clearImage))).map(p=>({...p,action:'clear-placeholder'}))),preserve:entry.original.elements.filter(e=>e.pageCandidates.some(p=>entry.descriptor.pageIds.includes(p))&&!edits.some(edit=>edit.elementId===e.id)&&!placeholders.some(p=>p.elementId===e.id&&edits.some(edit=>edit.elementId===p.imageElementId&&(edit.image||edit.clearImage)))).map(e=>e.id)};progress('registered.content.plan.success '+JSON.stringify(edits.map(e=>({role:e.role,elementId:e.elementId,storyId:e.storyId,characters:e.text&&e.text.length,image:e.image&&{source:e.image.source,widthPx:e.image.widthPx,heightPx:e.image.heightPx,documentOrder:e.image.documentOrder}}))));
   // Read every destination and direct override before the first write.
   const targets=edits.map(edit=>{
    const f=baseline.frames.get(edit.elementId);if(!f)throw new Error('교체 프레임 식별 실패');if(edit.image&&!edit.image.path)throw new Error('Word 이미지 파일 위치 없음');
    const target={edit,f,bounds:relative(f)};
-   if(edit.storyId){const initial=edit.textPolicy.mode==='enlarged-story-initial',mixedLanguage=edit.textPolicy.mode==='language-by-source-character-class',first=f.parentStory.characters.item(initial?edit.textPolicy.baseIndex:0),para=f.parentStory.paragraphs.item(0);Object.assign(target,{paragraphStyle:para.appliedParagraphStyle,characterStyle:first.appliedCharacterStyle,paragraph:F.directSnapshot(para,mixedLanguage?TextPolicy.withoutLanguage(edit.paragraphOverrides):edit.paragraphOverrides),character:F.directSnapshot(first,mixedLanguage?TextPolicy.withoutLanguage(edit.characterOverrides):edit.characterOverrides),hostType:readType(first,ID)});if(mixedLanguage)target.languages=TextPolicy.capture(f.parentStory,edit.textPolicy);if(initial)target.initial={pointSize:f.parentStory.characters.item(0).pointSize,typography:readType(f.parentStory.characters.item(0),ID)};}
+   if(edit.storyId&&edit.action!=='clear'){const initial=edit.textPolicy.mode==='enlarged-story-initial',mixedLanguage=edit.textPolicy.mode==='language-by-source-character-class',first=f.parentStory.characters.item(initial?edit.textPolicy.baseIndex:0),para=f.parentStory.paragraphs.item(0);Object.assign(target,{paragraphStyle:para.appliedParagraphStyle,characterStyle:first.appliedCharacterStyle,paragraph:F.directSnapshot(para,mixedLanguage?TextPolicy.withoutLanguage(edit.paragraphOverrides):edit.paragraphOverrides),character:F.directSnapshot(first,mixedLanguage?TextPolicy.withoutLanguage(edit.characterOverrides):edit.characterOverrides),hostType:readType(first,ID)});if(mixedLanguage)target.languages=TextPolicy.capture(f.parentStory,edit.textPolicy);if(initial)target.initial={pointSize:f.parentStory.characters.item(0).pointSize,typography:readType(f.parentStory.characters.item(0),ID)};}
    if(edit.textPolicy?.mode==='source-base-title-language'){target.character.appliedLanguage=f.parentStory.characters.item(0).appliedLanguage;context.contentWarnings.push(edit.role+' 원본 기본 문단 언어 사용: 샘플의 부분 언어 위치는 새 제목에 복사하지 않습니다.');}
    if(edit.image){target.fitting={};for(const k of F.FIT){const v=f.frameFittingOptions&&f.frameFittingOptions[k];if(v===undefined)throw new Error('UNSUPPORTED 이미지 fitting readback: '+k);target.fitting[k]=v;}}
    return target;
   });
   for(const target of targets){const {edit,f,bounds}=target;guard();
-   if(edit.storyId){const story=f.parentStory;operation('registered.content.'+edit.role+'.replace',story,'contents',{characters:edit.text.length},()=>{TextPolicy.replaceContents(story,edit.text.replace(/\r\n?|\n/g,'\r'),edit.textPolicy);});const text=story.texts.item(0);
+   if(edit.storyId&&edit.action==='clear'){const story=f.parentStory;operation('registered.content.'+edit.role+'.clear',story,'contents',0,()=>{story.contents='';});if(String(story.contents)!=='')throw new Error(edit.role+' 슬롯 비움 실패');context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,text:'',clearText:true,action:'clear'});
+   }else if(edit.storyId){const story=f.parentStory;operation('registered.content.'+edit.role+'.replace',story,'contents',{characters:edit.text.length},()=>{TextPolicy.replaceContents(story,edit.text.replace(/\r\n?|\n/g,'\r'),edit.textPolicy);});const text=story.texts.item(0);
     text.appliedParagraphStyle=target.paragraphStyle;text.appliedCharacterStyle=target.characterStyle;
     // Restore only explicit source overrides, using native values captured
     // before replacement. Style inheritance is left in the imported styles.
@@ -223,8 +224,13 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     if(target.languages)TextPolicy.apply(story,edit.textPolicy.assignments,target.languages);
     if(target.initial)operation('registered.content.'+edit.role+'.initial',story.characters.item(0),'pointSize',target.initial.pointSize,()=>{story.characters.item(0).pointSize=target.initial.pointSize;});
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,textPolicy:edit.textPolicy,initial:target.initial||null,languagePlan:target.languages?edit.textPolicy.assignments:null,languages:target.languages?Object.fromEntries(Object.entries(target.languages).map(([k,v])=>[k,F.value(v)])):null,paragraphStyle:F.value(target.paragraphStyle),characterStyle:F.value(target.characterStyle),typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
+   }else if(edit.clearImage){
+    for(const g of F.list(f.allGraphics)){if(g.parent!==f&&(!f.id||g.parent?.id!==f.id))throw new Error('CONTENT 이미지 슬롯의 중첩 그래픽은 안전하게 비울 수 없습니다.');operation('registered.content.'+edit.role+'.clear',g,'remove()',null,()=>g.remove());}
+    if(F.list(f.allGraphics).length)throw new Error(edit.role+' 슬롯 그래픽 비움 실패');
+    for(const relation of placeholders.filter(p=>p.imageElementId===edit.elementId)){const placeholder=baseline.frames.get(relation.elementId);if(!placeholder)throw new Error('placeholder 참조 없음');operation('registered.content.placeholder.hide',placeholder,'visible',false,()=>{placeholder.visible=false;});if(placeholder.visible!==false)throw new Error('placeholder 숨김 실패');context.edits.push({...relation,hidePlaceholder:true});}
+    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,clearImage:true,action:'clear',fitting:F.read(f.frameFittingOptions,F.FIT)});
    }else if(edit.image){
-    operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));const beforeFit=imageFitReadback(f);const appliedFitting=fitReplacement(f,target.fitting,ID,(command,name)=>operation('registered.content.'+edit.role+'.fit',f,'fit()',name,()=>f.fit(command)));
+    operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));const beforeFit=imageFitReadback(f);const appliedFitting=fitReplacement(f,target.fitting,ID,(command,name)=>operation('registered.content.'+edit.role+'.fit',f,'fit()',name,()=>f.fit(command)),{defaultFill:mode==='direct'});
     const graphics=F.list(f.allGraphics),normalizePath=p=>String(p||'').replace(/\\/g,'/');
     if(graphics.length!==1||normalizePath(graphics[0].itemLink?.filePath)!==normalizePath(edit.image.path))throw new Error(edit.role+' 이미지 place/링크 확인 실패 · placeholder 유지');
     for(const relation of placeholders.filter(p=>p.imageElementId===edit.elementId)){
@@ -235,7 +241,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     }
     progress('registered.content.'+edit.role+'.fitting '+JSON.stringify({elementId:edit.elementId,image:{widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio},sourceFitting:F.read(target.fitting,F.FIT),before:beforeFit,after:imageFitReadback(f)}));
     const fill=ID.EmptyFrameFittingOptions?.FILL_PROPORTIONALLY;
-    if(fill!==undefined&&sameEnum(target.fitting.fittingOnEmptyFrame,fill)){const g=graphics[0],b=Array.from(g.geometricBounds,Number),fb=Array.from(f.geometricBounds,Number);if(!Number.isFinite(g.horizontalScale)||!Number.isFinite(g.verticalScale)||Math.abs(Math.abs(g.horizontalScale)-Math.abs(g.verticalScale))>.001||b[0]>fb[0]+.01||b[1]>fb[1]+.01||b[2]<fb[2]-.01||b[3]<fb[3]-.01)throw new Error(edit.role+' FillProportionally 결과 불일치: 비율/프레임 채움 확인 필요');}
+    if(fill!==undefined&&(sameEnum(target.fitting.fittingOnEmptyFrame,fill)||mode==='direct'&&ID.EmptyFrameFittingOptions?.NONE!==undefined&&sameEnum(target.fitting.fittingOnEmptyFrame,ID.EmptyFrameFittingOptions.NONE))){const g=graphics[0],b=Array.from(g.geometricBounds,Number),fb=Array.from(f.geometricBounds,Number);if(!Number.isFinite(g.horizontalScale)||!Number.isFinite(g.verticalScale)||Math.abs(Math.abs(g.horizontalScale)-Math.abs(g.verticalScale))>.001||b[0]>fb[0]+.01||b[1]>fb[1]+.01||b[2]<fb[2]-.01||b[3]<fb[3]-.01)throw new Error(edit.role+' FillProportionally 결과 불일치: 비율/프레임 채움 확인 필요');}
     const imageProfile=Match.imageProfile(edit.image),frameRatio=(bounds[3]-bounds[1])/(bounds[2]-bounds[0]);
     if(imageProfile.known&&Math.abs(Math.log(imageProfile.aspectRatio/frameRatio))>.05)context.contentWarnings.push(edit.role+' 원고 사진과 원본 프레임 비율이 다릅니다. 원본 fitting/crop 유지 · 잘림/여백을 확인해주세요.');
     const placed=F.frameSnapshot(f,undefined,doc,ID).graphics[0],gb=placed&&placed.bounds;
@@ -254,13 +260,13 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
 }
 function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;try{ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;const issues=[];
  if(!['CONTENT_APPLIED','FIDELITY_PASSED'].includes(context.phase))issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:context.failure||'원본 Fidelity 미검증',hint:'원본/생성 비교를 확인해주세요. Auto Fix는 실행하지 않습니다.'});
- if(context.phase==='CONTENT_APPLIED')for(const expected of context.requiredContent||[]){const got=context.contentChecks.filter(c=>c.role===expected.role&&c.elementId===expected.elementId);if(got.length!==1||(expected.image?!got[0].imagePath:typeof got[0].text!=='string'))issues.push({cause:'CONTENT_REPLACEMENT_INCOMPLETE',category:'BLOCKING',role:expected.role,elementId:expected.elementId,message:expected.role+' 콘텐츠 교체 완료 증거 없음'});}
+ if(context.phase==='CONTENT_APPLIED')for(const expected of context.requiredContent||[]){const got=context.contentChecks.filter(c=>c.role===expected.role&&c.elementId===expected.elementId);if(got.length!==1||(expected.clearImage?!got[0].clearImage:expected.image?!got[0].imagePath:typeof got[0].text!=='string'))issues.push({cause:'CONTENT_REPLACEMENT_INCOMPLETE',category:'BLOCKING',role:expected.role,elementId:expected.elementId,message:expected.role+' 콘텐츠 교체 완료 증거 없음'});}
  if(context.phase==='FIDELITY_FAILED'&&context.originalInspection)for(const message of context.originalInspection.errors)issues.push({cause:/overflow|넘칩니다|넘침/i.test(message)?'SOURCE_OVERFLOW':'SOURCE_INSPECTION',category:'BLOCKING',message:'원본 단계: '+message,hint:'원고 교체/Auto Fix로 원본 오류를 숨기지 않습니다.'});
  for(const asset of context.baseline?.externalAssets||[])issues.push({cause:asset.state,category:'BLOCKING',elementId:asset.elementId,source:'template',failureOperation:'registered.graphics.externalAsset',property:'itemLink.status',message:'템플릿 원본 그래픽: '+asset.state,hint:'DOCX 사진 추출 오류가 아닙니다. 템플릿 패키지의 원본 링크 검증이 필요합니다. 사용자 원고의 다른 사진으로 대체하지 않습니다.'});
  if(context.snapshot){
   const current=F.capture(context.doc,context.entry.descriptor.pageIds,undefined,ID),kept=F.preservation(context.snapshot,current,context.edits);
   if(!kept.equal)issues.push({cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'고정 객체 · 페이지 · Story · 레이어 · 쌓임 순서 보존 불일치',differences:kept.differences,failureOperation:'registered.preservation.compare',detail:JSON.stringify(kept.differences)});
-  const live=diagnostics(context.entry,context.doc,ID,{colorOverrides:context.colorOverrides||{},ignoreStories:context.edits.filter(e=>e.storyId||e.image).map(e=>e.storyId||'image:'+e.elementId)});
+  const live=diagnostics(context.entry,context.doc,ID,{colorOverrides:context.colorOverrides||{},ignoreStories:context.edits.filter(e=>e.storyId||e.image||e.clearImage).map(e=>e.storyId||'image:'+e.elementId)});
   for(const r of live.records.filter(r=>!r.comparison.equal))issues.push({role:r.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:'원본 속성 재검사 불일치: '+r.elementId,elementId:r.elementId,differences:r.comparison.differences,failureOperation:r.readbackFailure&&r.readbackFailure.operation,property:r.readbackFailure&&r.readbackFailure.property,adobeError:r.readbackFailure&&r.readbackFailure.message,adobeErrorCode:r.readbackFailure&&r.readbackFailure.code,detail:JSON.stringify(r.comparison.differences)});
  }
  for(const c of context.contentChecks){const f=c.frame;let comparison=Model.compare(c.bounds,relative(f));if(c.autoFit){const cmp=AutoFit.check(c,char=>readType(char,ID),F.value,(a,b)=>F.compare(a,b,ID));if(!cmp.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' Auto-fit 허용 서식/관계 불일치',differences:cmp.differences});}if(c.typography&&!c.initial&&!c.autoFit){const got=readType(c.languagePlan?f.parentStory.characters.item(0):f.parentStory.texts.item(0),ID);comparison=F.compare({bounds:c.bounds,typography:c.typography},{bounds:relative(f),typography:got},ID);}
@@ -269,7 +275,8 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
   if(c.languagePlan&&!c.autoFit){for(let i=0;i<c.languagePlan.length;i++){const char=f.parentStory.characters.item(i),expected={typography:c.typography,language:c.languages[c.languagePlan[i]],paragraphStyle:c.paragraphStyle,characterStyle:c.characterStyle,overrides:Object.fromEntries(Object.entries(c.overrides).map(([k,v])=>[k,F.value(v)]))},actual={typography:readType(char,ID),language:F.value(char.appliedLanguage),paragraphStyle:F.value(char.appliedParagraphStyle),characterStyle:F.value(char.appliedCharacterStyle),overrides:Object.fromEntries(Object.keys(c.overrides).map(k=>[k,F.value(char[k])]))};const cmp=F.compare(expected,actual,ID);if(!cmp.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 혼합 언어/스타일 보존 불일치',differences:cmp.differences,characterIndex:i});}}
   if(c.overrides&&!c.languagePlan&&!c.initial&&!c.autoFit){const text=f.parentStory.texts.item(0),actual={};for(const k of Object.keys(c.overrides))actual[k]=F.value(text[k]);const expected=Object.fromEntries(Object.entries(c.overrides).map(([k,v])=>[k,F.value(v)]));const cmp=F.compare(expected,actual,ID);if(!cmp.equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' direct override 보존 불일치',detail:JSON.stringify(cmp.differences)});}
   if(c.imagePath){const graphics=F.list(f.allGraphics),path=graphics[0]&&graphics[0].itemLink&&graphics[0].itemLink.filePath;const normalize=p=>String(p||'').replace(/\\/g,'/');if(graphics.length!==1||normalize(path)!==normalize(c.imagePath))issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 이미지 place/링크 불일치'});if(!Model.compare(c.imageGeometry,F.frameSnapshot(f,undefined,context.doc,ID).graphics).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 배치 이미지 geometry/crop 변경'});if(!Model.compare(c.fitting,F.read(f.frameFittingOptions,F.FIT)).equal)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' fitting/crop 변경'});}
-  if(c.typography&&String(f.parentStory.contents)!==c.text)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 새 원고와 실제 Story 내용 불일치',hint:'콘텐츠 누락/변경을 확인해주세요. Auto Fix는 실행하지 않습니다.'});
+  if(c.clearImage&&(F.list(f.allGraphics).length||!Model.compare(c.fitting,F.read(f.frameFittingOptions,F.FIT)).equal))issues.push({role:c.role,cause:'CONTENT_REPLACEMENT_INCOMPLETE',category:'BLOCKING',message:c.role+' 비운 이미지 슬롯에 그래픽/원본 fitting 변경 발견'});
+  if((c.typography||c.clearText)&&String(f.parentStory.contents)!==c.text)issues.push({role:c.role,cause:'GENERATOR_MISMATCH',category:'BLOCKING',message:c.role+' 새 원고와 실제 Story 내용 불일치',hint:'콘텐츠 누락/변경을 확인해주세요. Auto Fix는 실행하지 않습니다.'});
   if(c.typography&&f.parentStory.overflows)issues.push({role:c.role,cause:'CONTENT_OVERFLOW',category:'USER_ACTION_REQUIRED',message:c.role+' 새 원고가 원본 프레임 수용량을 초과합니다.',hint:'이 원고에는 다른 템플릿을 권장합니다. 원고 분량을 줄이거나 다른 등록 디자인을 선택해주세요. 원본 스레드/지면은 늘리지 않습니다.'});
  }
  return issues;

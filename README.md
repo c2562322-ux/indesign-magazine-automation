@@ -133,3 +133,6 @@ The action tries the full safe ranked pool until three actual Production PASS re
 # Current native design source
 
 The local native panel uses the explicit `assets/templates/working/active-design-set.private.json` selection and its source filename/SHA allowlist. Archived libraries and generic preview/creation modes are excluded from the general native flow. Reload → DOCX → active registered recommendations. Missing/broken selection reports an error without legacy fallback. Private source/model/Library files remain local. Current source and actual Adobe proof counts: [docs/ACTIVE_SOURCE_5583.md](docs/ACTIVE_SOURCE_5583.md).
+
+
+Gallery direct Production now clears absent confirmed CONTENT slots and spare images. Residual bounded-Auto-fit overflow keeps an editable document open with `조판 미완료`; it is not output approval. Policy and actual Host/UDT checks: [docs/DIRECT_CONTENT_POLICY.md](docs/DIRECT_CONTENT_POLICY.md).

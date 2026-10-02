@@ -319,7 +319,7 @@
         try{
             if(adapter.yieldUI)await adapter.yieldUI();if(api.disposed)return;
             const report=await action(progress);if(api.disposed)return;
-            if(report){showReport(report,label,trace);$('productionStatus').textContent=report.options?D.optionsSummary(report):report.outcome==='blocked'?'제작 중단 · '+report.errors.join(' / '):report.outcome==='unconfirmed'?label+' 완료 미확인 · 출력 파일을 확인해주세요.':'✓ '+label+' 완료'+(report.errors.length?' · 검사 수정 필요':'');}
+            if(report){showReport(report,label,trace);$('productionStatus').textContent=report.options?D.optionsSummary(report):report.outcome==='blocked'?'제작 중단 · '+report.errors.join(' / '):report.outcome==='incomplete'?'조판 미완료 · '+report.errors.join(' / '):report.outcome==='unconfirmed'?label+' 완료 미확인 · 출력 파일을 확인해주세요.':'✓ '+label+' 완료'+(report.errors.length?' · 검사 수정 필요':'');}
             else{trace.push(label+' 취소');$('hostReport').textContent=safe(trace.join('\n'));status(label+' 취소');$('productionStatus').textContent=label+' 취소 · 다시 시도할 수 있습니다.';}
             return report;
         }catch(e){

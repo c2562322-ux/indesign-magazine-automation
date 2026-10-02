@@ -546,3 +546,8 @@ test('gallery DOCX load releases Studio busy after thumbnail work, including fai
   const report=await app.createRegistered({descriptor:{id:'chosen'},profile:{name:'Chosen'},original:{metadata:{sourceSha256:'fixture'}}},app.read().article);assert.equal(report.outputReady,true);assert.equal(app.state.busy,false);
  }
 });
+
+test('incomplete direct layout retains editable document and shows incomplete rather than completion',async()=>{
+ const report={pageCount:1,errors:['본문 텍스트가 넘칩니다.'],warnings:['body 안전 한계에서도 넘침 유지'],issues:[{cause:'CONTENT_OVERFLOW',role:'body'}],outcome:'incomplete',outputReady:false,fidelity:{phase:'CONTENT_APPLIED',designId:'chosen'}};
+ const x=setup(true,{registeredOnly:true,manualOutput:true,createRegistered:async()=>report}),entry={descriptor:{id:'chosen'},profile:{name:'Chosen'},original:{metadata:{sourceSha256:'fixture'}}};await x.app.createRegistered(entry,x.app.read().article,'direct');assert.match(x.e.productionStatus.textContent,/조판 미완료/);assert.doesNotMatch(x.e.productionStatus.textContent,/✓.*완료/);assert.equal(x.app.state.hasDocument,true);assert.equal(x.app.state.pdfReady,false);assert.equal(x.app.state.busy,false);
+});
