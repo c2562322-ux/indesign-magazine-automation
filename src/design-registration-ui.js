@@ -1,4 +1,4 @@
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-registration'),require('./design-matching'),require('./design-model'));else root.MagazineRegistrationUI=factory(root.MagazineRegistration,root.MagazineMatching,root.MagazineDesignModel);})(typeof window!=='undefined'?window:this,function(R,Match,Model){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-registration'),require('./design-matching'),require('./design-model'),require('./production-diagnostics'));else root.MagazineRegistrationUI=factory(root.MagazineRegistration,root.MagazineMatching,root.MagazineDesignModel,root.MagazineProductionDiagnostics);})(typeof window!=='undefined'?window:this,function(R,Match,Model,D){
 'use strict';
 const labels={title:'제목',subtitle:'부제',body:'본문',image1:'사진 1',image2:'사진 2',caption:'캡션',header:'헤더',footer:'푸터',pageNumber:'페이지 번호',keep:'장식/고정 내용 유지'};
 function mount(root,studio,adapter){
@@ -60,6 +60,7 @@ function mount(root,studio,adapter){
    if(!entries.length)throw new Error('제작 가능한 추천 디자인이 없습니다.');
    if(!studio.createRegisteredOptions)throw new Error('실제 InDesign에서 실행해주세요.');
    const report=await studio.createRegisteredOptions(entries,article);if(!fresh())return;
+   status.textContent=D.optionsSummary(report);
    optionFeedback.textContent=report?.options?report.options.map(o=>o.optionId+' '+(o.designName||o.designId||'')+' '+o.status+' · '+o.stage+' · '+(o.errors||[]).join(' / ')).join('\n')+' · '+(report.outputReady?'3안 검사 완료':'부분/실패 결과 · 저장/PDF 차단'):'제작 중단 · 검사 및 출력의 오류를 확인해주세요.';
   },results);optionsButton.feedback=optionFeedback;optionsButton.registrationDisabled=!optionRows.length;optionsButton.disabled=!optionRows.length;
 

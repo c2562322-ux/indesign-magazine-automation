@@ -227,3 +227,13 @@ test('3-option freeze retains descriptor/article snapshot and excludes no safety
  assert.equal(j.selected.length,3);manuscript.title='changed';assert.equal(j.article.title,article.title);assert.notEqual(j.selected[0].descriptor,entries[0].descriptor);
  const blocked=R.register(e.original,{...e.descriptor,capability:{productionReasons:['unsafe mixed style']}});assert.throws(()=>Options.freeze([blocked],article),/PRODUCTION_UNSUPPORTED/);assert.throws(()=>Options.freeze([],article));
 });
+
+test('batch result status never reports completion for zero/partial successes',async()=>{
+ for(const passed of [0,1,2,3]){
+  const e=registered(),entries=Array.from({length:3},(_,i)=>R.register(e.original,{...e.descriptor,id:'result-'+i})),x=setup({load:async()=>R.pack(entries)});
+  x.studio.createRegisteredOptions=async()=>({options:entries.map((e,i)=>({optionId:'OPTION_'+(i+1),status:i<passed?'PASS':'BLOCK',stage:'production',errors:i<passed?[]:['fitting failed']})),outputReady:passed===3});
+  await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');await x.click('추천 3안으로 제작');
+  const expected=passed===3?'추천 3안 제작 완료 (3/3)':passed?'추천 3안 제작 미완료 ('+passed+'/3)':'추천 3안 제작 실패 (0/3)';
+  assert.ok(x.nodes().some(n=>n.textContent===expected));assert.ok(!x.nodes().some(n=>n.textContent==='추천 3안으로 제작 완료'));
+ }
+});

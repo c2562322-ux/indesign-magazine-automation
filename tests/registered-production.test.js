@@ -499,8 +499,8 @@ test('placed graphic snapshots remain page-relative through cleanup and detect r
 });
 test('FillProportionally rejects letterboxing or distorted scale while preserving frame geometry',async()=>{
  const e=JSON.parse(JSON.stringify(fixture())),photo=e.original.elements.find(e=>e.type==='Rectangle');photo.pageCandidates=['p1'];photo.pageBounds={p1:[10,450,150,590]};photo.image=[];photo.properties={};photo.details={FrameFittingOption:{FittingOnEmptyFrame:'FillProportionally'}};e.descriptor.roles[photo.id]={role:'image1',confirmed:true};e.descriptor.images[photo.id]='required';const entry=R.register(e.original,e.descriptor),article={title:'새 제목',body:'새 본문',images:[{path:'C:/a.png',widthPx:1200,heightPx:800}]};
- for(const bad of [false,true]){const h=host(entry,{onPlace:f=>{Object.assign(f.allGraphics[0],{horizontalScale:100,verticalScale:bad?80:100});}});h.ID.EmptyFrameFittingOptions={FILL_PROPORTIONALLY:42};h.frames.find(f=>f.extractLabel()===photo.id).frameFittingOptions.fittingOnEmptyFrame=42;
- if(bad)await assert.rejects(()=>N.create(entry,article,h.env),/FillProportionally/);else {const c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.deepEqual(c.contentChecks.find(c=>c.imagePath).bounds,photo.pageBounds.p1);}}
+ for(const bad of [false,'scale','letterbox']){const h=host(entry,{onPlace:f=>{Object.assign(f.allGraphics[0],{horizontalScale:100,verticalScale:bad==='scale'?80:100});if(bad==='letterbox')f.allGraphics[0].geometricBounds=f.geometricBounds.map((v,i)=>v+(i===0?10:0));}});h.ID.EmptyFrameFittingOptions={FILL_PROPORTIONALLY:42};h.ID.FitOptions.FILL_PROPORTIONALLY='fill';h.frames.find(f=>f.extractLabel()===photo.id).frameFittingOptions.fittingOnEmptyFrame=42;
+ if(bad)await assert.rejects(()=>N.create(entry,article,h.env),/FillProportionally/);else {const c=await N.create(entry,article,h.env);assert.equal(c.phase,'CONTENT_APPLIED');assert.deepEqual(c.contentChecks.find(c=>c.imagePath).bounds,photo.pageBounds.p1);const image=c.contentChecks.find(c=>c.imagePath);image.frame.frameFittingOptions.topCrop+=1;assert.ok(N.check(c,h.ID).some(i=>/fitting\/crop 변경/.test(i.message)));}}
 });
 
 test('native mixed-language BODY replacement preserves styles, rechecks each character and reports content overflow',async()=>{
@@ -573,4 +573,12 @@ test('placed image child in allPageItems is not a frame z-order change; unrelate
  const reordered=JSON.parse(JSON.stringify(after));reordered.pages[0].order.reverse();assert.equal(F.preservation(before,reordered,edits).equal,false);
  const wrongOwner=JSON.parse(JSON.stringify(after));wrongOwner.pages[0].order.at(-1).placedGraphicOf='KEEP';assert.equal(F.preservation(before,wrongOwner,edits).equal,false);
  const changed=JSON.parse(JSON.stringify(after));changed.objects[frame.extractLabel()].bounds[0]+=1;assert.equal(F.preservation(before,changed,edits).equal,false);
+});
+
+test('Fill replacement invokes source policy and keeps newly computed crops, not previous image crop distances',()=>{
+ const source={autoFit:false,leftCrop:0,rightCrop:0,topCrop:427,bottomCrop:427,fittingOnEmptyFrame:'fill',fittingAlignment:'right'},frame={frameFittingOptions:{...source}},ID={EmptyFrameFittingOptions:{FILL_PROPORTIONALLY:'fill'},FitOptions:{FILL_PROPORTIONALLY:'fill-command',APPLY_FRAME_FITTING_OPTIONS:'apply'}};
+ const result=N.fitReplacement(frame,source,ID,(command)=>{assert.equal(command,'fill-command');frame.frameFittingOptions.topCrop=0;frame.frameFittingOptions.bottomCrop=0;});
+ assert.equal(result.topCrop,0);assert.equal(result.fittingAlignment,'right');assert.equal(source.topCrop,427);assert.equal(frame.frameFittingOptions.topCrop,0);
+ assert.throws(()=>N.fitReplacement(frame,source,ID,()=>{frame.frameFittingOptions.fittingAlignment='center';}),/정책 불일치/);
+ const other={...source,fittingOnEmptyFrame:'none'};N.fitReplacement(frame,other,ID,command=>{assert.equal(command,'apply');frame.frameFittingOptions.topCrop=99;});assert.equal(frame.frameFittingOptions.topCrop,427);
 });

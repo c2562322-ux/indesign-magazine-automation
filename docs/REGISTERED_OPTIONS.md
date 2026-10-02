@@ -54,3 +54,8 @@ Private test scripts/reports and generated INDD/PDF are ignored under `assets/te
 4. Only for 3 PASS: use **INDD 저장**, then **PDF 내보내기**. If blocked, save the existing diagnostic JSON; it includes the complete options report and failure details.
 
 Do not alter the manuscript just to hide a blocked template. Fewer than three eligible designs and content overset are explicit results. Single-design production remains available separately.
+
+
+## 2026-10-02 UDT follow-up
+
+See [current candidate/fitting evidence](UDT_OPTIONS_FITTING.md). The earlier3-design test explicitly selected old-source designs; the current active panel yields only newu577b for the tested one-image inputs, including Smoke. Old Smoke coverage PASS concealed extreme crop; source Fill now uses the explicit fitting command and records new-content crop. Actual UI-module/Host tests confirm accurate0/3 failure and1/3 incomplete messages. No current-panel3/3 success is claimed.

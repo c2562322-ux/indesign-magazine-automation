@@ -1,3 +1,16 @@
+# UDT 3안 실패 후속 — 2026-10-02
+
+- HEAD 작업 기준 b0c1d4c. 기존 미추적 sample/magazine-design.indd 보존. 추천/Library/원본/parser/binding 변경 없음.
+- 과거3 PASS는 구형 original u335e/u3d5/u577b 직접 지정 회귀 시험. 현재 패널은 대체된14개를 빼고 활성41개를 추천하므로 같은 조건이 아님. 실제 UI 모듈의 추천/클릭 handler + 실제 Host로 Smoke도 새 u577b1개만 고정됨. 이번 사용자 DOCX 정확한 경로는 미확정(Desktop/테스트원고.docx 없음).
+- fitting 원인 실기 재현: 원본 FillProportionally에 남은 top/bottom crop427.7731pt를 APPLY_FRAME_FITTING_OPTIONS와 fit후 restore가 재사용. 로컬439×349 DOCX사진은 높이390.4072pt로 566.6457pt frame을 못 채움. Smoke1200×800은1020% 과확대되어 기존coverage검사만 통과했음.
+- 원본이 Fill인 경우에만 Adobe FILL_PROPORTIONALLY 실행, 계산된 새crop 유지/후검사. source alignment/autoFit/mode 보존 확인. 다른 정책 unchanged. 프레임/원본/proof/KEEP 변경 없음. 비율·채움·링크·후검사·overflow 차단 유지. before/after bounds, scale, PPI, crop 진단 포함.
+- UI 두 상태 영역 모두0/3 실패,1~2/3 미완료,3/3 및 출력검사 통과시 완료. 부분 저장/PDF차단 유지.
+- 실기: 실제 등록UI handler(화면DOM harness)+실제Host+55Library+설치폰트 사용. 로컬01 DOCX → 후보1/검사30/제외10, 글·사진6targets 교체/fitting 통과 후 콘텐츠넘침5건으로0/3차단. Smoke → 새u577b PASS/한페이지, UI미완료1/3/출력차단. 구형3개 직접지정 회귀 →3PASS/한INDD3페이지/저장후검사0오류/PDF파일생성, API afterExport미관측 구분. 이는 사용자UDT3/3 성공이 아님.
+- Node331/331, Python18/18. docs/UDT_OPTIONS_FITTING.md에 활성41개 제외사유 및 실기수치.
+- NEXT: UDT Reload → 같은DOCX → N/3 확인 → 추천3안으로 제작. 현재Library에서3개를 억지로 채우지 않음. 정확한사용DOCX 또는 새진단 제공시 같은입력 재확인 가능. 새디자인지원/Library확대는 이번범위밖. 기존단일버튼 유지.
+
+---
+
 # 추천 3안 제작 — 2026-10-02
 
 - 새 샘플 `172e0fb7adc52e31-u577b` (10쪽): 실제 InDesign 2026 UXP에서 기존 registered-smoke.docx 추출 payload로 TITLE/SUBTITLE/BODY 3개/IMAGE1 교체, Recompose, 사전/후검사 실행. 오류0, outputReady=true. 원고/사진 해상도 및 crop 확인 경고 유지. 실제 사용자 DOCX의 무조건 성공이나 모든 새 디자인 통과를 뜻하지 않음.

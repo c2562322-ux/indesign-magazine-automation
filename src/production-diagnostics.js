@@ -68,5 +68,9 @@
             rawReport:report||null,hostFailure:hostFailure?{message:hostFailure.message,registeredFailure:failure||null}:null,trace};
     }
     function diagnosticJSON(data){return JSON.stringify(data,(key,value)=>value===undefined?{__diagnosticType:'undefined'}:typeof value==='number'&&!Number.isFinite(value)?{__diagnosticType:String(value)}:value,2);}
-    return {redact,failure,step,asyncStep,registeredFailure,fidelityRows,fidelityDiagnostic,diagnosticJSON};
+    function optionsSummary(report){
+        const passed=(report?.options||[]).filter(o=>o.status==='PASS').length;
+        return report?.outputReady===true&&passed===3&&!(report.errors||[]).length?'추천 3안 제작 완료 (3/3)':passed?'추천 3안 제작 미완료 ('+passed+'/3)':'추천 3안 제작 실패 (0/3)';
+    }
+    return {redact,failure,step,asyncStep,registeredFailure,fidelityRows,fidelityDiagnostic,diagnosticJSON,optionsSummary};
 });

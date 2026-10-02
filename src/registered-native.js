@@ -155,6 +155,21 @@ function support(entry){
  }
  return {fidelityReasons:[...new Set(fidelity)],productionReasons:[...new Set(production)],fidelityTestable:!fidelity.length};
 }
+function imageFitReadback(frame){const g=F.list(frame.allGraphics)[0];return {frameBounds:Array.from(frame.geometricBounds,Number),fitting:F.read(frame.frameFittingOptions,F.FIT),graphic:g?F.read(g,['geometricBounds','horizontalScale','verticalScale','actualPpi','effectivePpi']):null};}
+// A new graphic has a new intrinsic size. Historical crop distances are not
+// the Fill policy: reapplying them can create whitespace or extreme zoom.
+function fitReplacement(frame,source,ID,operation){
+ const fill=ID.EmptyFrameFittingOptions?.FILL_PROPORTIONALLY;
+ const isFill=fill!==undefined&&sameEnum(source.fittingOnEmptyFrame,fill);
+ F.restore(frame.frameFittingOptions,source);
+ const command=isFill?ID.FitOptions.FILL_PROPORTIONALLY:ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS;
+ if(command===undefined)throw new Error('UNSUPPORTED 이미지 fitting 명령');
+ operation(command,isFill?'FILL_PROPORTIONALLY':'APPLY_FRAME_FITTING_OPTIONS');
+ if(!isFill)F.restore(frame.frameFittingOptions,source);
+ const actual=F.read(frame.frameFittingOptions,F.FIT);
+ for(const key of ['autoFit','fittingOnEmptyFrame','fittingAlignment'])if(!F.compare(F.value(source[key]),actual[key],ID).equal)throw new Error('이미지 fitting 정책 불일치: '+key);
+ return actual;
+}
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
  const colorPlan=mode==='proof'?[]:Colors.plan(entry,article?.themeColors||{});
  const plan=packagePlan(entry,{allowUnmapped:mode==='proof'});guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
@@ -199,7 +214,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     if(target.languages)TextPolicy.apply(story,edit.textPolicy.assignments,target.languages);
     context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,languagePlan:target.languages?edit.textPolicy.assignments:null,languages:target.languages?Object.fromEntries(Object.entries(target.languages).map(([k,v])=>[k,F.value(v)])):null,paragraphStyle:F.value(target.paragraphStyle),characterStyle:F.value(target.characterStyle),typography:target.hostType,overrides:{...target.paragraph,...target.character},text:edit.text.replace(/\r\n?|\n/g,'\r')});
    }else if(edit.image){
-    operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));F.restore(f.frameFittingOptions,target.fitting);operation('registered.content.'+edit.role+'.fit',f,'fit()','APPLY_FRAME_FITTING_OPTIONS',()=>f.fit(ID.FitOptions.APPLY_FRAME_FITTING_OPTIONS));F.restore(f.frameFittingOptions,target.fitting);
+    operation('registered.content.'+edit.role+'.place',f,'place()',{source:edit.image.source,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx},()=>f.place(edit.image.path));const beforeFit=imageFitReadback(f);const appliedFitting=fitReplacement(f,target.fitting,ID,(command,name)=>operation('registered.content.'+edit.role+'.fit',f,'fit()',name,()=>f.fit(command)));
     const graphics=F.list(f.allGraphics),normalizePath=p=>String(p||'').replace(/\\/g,'/');
     if(graphics.length!==1||normalizePath(graphics[0].itemLink?.filePath)!==normalizePath(edit.image.path))throw new Error(edit.role+' 이미지 place/링크 확인 실패 · placeholder 유지');
     for(const relation of placeholders.filter(p=>p.imageElementId===edit.elementId)){
@@ -208,6 +223,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
      if(placeholder.visible!==false)throw new Error('placeholder 숨김 readback 실패: '+relation.elementId);
      context.edits.push({...relation,hidePlaceholder:true});
     }
+    progress('registered.content.'+edit.role+'.fitting '+JSON.stringify({elementId:edit.elementId,image:{widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio},sourceFitting:F.read(target.fitting,F.FIT),before:beforeFit,after:imageFitReadback(f)}));
     const fill=ID.EmptyFrameFittingOptions?.FILL_PROPORTIONALLY;
     if(fill!==undefined&&sameEnum(target.fitting.fittingOnEmptyFrame,fill)){const g=graphics[0],b=Array.from(g.geometricBounds,Number),fb=Array.from(f.geometricBounds,Number);if(!Number.isFinite(g.horizontalScale)||!Number.isFinite(g.verticalScale)||Math.abs(Math.abs(g.horizontalScale)-Math.abs(g.verticalScale))>.001||b[0]>fb[0]+.01||b[1]>fb[1]+.01||b[2]<fb[2]-.01||b[3]<fb[3]-.01)throw new Error(edit.role+' FillProportionally 결과 불일치: 비율/프레임 채움 확인 필요');}
     const imageProfile=Match.imageProfile(edit.image),frameRatio=(bounds[3]-bounds[1])/(bounds[2]-bounds[0]);
@@ -215,7 +231,7 @@ async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode=
     const placed=F.frameSnapshot(f,undefined,doc,ID).graphics[0],gb=placed&&placed.bounds;
     if(imageProfile.known&&Array.isArray(gb)&&gb[3]>gb[1]&&gb[2]>gb[0]){const ppi=Math.min(imageProfile.width*72/(gb[3]-gb[1]),imageProfile.height*72/(gb[2]-gb[0]));if(ppi<150)context.contentWarnings.push(edit.role+' 배치 bounds 기준 추정 해상도 '+Math.round(ppi)+'ppi · 인쇄 해상도 확인 필요');}
     else context.contentWarnings.push(edit.role+' 배치 이미지 해상도 미확정 · 링크/출력 해상도를 확인해주세요.');
-    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
+    context.contentChecks.push({role:edit.role,elementId:edit.elementId,frame:f,bounds,imagePath:edit.image.path,imageMetadata:{documentOrder:edit.image.documentOrder,widthPx:edit.image.widthPx,heightPx:edit.image.heightPx,aspectRatio:edit.image.aspectRatio,orientation:edit.image.orientation},fitting:appliedFitting,sourceFitting:F.read(target.fitting,F.FIT),imageGeometry:F.frameSnapshot(f,undefined,doc,ID).graphics});
    }
   }
   context.colorOverrides={};
@@ -245,4 +261,4 @@ function check(context,ID){const old=ID.app.scriptPreferences.measurementUnit;tr
  return issues;
  }finally{ID.app.scriptPreferences.measurementUnit=old;}}
 function rebind(context,doc){context.doc=doc;const all=items(doc.allPageItems);for(const c of context.contentChecks){const found=all.find(f=>f.extractLabel(KEY)===c.elementId);if(!found)throw new Error('저장 후 등록 프레임 재연결 실패');c.frame=found;}}
-module.exports={support,KEY,packagePlan,replacementPlan,diagnostics,create,check,rebind};
+module.exports={fitReplacement,support,KEY,packagePlan,replacementPlan,diagnostics,create,check,rebind};

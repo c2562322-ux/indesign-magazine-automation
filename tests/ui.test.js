@@ -509,8 +509,17 @@ test('UXP diagnostic save rejects damaged readback, supports cancellation and bl
 
 test('3-option UI uses existing check/save/PDF adapter and partial results disable both outputs',async()=>{
  const entry={descriptor:{id:'option',sourceSha256:'hash',name:'Option'},profile:{name:'Option'}};let partial=false;
- const x=setup(true,{createRegisteredOptions:async()=>({pageCount:3,errors:partial?['OPTION_2 failed']:[],warnings:[],options:[{optionId:'OPTION_1',status:'PASS'}],outputReady:!partial})});
+ const x=setup(true,{createRegisteredOptions:async()=>({pageCount:3,errors:partial?['OPTION_2 failed']:[],warnings:[],options:Array.from({length:3},(_,i)=>({optionId:'OPTION_'+(i+1),status:partial&&i===1?'BLOCK':'PASS'})),outputReady:!partial})});
  await x.app.createRegisteredOptions([entry],x.app.read().article);assert.equal(x.e.btnExportPdf.disabled,false);assert.equal(x.e.btnSaveIndd.disabled,false);x.e.btnCheckAuto.click();await tick();x.e.btnSaveIndd.click();await tick();x.e.btnExportPdf.click();await tick();assert.deepEqual(x.calls,['check','save','pdf']);
  partial=true;await x.app.createRegisteredOptions([entry],x.app.read().article);assert.equal(x.e.btnSaveIndd.disabled,true);assert.equal(x.e.btnExportPdf.disabled,true);assert.equal(x.e.btnCheckAuto.disabled,false);
  x.e.autoTitle.value='changed';x.e.autoTitle.listeners.input();assert.equal(x.e.btnCheckAuto.disabled,true);
+});
+
+test('production status distinguishes zero, partial and complete batch results',async()=>{
+ for(const passed of [0,1,2,3]){
+  const entry={descriptor:{id:'option',sourceSha256:'hash'}},x=setup(true,{createRegisteredOptions:async()=>({pageCount:passed,errors:passed<3?['BLOCK']:[],warnings:[],options:Array.from({length:3},(_,i)=>({optionId:'OPTION_'+i,status:i<passed?'PASS':'BLOCK'})),outcome:passed?'options':'blocked',outputReady:passed===3})});
+  await x.app.createRegisteredOptions([entry],x.app.read().article);
+  assert.match(x.e.productionStatus.textContent,new RegExp(passed===3?'완료 \\(3/3\\)':passed?'미완료 \\('+passed+'/3\\)':'실패 \\(0/3\\)'));
+  assert.equal(x.e.btnExportPdf.disabled,passed!==3);assert.equal(x.e.btnSaveIndd.disabled,passed!==3);
+ }
 });
