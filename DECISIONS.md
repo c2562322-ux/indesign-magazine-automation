@@ -620,3 +620,6 @@ Batch UI completion requires three PASS and outputReady with no errors. A return
 
 ## 2026-10-02 — page-set identity and crop assignment
 Group source pages by actual shared/Story/Group relationships; do not duplicate furniture into single pages. Dependency fingerprints are change evidence, never Adobe approval. New registered sets opt into global crop-loss matching; legacy sequential binding stays intact. Unknown semantic emphasis and multiple independent titles require review rather than flattening or positional mapping.
+
+## 2026-10-02 — execution evidence is required for verification export
+A registered inventory with NOT_RUN states and no reports is not actual Adobe validation evidence. Reject empty verification exports instead of reporting success. Scope batch to the latest explicitly loaded Library while preserving legacy entries. Partial, failed and unsupported-skip records remain exportable; neither static support reasons nor missing evidence establishes a source-design defect or Production PASS.

@@ -1378,3 +1378,6 @@ e7a236b 인수, 브랜치/상태/로컬 자료 확인. 고정 Story의 페이지
 - NEXT: UDT Reload → 같은DOCX → N/3 확인 → 추천3안으로 제작. 현재Library에서3개를 억지로 채우지 않음. 정확한사용DOCX 또는 새진단 제공시 같은입력 재확인 가능. 새디자인지원/Library확대는 이번범위밖. 기존단일버튼 유지.
 ## 2026-10-02 — latest final-layout foundation (E2E blocked)
 Shared page-set registration, dependency fingerprints and opt-in crop assignment implemented. Latest 31 pages grouped into22 units; no Adobe PASS. COM unavailable and ambiguous independent titles/visual emphasis/Table semantics prevent the three-PASS milestone. Existing active Library preserved. See docs/FINAL_LAYOUT_PAGE_SETS.md.
+
+## 2026-10-02 — batch evidence export reliability
+Latest user export contains77 NOT_RUN, reports0/groups0 and manual mode, including22 latest units. Cannot infer actual Host failures or designer-source defects. Fixed loaded-Library batch scope without deleting55 legacy entries, blocked empty exports, and exposed batch progress/save counts. New regression covers skipped/failed pages continuing through22 entries, legacy preservation and reload invalidation. Node337/337, Python18/18. No new Adobe PASS or Production policy change; docs/LATEST_BATCH_EVIDENCE.md records provisional classification and retest.

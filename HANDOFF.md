@@ -1,3 +1,11 @@
+# Latest batch export has no execution evidence — 2026-10-02
+
+- User Desktop export created 2026-10-02T01:31:20.883Z contains 77 NOT_RUN entries, reports0/groups0, run.mode=manual. Latest22 are all NOT_RUN. Actual source/Production PASS or designer repair requirements cannot be inferred.
+- Static constraints only: engine15, role17 (overlap12); engine-only3, role-only5, both12, neither2. No confirmed designer-source defect. See docs/LATEST_BATCH_EVIDENCE.md.
+- Preserve legacy entries, but scope batch to the most recently loaded Library IDs. Reject exports with no execution/skip records; retain failure/partial/cancelled evidence. Add batch start/skip/page start/finished progress and counts on save.
+- Node337/337 and Python18/18 pass. No Production/Fidelity/typography/image policy changed. Existing untracked sample/magazine-design.indd preserved.
+- NEXT Adobe: Reload → load latest22 Library → full batch → wait for completion counts → save immediately without another Library load/Reload. Expect total22, run.mode=proof and nonempty reports. Unsupported skips are not PASS. Three new Production PASS remains unverified.
+
 # Latest final layout page-set foundation — 2026-10-02
 
 - Source is now `3매거진자동화템플릿 (1).idml`, SHA 7e5b49257d3e3661...; original unchanged. Prior file analysis does not confer validation.

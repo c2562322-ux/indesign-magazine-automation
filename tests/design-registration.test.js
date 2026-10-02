@@ -253,6 +253,20 @@ test('3-option control freezes displayed non-BLOCK recommendations and preserves
  await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('등록 디자인에서 추천');assert.equal(x.nodes().filter(e=>e.textContent==='이 디자인으로 제작').length,3);
  await x.click('추천 3안으로 제작');assert.equal(calls.length,1);assert.equal(calls[0].ids.length,3);assert.equal(calls[0].a.title,article.title);
 });
+test('batch export rejects an empty manual inventory rather than claiming Adobe validation',async()=>{
+ let saves=0;const x=setup({hostKind:'adobe',saveBatch:async()=>{saves++;return true;}});
+ await x.click('디자인 모델 / 등록 파일 불러오기');await x.click('전체 페이지 검증 결과 저장');
+ assert.equal(saves,0);assert.ok(x.nodes().some(n=>String(n.textContent).includes('저장할 검증 실행 결과가 없습니다')));
+});
+test('loaded page-set library fixes batch scope without deleting legacy entries or skipping failures',async()=>{
+ const base=registered(),legacy=Array.from({length:55},(_,i)=>R.register(base.original,{...base.descriptor,id:'legacy'+i})),latest=Array.from({length:22},(_,i)=>R.register(base.original,{...base.descriptor,id:'latest'+i,...(i===0?{capability:{fidelityReasons:['unsupported source']}}:{})}));
+ let saved,calls=[];const x=setup({hostKind:'adobe',load:async()=>R.pack(latest),saveBatch:async p=>{saved=p;return true;}});x.ui.state.entries=legacy;
+ x.studio.createRegistered=async e=>{calls.push(e.id);return {errors:e.id==='latest1'?['source overset']:[],issues:[],fidelity:{phase:e.id==='latest1'?'FIDELITY_FAILED':'FIDELITY_PASSED',proofOnly:true}};};
+ await x.click('디자인 모델 / 등록 파일 불러오기');assert.equal(x.ui.state.entries.length,77);
+ await x.click('전체 등록 디자인 일괄 검증');await x.click('전체 페이지 검증 결과 저장');
+ assert.equal(saved.run.mode,'proof');assert.equal(saved.counts.total,22);assert.equal(saved.reports.length,22);assert.equal(saved.counts.passed,20);assert.equal(saved.counts.fidelityFailed,1);assert.equal(saved.counts.unsupported,1);assert.equal(saved.counts.notRun,0);assert.equal(calls.length,21);assert.ok(calls.every(id=>id.startsWith('latest')));
+ await x.click('디자인 모델 / 등록 파일 불러오기');saved=null;await x.click('전체 페이지 검증 결과 저장');assert.equal(saved,null);
+});
 test('3-option freeze retains descriptor/article snapshot and excludes no safety checks',()=>{
  const Options=require('../src/registered-options'),e=registered(),entries=Array.from({length:4},(_,i)=>R.register(e.original,{...e.descriptor,id:'freeze-'+i}));const manuscript=copy(article),j=Options.freeze(entries,manuscript);
  assert.equal(j.selected.length,3);manuscript.title='changed';assert.equal(j.article.title,article.title);assert.notEqual(j.selected[0].descriptor,entries[0].descriptor);
