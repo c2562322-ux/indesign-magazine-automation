@@ -202,7 +202,9 @@ class Package:
 def extract(path):
     package = Package(path)
     try:
-        return extract_package(package, hashlib.sha256(Path(path).read_bytes()).hexdigest())
+        result = extract_package(package, hashlib.sha256(Path(path).read_bytes()).hexdigest())
+        result["metadata"]["sourceFilename"] = Path(path).name
+        return result
     finally:
         package.zip.close()
 

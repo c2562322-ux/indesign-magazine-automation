@@ -178,6 +178,7 @@ function fitReplacement(frame,source,ID,operation){
  return actual;
 }
 async function create(entry,article,{ID,open,guard,inspect,progress=()=>{},mode='production'}){
+ require('./active-design-set').assertEntry(entry);
  const colorPlan=mode==='proof'?[]:Colors.plan(entry,article?.themeColors||{});
  const plan=packagePlan(entry,{allowUnmapped:mode==='proof'});guard();progress('registered.nativeImport');const doc=await open(plan.bytes);const old=ID.app.scriptPreferences.measurementUnit;
  let failure;

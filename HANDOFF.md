@@ -686,3 +686,12 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 - 본문은 기존 연결이 유지된 경우만 continuation 추가. 원본 샘플 JSON/레이아웃 값 변경 없음.
 - 132개 자동 테스트 통과. 실제 InDesign auto-fit은 미검증: docs/AUTO_FIX.md PC 순서로 확인 필요.
 - 기록은 세션 메모리이며 Preview/작업 JSON은 원본 plan을 유지한다. 디자인/원고 변경 후 새 생성 대상에 이전 수정값을 적용하지 않음.
+# Current active source — 2026-10-02
+
+- Only source IDML SHA `5583fa2bb92b5405d28bb6ad1ee9c1a0b6c6be1c31159e73819181dc4bb5979d` / companion INDD `bba54175...` is active. Prior 7e5...22 and legacy55 remain archived; no role/proof inheritance.
+- Fresh 31 pages →22 page-sets; selection `assets/templates/working/active-design-set.private.json` → `source-5583fa2b.library.private.json`. Set `magazine-active-source`, version `5583fa2bb92b5405`. Private data stays local/ignored.
+- Actual Adobe proof batch: total22/reports22, PASS13/FAIL7/UNSUPPORTED2, mode=proof, mockPassed0. Source mixing0. Details and all22 statuses: docs/ACTIVE_SOURCE_5583.md.
+- READY0/WARN5/REVIEW3/BLOCK14. Production-entry5; one-photo entries3 (new-source u335e/u3356/u8e19). No current-source DOCX Production PASS or 3-option merge claim.
+- Filename/SHA/set/version/pages/spreads/fingerprint enforced from Library/recommendation through Production/final OPTION. No remembered/legacy fallback. Native general UI hides legacy generated/JSON paths; engines retained.
+- Next: user milestone review, then actual DOCX sequential Production on the new set only. Five source-proof overflow failures need source-vs-reconstruction evidence; two gradient readbacks remain unsupported. Do not weaken checks or assume designer faults.
+- Existing untracked sample/magazine-design.indd is preserved. Original source files and main are unchanged.

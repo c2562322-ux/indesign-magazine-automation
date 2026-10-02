@@ -29,7 +29,7 @@ function mergeDouble(breakCopy){
   const p={source:'p'+index,bounds:[0,0,800,500],side:'RIGHT',parent:spread,appliedMaster:d.masters[0],labels,extractLabel:k=>labels[k]||'',insertLabel:(k,v)=>labels[k]=v,allPageItems:[{source:'frame',text:breakCopy&&src?'corrupted':'DOCX',image:'/docx.png',thread:['frame'],geometry:[1,2,3,4]}]};spread.ps=[p];d.sp.push(spread);return spread;}
  const F={ref,list:c=>Array.isArray(c)?c:Array.from({length:c.length},(_,i)=>c.item(i)),compare:(a,b)=>require('../src/design-model').compare(a,b),capture(d){return JSON.parse(JSON.stringify({pages:this.list(d.pages).map(p=>({id:ref(p),items:p.allPageItems}))}));}};
  const N={rebind:(c,d)=>{c.doc=d;},check:()=>[]};
- const sandbox={module:{exports:{}},require:n=>n==='./registered-fidelity'?F:n==='./registered-native'?N:n==='./registered-options'?Options:require('../src/design-model')};vm.runInNewContext(fs.readFileSync('src/registered-options-host.js','utf8'),sandbox);
+ const sandbox={module:{exports:{}},require:n=>n==='./registered-fidelity'?F:n==='./registered-native'?N:n==='./registered-options'?Options:n==='./active-design-set'?require('../src/active-design-set'):require('../src/design-model')};vm.runInNewContext(fs.readFileSync('src/registered-options-host.js','utf8'),sandbox);
  const made=(id,count)=>{const d=doc(count),e=entry();e.descriptor={...e.descriptor,id,pageIds:F.list(d.pages).map(ref)};return {doc:d,context:{entry:e,contentChecks:[]},report:pass(),row:{optionId:id,designId:id,sourceId:'same',pageIds:e.descriptor.pageIds,status:'PASS',errors:[],report:pass()}};};
  return {M:sandbox.module.exports,made,ID:{app:{scriptPreferences:{measurementUnit:'old'}},MeasurementUnits:{POINTS:'pt'},LocationOptions:{AT_END:1},SaveOptions:{NO:0}}};
 }

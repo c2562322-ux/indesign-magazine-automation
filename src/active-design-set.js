@@ -1,0 +1,7 @@
+'use strict';
+let policy=null;
+function activate(config){policy=config?.sources?JSON.parse(JSON.stringify(config)):null;}
+function assertEntry(entry){if(!policy)return;const d=entry.descriptor,m=entry.original,p=d.provenance,s=policy.sources.find(s=>s.sourceSha256===m.metadata.sourceSha256&&s.sourceFilename===m.metadata.sourceFilename);if(!s||d.sourceSha256!==s.sourceSha256||d.designSet?.id!==policy.designSetId||d.designSet?.version!==policy.version||d.designSet?.active===false||!p||p.sourceFilename!==s.sourceFilename||p.sourceSha256!==s.sourceSha256||p.designSetId!==policy.designSetId||p.designSetVersion!==policy.version||JSON.stringify(p.sourcePageIds)!==JSON.stringify(d.pageIds)||p.pageSetId!==d.pageSet?.id||JSON.stringify(p.sourceSpreadIds)!==JSON.stringify([...new Set(m.pages.filter(x=>d.pageIds.includes(x.id)).map(x=>x.spreadId))])||p.fingerprint!==d.pageSet?.fingerprint)throw new Error('ACTIVE_SOURCE_MISMATCH: 현재 활성 디자인 소스가 아닙니다.');}
+function assertOption(option){assertEntry(option.context.entry);if(policy&&(option.row.designId!==option.context.entry.descriptor.id||option.row.sourceId!==option.context.entry.original.metadata.sourceSha256||JSON.stringify(option.row.provenance)!==JSON.stringify(option.context.entry.descriptor.provenance)))throw new Error('ACTIVE_OPTION_SOURCE_MISMATCH');}
+function assertUnregistered(){if(policy)throw new Error('ACTIVE_SOURCE_REQUIRED: 활성 등록 디자인만 제작할 수 있습니다.');}
+module.exports={activate,assertEntry,assertOption,assertUnregistered};

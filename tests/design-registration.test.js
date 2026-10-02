@@ -55,9 +55,10 @@ class El{constructor(doc,tag){this.ownerDocument=doc;this.tagName=tag;this.child
 test('explicit active-set selection wins over old packaged and remembered libraries without deleting either',async()=>{
  const S=require('../src/design-library-source'),config={schema:'magazine-active-design-set/v1',libraryPath:'assets/templates/working/new.private.json',designSetId:'new',version:'v2'},library={schema:'magazine-registered-library/v1',models:{},designs:[{descriptor:{id:'new',designSet:{id:'new',version:'v2',active:true}}},{descriptor:{id:'legacy',designSet:{id:'old',version:'v1'}}}]};
  let oldReads=0;const folder={getEntry:async path=>{if(path.endsWith('active-design-set.private.json'))return {read:async()=>JSON.stringify(config)};if(path===config.libraryPath)return {read:async()=>JSON.stringify(library)};oldReads++;throw Error('old');}};
+ const hash='a'.repeat(64);config.sources=[{sourceFilename:'new.idml',sourceSha256:hash}];library.models.model={metadata:{sourceFilename:'new.idml',sourceSha256:hash},pages:[{id:'p',spreadId:'s'}]};Object.assign(library.designs[0],{modelKey:'model'});Object.assign(library.designs[0].descriptor,{sourceSha256:hash,pageIds:['p'],pageSet:{id:'new:p',fingerprint:'f'},provenance:{designSetId:'new',designSetVersion:'v2',sourceFilename:'new.idml',sourceSha256:hash,sourcePageIds:['p'],sourceSpreadIds:['s'],pageSetId:'new:p',fingerprint:'f'}});
  const result=await S.loadDefault(folder,async()=>{oldReads++;throw Error('remembered');});assert.deepEqual(result.designs.map(d=>d.descriptor.id),['new']);assert.equal(oldReads,0);assert.equal(library.designs.length,2);
  config.version='missing';await assert.rejects(()=>S.loadDefault(folder,async()=>null),/선택한 최신/);
- config.libraryPath='../old.json';await assert.rejects(()=>S.loadDefault(folder,async()=>null),/설정 오류/);
+ config.libraryPath='../old.json';await assert.rejects(()=>S.loadDefault(folder,async()=>null),/설정 오류/);require('../src/active-design-set').activate(null);
 });
 test('long BODY with a large first letter and unique modest heading above it maps without ID exceptions',()=>{
  const m=model(),title=m.elements.find(e=>e.id==='title'),body=m.elements.find(e=>e.id==='body');title.pageBounds.p1=[10,20,30,300];body.pageBounds.p1=[50,20,650,300];

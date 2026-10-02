@@ -14,7 +14,7 @@ async function run(job,adapter){
  const rows=[],successful=[];
  try{
   for(const option of job.selected){
-   const row={optionId:'ATTEMPT_'+(rows.length+1),designId:option.descriptor.id,designName:option.descriptor.name,sourceId:option.descriptor.sourceSha256,pageIds:option.descriptor.pageIds.slice(),attemptId:'ATTEMPT_'+(rows.length+1),candidateCount:job.selected.length,status:'BLOCK',stage:'production',errors:[]};rows.push(row);
+   const row={optionId:'ATTEMPT_'+(rows.length+1),designId:option.descriptor.id,designName:option.descriptor.name,sourceId:option.descriptor.sourceSha256,provenance:option.descriptor.provenance?copy(option.descriptor.provenance):null,pageIds:option.descriptor.pageIds.slice(),attemptId:'ATTEMPT_'+(rows.length+1),candidateCount:job.selected.length,status:'BLOCK',stage:'production',errors:[]};rows.push(row);
    adapter.progress(row.attemptId+' '+(row.designName||row.designId)+' 독립 제작 중 · 실제 PASS '+successful.length+'/3');let made;
    try{
     made=await adapter.produce({...option.entry,descriptor:copy(option.descriptor)},copy(job.article));

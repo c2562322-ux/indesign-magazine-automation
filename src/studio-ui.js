@@ -30,6 +30,7 @@
     const required=['studioStatus','autoTitle','autoSubtitle','autoBody','autoKicker','autoAuthor','pageWidth','pageHeight','pageMargin','pageBleed','bodySize','accent','publication','bodyFont','titleFont','btnPrepare','btnSample','btnClear','btnLoadAuto','btnAddImage','btnSettings','settingsPanel','candidateList','largePreview','designName','designDescription','pageIndicator','previewNote','wordCount','imageCount','autoImages','prevPage','nextPage','btnCreateAuto','btnCheckAuto','btnSaveIndd','btnExportPdf','btnSaveProject','hostReport'];
     const absent=required.filter(id=>!$(id));if(absent.length)throw new Error('DOM ready 필수 요소 누락: '+absent.join(', '));
     diagnostic('State ready');
+    if(adapter.registeredOnly){for(const id of ['legacyDesignTools','btnPrepare','btnAiSettings','btnCreateAuto','modeLegacy'])if($(id))$(id).style.display='none';}
     try{if(adapter.resetSession)adapter.resetSession();}catch(e){adapter.native=false;adapter.hostError=D.redact(e.message);diagnostic('Host adapter 초기화 실패: '+adapter.hostError);}
     diagnostic(adapter.native?'Host adapter ready':'Host adapter unavailable · 미리보기/입력 유지');
     if(missing.length)diagnostic('선택 기능 요소 누락: '+missing.join(', '));
@@ -164,7 +165,7 @@
         $('previewNote').textContent='배치 미리보기 · 실제 줄바꿈과 페이지 수는 InDesign에서 확정됩니다.';
         buttons();
     }
-    function prepare(){const v=read();state.plans=L.candidates(v.article,v.settings);state.signature=fingerprint(v.article,v.settings);state.selected=0;state.page=0;render();status('무료 시안 3개를 만들었습니다. 원하는 안을 선택해주세요.');}
+    function prepare(){if(adapter.registeredOnly)throw new Error('현재 활성 등록 디자인에서 추천해주세요.');const v=read();state.plans=L.candidates(v.article,v.settings);state.signature=fingerprint(v.article,v.settings);state.selected=0;state.page=0;render();status('무료 시안 3개를 만들었습니다. 원하는 안을 선택해주세요.');}
 
     function designInfo(plan){
         if(!plan||plan.origin!=='json'){$('jsonDesignInfo').textContent='';return;}
@@ -202,13 +203,13 @@
     on('btnLoadDesigns','click',()=>run(loadLibrary));
     editable.forEach(id=>on(id,'input',changed));
     on('btnPrepare','click',()=>run(prepare));
-    on('btnSample','click',()=>run(()=>{fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status('예시 원고입니다. 직접 입력하거나 원고 파일을 불러와주세요.');}));
+    on('btnSample','click',()=>run(()=>{fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);if(!adapter.registeredOnly)prepare();status('예시 원고입니다. 직접 입력하거나 원고 파일을 불러와주세요.');}));
     on('btnClear','click',()=>run(()=>{fill({title:'',subtitle:'',body:'',kicker:'ARTICLE',images:[]},L.DEFAULTS);state.plans=[];state.hasDocument=false;state.documentKey='';state.pdfReady=false;$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote','hostReport','jsonDesignInfo'].forEach(id=>$(id).textContent='');$('largePreview').textContent='원고를 입력하고 시안을 만들어주세요.';renderLibrary();fontCurrent();status('새 원고를 입력해주세요.');}));
     on('btnLoadAuto','click',()=>run(async()=>{
         const started=Date.now();const reportProgress=async message=>{status(message);diagnostic(message+' · 경과 '+(Date.now()-started)+'ms');if(adapter.yieldUI)await adapter.yieldUI();};status('DOCX 선택 대기 중…');const result=await adapter.load(reportProgress);if(api.disposed)return;if(!result){status('불러오기를 취소했습니다.');return;}
         await reportProgress('원고 분석 중…');const a=inputArticle(result.article),s=L.settings(result.settings||readSettingsOnly());
         if(result.plan){L.validate(result.plan,a);if(result.plan.origin!=='json'&&JSON.stringify(L.settings(result.plan.settings))!==JSON.stringify(s))throw new Error('저장된 시안과 설정이 일치하지 않습니다.');}
-        fill(a,s);if(a.images.length<=2)prepare();else{state.plans=[];state.signature='';$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote'].forEach(id=>$(id).textContent='');$('largePreview').textContent='사진 3장 이상 원고입니다. 등록 디자인에서 추천을 실행해주세요.';buttons();}
+        fill(a,s);if(!adapter.registeredOnly&&a.images.length<=2)prepare();else{state.plans=[];state.signature='';$('candidateList').textContent='';['designName','designDescription','pageIndicator','previewNote'].forEach(id=>$(id).textContent='');$('largePreview').textContent='사진 3장 이상 원고입니다. 등록 디자인에서 추천을 실행해주세요.';buttons();}
         if(result.plan){state.plans.push(result.plan);state.selected=state.plans.length-1;render();}
         const issues=result.plan&&result.plan.origin==='json'&&adapter.validateDesignFonts?await adapter.validateDesignFonts(result.plan):adapter.validateFonts?await adapter.validateFonts(s):[];if(api.disposed)return;
         const missing=issues.filter(f=>f.error);if(result.plan&&result.plan.origin==='json'){state.designIssues=missing;state.designFontsChecked=!!adapter.validateDesignFonts;designInfo(result.plan);}
@@ -331,6 +332,7 @@
     });}
     on('btnSaveFidelity','click',()=>run(async()=>{if(!state.fidelityJSON||!adapter.saveFidelityDiagnostic)throw new Error('저장할 Fidelity 진단이 없습니다.');const saved=await adapter.saveFidelityDiagnostic(state.fidelityJSON);if(api.disposed)return;status(saved?'Fidelity 진단 JSON 저장 완료 · 원문/경로가 포함된 개인 진단 파일입니다.':'Fidelity 진단 JSON 저장 취소');}));
     on('btnCreateAuto','click',()=>production('문서 생성',async progress=>{
+        if(adapter.registeredOnly)throw new Error('활성 등록 디자인의 제작 버튼을 사용해주세요.');
         invalidateDocument();$('productionStatus').textContent='문서 생성 중…';
         const v=fresh(),key=documentKey();
         const report=await adapter.create(v.article,state.plans[state.selected],progress);
@@ -344,8 +346,8 @@
     if($('modeLegacy'))on('modeLegacy','click',()=>{if(state.busy||api.disposed)return;$('studioPanel').style.display='none';$('legacyPanel').style.display='block';});
     if($('modeStudio'))on('modeStudio','click',()=>{$('legacyPanel').style.display='none';$('studioPanel').style.display='block';});
     diagnostic('Events binding complete · '+listeners.length+' listeners');
-    fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
-    Object.assign(api,{createRegisteredOptions:(entries,article)=>production('추천 3안 제작',async progress=>{invalidateDocument();if(!adapter.createRegisteredOptions)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredOptions=entries;const key=documentKey();const report=await adapter.createRegisteredOptions(entries,article,progress);if(api.disposed)return;state.documentKey=key;return report;}),read,state,prepare,diagnostics,progress:async message=>{if(api.disposed)return;status(message);diagnostic(message);if(adapter.yieldUI)await adapter.yieldUI();},invalidateRegistered:entry=>{invalidateDocument();if(entry)state.registeredEntry=entry;buttons();},createRegistered:(entry,article,mode='production',themeColors={})=>production(mode==='proof'?'원본 검증용 문서 생성':'등록 디자인 제작',async progress=>{invalidateDocument();if(!adapter.createRegistered)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredEntry=entry;state.themeColors=JSON.parse(JSON.stringify(themeColors));const key=documentKey();const report=await adapter.createRegistered(entry,{...article,themeColors:state.themeColors},progress,mode);if(api.disposed)return;state.documentKey=key;return report;})});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
+    fill(JSON.parse(JSON.stringify(SAMPLE)),L.DEFAULTS);if(!adapter.registeredOnly)prepare();status(adapter.native?'예시 원고가 입력되어 있습니다. 원고를 바꿔 시작해주세요.':adapter.hostError?'Host 시작 실패 · '+adapter.hostError+' · 원고/무료 시안은 사용 가능합니다.':'브라우저 체험판 · 무료 시안과 원고 저장을 사용할 수 있습니다. INDD/PDF 생성은 플러그인에서 실행하세요.');
+    Object.assign(api,{createRegisteredOptions:(entries,article)=>production('추천 3안 제작',async progress=>{invalidateDocument();if(!adapter.createRegisteredOptions)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredOptions=entries;const key=documentKey();const report=await adapter.createRegisteredOptions(entries,article,progress);if(api.disposed)return;state.documentKey=key;return report;}),read,state,prepare,diagnostics,progress:async message=>{if(api.disposed)return;status(message);diagnostic(message);if(adapter.yieldUI)await adapter.yieldUI();},invalidateRegistered:entry=>{invalidateDocument();if(entry)state.registeredEntry=entry;buttons();},createRegistered:(entry,article,mode='production',themeColors={})=>production(mode==='proof'?'원본 검증용 문서 생성':'등록 디자인 제작',async progress=>{invalidateDocument();if(!adapter.createRegistered)throw new Error('실제 InDesign에서 실행해주세요.');if(JSON.stringify(read().article)!==JSON.stringify(article))throw new Error('원고 변경 · 다시 추천해주세요.');state.registeredEntry=entry;state.themeColors=JSON.parse(JSON.stringify(themeColors));const key=documentKey();const report=await adapter.createRegistered(entry,{...article,themeColors:state.themeColors},progress,mode);if(api.disposed)return;state.documentKey=key;return report;})});mounted=api;try{if(adapter.registration)api.registration=adapter.registration(api);}catch(e){diagnostic('등록 디자인 UI 초기화 실패: '+e.message);}diagnostic('Studio ready [stability-01] [json-design-01] '+(Date.now()-initStart)+'ms');if(!adapter.registeredOnly&&adapter.designs&&!missing.includes('jsonDesignList'))loadLibrary();return api;
     }catch(e){diagnostic('Studio init 실패: '+e.message);api.destroy();const el=$('studioStatus');if(el)el.textContent='Studio init 실패: '+D.redact(e.message);throw e;}
  }
  return {mount,SAMPLE};

@@ -1,4 +1,4 @@
-(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-registration'),require('./design-matching'),require('./design-model'),require('./production-diagnostics'));else root.MagazineRegistrationUI=factory(root.MagazineRegistration,root.MagazineMatching,root.MagazineDesignModel,root.MagazineProductionDiagnostics);})(typeof window!=='undefined'?window:this,function(R,Match,Model,D){
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./design-registration'),require('./design-matching'),require('./design-model'),require('./production-diagnostics'),require('./active-design-set'));else root.MagazineRegistrationUI=factory(root.MagazineRegistration,root.MagazineMatching,root.MagazineDesignModel,root.MagazineProductionDiagnostics,root.MagazineActiveSet);})(typeof window!=='undefined'?window:this,function(R,Match,Model,D,Guard){
 'use strict';
 const labels={title:'제목',subtitle:'부제',body:'본문',image1:'사진 1',image2:'사진 2',caption:'캡션',header:'헤더',footer:'푸터',pageNumber:'페이지 번호',keep:'장식/고정 내용 유지'};
 function mount(root,studio,adapter){
@@ -10,7 +10,7 @@ function mount(root,studio,adapter){
   for(let i=0;i<data.designs.length;i++){
    if(i%4===0){await progress('디자인 분석 중… '+i+'/'+data.designs.length);if(api.disposed)return {entries:[],errors:[]};}
    const row=data.designs[i],one=R.unpack({...data,models:{...data.models,...models},designs:[row]});errors.push(...one.errors);
-   for(let e of one.entries){if(ids.has(e.descriptor.id)){errors.push('중복 디자인 ID');continue;}ids.add(e.descriptor.id);models[row.modelKey]=e.original;if(adapter.capability)e=R.register(e.original,{...e.descriptor,capability:adapter.capability(e)});entries.push(e);}
+   for(let e of one.entries){if(Guard)Guard.assertEntry(e);if(ids.has(e.descriptor.id)){errors.push('중복 디자인 ID');continue;}ids.add(e.descriptor.id);models[row.modelKey]=e.original;if(adapter.capability)e=R.register(e.original,{...e.descriptor,capability:adapter.capability(e)});entries.push(e);}
   }
   await progress('디자인 분석 완료 '+entries.length+'개 · '+(Date.now()-started)+'ms');return {entries,errors};
  }
@@ -41,6 +41,7 @@ function mount(root,studio,adapter){
  },devActions);
  button('등록 라이브러리 저장',async fresh=>{if(!state.entries.length)throw new Error('먼저 페이지를 등록해주세요.');const saved=await adapter.save(R.pack(state.entries));if(fresh())status.textContent=saved?'등록 파일 저장 완료 · 원문/개인 자료 포함, GitHub에 올리지 마세요.':'저장 취소';},devActions);
  async function recommend(fresh=()=>!api.disposed){
+  if(Guard)for(const entry of state.entries)Guard.assertEntry(entry);
   if(!state.entries.length)throw new Error('등록된 디자인이 없습니다.');const article=studio.read().article;const signature=JSON.stringify(article),started=Date.now();await progress('제작 가능한 디자인 찾는 중…');
   let fonts=null;try{if(adapter.fonts)fonts=await adapter.fonts(false);}catch(e){/* Keep analysis available with an explicit review gate. */}
   if(!fresh()||JSON.stringify(studio.read().article)!==signature)return;
@@ -147,7 +148,7 @@ function mount(root,studio,adapter){
   button('미지정 영역은 모두 원본 유지',()=>{for(const e of all)if(!d.roles[e.id])R.confirm(d,e.id,'keep');showRoles();status.textContent='미지정 영역 유지 확인. 제목/본문/사진 역할은 남아 있습니다.';},editor);
   button('핵심 역할 검토 완료',()=>{d.mappingReview=[];const body=R.frames(m,d.pageIds[0]).filter(e=>d.roles[e.id]?.role==='body').sort((a,b)=>{const x=a.pageBounds[d.pageIds[0]],y=b.pageBounds[d.pageIds[0]];return Math.abs(x[0]-y[0])<20?x[1]-y[1]:x[0]-y[0];});d.bodyFlow=[...new Set(body.map(e=>e.textFrame.storyRef))];if(adapter.capability){const entry=R.register(m,d);d.capability=adapter.capability(entry);}showRoles();status.textContent='역할 검토 확인 · 이 페이지 등록을 눌러 적용하세요. Fidelity 승인은 별도입니다.';},editor);
   el('p','컬러 슬롯: 명시 승인한 비사진 객체만 함께 변경합니다.',editor);const colorName=el('input',undefined,editor);colorName.value='ACCENT';colorName.setAttribute('aria-label','컬러 슬롯 의미');const colorTargets=el('input',undefined,editor);colorTargets.setAttribute('aria-label','승인한 컬러 객체 ID 목록');el('p','등록 가능한 객체: '+all.filter(e=>R.Colors.eligible(m,d,e)).map(e=>e.id).join(', '),editor);button('컬러 슬롯 명시 등록',()=>{const slot={name:colorName.value.trim().toUpperCase(),confirmed:true,elementIds:colorTargets.value.split(/[ ,]+/).filter(Boolean)},next={...d,colorSlots:(d.colorSlots||[]).filter(s=>s.name!==slot.name).concat(slot)};R.Colors.validate(m,next);d.colorSlots=next.colorSlots;status.textContent='COLOR_SLOT '+slot.name+' 등록 · 페이지 등록을 눌러 저장해주세요.';},editor);
-  button('이 페이지 등록',()=>{let entry=R.register(m,d);if(adapter.capability){d.capability=adapter.capability(entry);entry=R.register(m,d);}state.model=entry.original;delete state.evidence[entry.descriptor.id];delete state.readyTemplates[entry.descriptor.id];state.selected=null;state.proofPassed=false;state.visualConfirmed=false;state.report=null;if(studio.invalidateRegistered)studio.invalidateRegistered();state.entries=state.entries.filter(e=>e.descriptor.id!==d.id).concat(entry);status.textContent='등록됨 · '+entry.fidelity.state+' · '+entry.fidelity.reasons.join(' / ');},editor);
+  button('이 페이지 등록',()=>{let entry=R.register(m,d);if(Guard)Guard.assertEntry(entry);if(adapter.capability){d.capability=adapter.capability(entry);entry=R.register(m,d);}state.model=entry.original;delete state.evidence[entry.descriptor.id];delete state.readyTemplates[entry.descriptor.id];state.selected=null;state.proofPassed=false;state.visualConfirmed=false;state.report=null;if(studio.invalidateRegistered)studio.invalidateRegistered();state.entries=state.entries.filter(e=>e.descriptor.id!==d.id).concat(entry);status.textContent='등록됨 · '+entry.fidelity.state+' · '+entry.fidelity.reasons.join(' / ');},editor);
   button('다른 페이지',()=>showPages(),editor);
  }
  return api;

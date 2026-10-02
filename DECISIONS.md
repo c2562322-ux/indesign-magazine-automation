@@ -641,3 +641,6 @@ An explicitly absent optional SUBTITLE may remain unapplied with a visible WARN 
 ## 2026-10-02 — Bounded typography Auto-fit
 
 User explicitly authorized limited content Typography adjustment after actual overset. Conservative BODY10%/SUBTITLE4% maximum, 2% increments; TITLE and tracking unchanged. This is a declared content contract, never source-Fidelity relaxation. Source character snapshots generate permitted expected values; post-checks authenticate the runtime ledger and verify every character/style/override plus existing preservation checks. All BODY Stories use one ratio; actual residual overset remains BLOCK.
+# Active source provenance boundary — 2026-10-02
+
+Only the explicitly selected source filename/full SHA allowlist may enter general native recommendations, preview and Production. Set/version labels and matching page IDs alone are insufficient identity. Carry page/spread/page-set/fingerprint provenance to final OPTION validation. Reject remembered/packaged legacy fallback when selection is missing/broken; preserve archived sources and engines. A new source starts with fresh roles and unverified proof; actual source proof does not grant content Production readiness. See docs/ACTIVE_SOURCE_5583.md.

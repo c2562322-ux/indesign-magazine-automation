@@ -230,9 +230,10 @@ function check(doc,progress,repair=false,ignoreOptions=false){
     if(changed){D.step('check.autoFix.recompose',()=>doc.recompose(),progress);return check(doc,progress,false);}
     if(context)context.records.forEach(r=>r.initial=false);
     if(registered){warnings.push(...(registered.contentWarnings||[]));const extra=require('./registered-native').check(registered,ID).filter(i=>!['SOURCE_OVERFLOW','CONTENT_OVERFLOW'].includes(i.cause)||!issues.some(existing=>existing.cause===i.cause&&(!i.role||existing.role===i.role)));errors.push(...extra.map(i=>i.message));other.push(...extra);}
-    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),outputReady:registered?!registered.proofOnly&&errors.length===0:errors.length===0,fidelity:registered?{phase:registered.phase,proofOnly:registered.proofOnly,autoFit:registered.autoFit||null,unappliedContent:registered.unappliedContent||[],contentApplied:registered.contentChecks.map(c=>({role:c.role,elementId:c.elementId,characters:c.text===undefined?null:Array.from(c.text).length,typographyPolicy:c.textPolicy||null,imagePlaced:!!c.imagePath,image:c.imageMetadata||null})),design:registered.entry.descriptor.name,pages:registered.entry.descriptor.pageIds,records:registered.baseline.records,externalAssets:registered.baseline.externalAssets,originalErrors:registered.originalInspection.errors,fallbacks:registered.baseline.fallbacks,notApplicable:registered.notApplicable,packageValidation:registered.packageValidation,packagingNotes:registered.packagingNotes,autoFixAllowed:false,visualReviewRequired:['Parent/페이지 번호 표시','그룹/쌓임 순서와 장식','사진 fitting/crop 및 인쇄 색상']}:undefined,autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
+    return {pageCount:doc.pages.length,errors,warnings:[...new Set(warnings)],issues:issues.concat(other),outputReady:registered?!registered.proofOnly&&errors.length===0:errors.length===0,fidelity:registered?{phase:registered.phase,provenance:registered.entry.descriptor.provenance||null,proofOnly:registered.proofOnly,autoFit:registered.autoFit||null,unappliedContent:registered.unappliedContent||[],contentApplied:registered.contentChecks.map(c=>({role:c.role,elementId:c.elementId,characters:c.text===undefined?null:Array.from(c.text).length,typographyPolicy:c.textPolicy||null,imagePlaced:!!c.imagePath,image:c.imageMetadata||null})),design:registered.entry.descriptor.name,pages:registered.entry.descriptor.pageIds,records:registered.baseline.records,externalAssets:registered.baseline.externalAssets,originalErrors:registered.originalInspection.errors,fallbacks:registered.baseline.fallbacks,notApplicable:registered.notApplicable,packageValidation:registered.packageValidation,packagingNotes:registered.packagingNotes,autoFixAllowed:false,visualReviewRequired:['Parent/페이지 번호 표시','그룹/쌓임 순서와 장식','사진 fitting/crop 및 인쇄 색상']}:undefined,autoFixes:context?context.records.filter(r=>r.attempt).map(r=>r.attempt).concat(context.bodyAttempt?[context.bodyAttempt]:[]):[]};
 }
 async function createRegistered(entry,article,open,progress,mode='production'){
+ require('./active-design-set').assertEntry(entry);
  const generation=session;latest=null;
  const guard=()=>{if(generation!==session)throw new Error('패널이 다시 초기화되었습니다. 다시 제작해주세요.');};
  let created;
@@ -248,7 +249,7 @@ async function createRegistered(entry,article,open,progress,mode='production'){
 async function createRegisteredOptions(entries,article,open,progress=()=>{}){
  const generation=session,guard=()=>{if(generation!==session)throw new Error('패널 Reload로 3안 제작이 취소되었습니다.');};
  const Options=require('./registered-options'),Merge=require('./registered-options-host');latest=null;
- const job=Options.freeze(entries,article);let result;
+ for(const entry of entries)require('./active-design-set').assertEntry(entry);const job=Options.freeze(entries,article);let result;
  try{
   result=await Options.run(job,{progress,close:doc=>Merge.close(doc,ID),produce:async(entry,copy)=>{
    guard();const report=await createRegistered(entry,copy,open,progress,'production'),doc=latest;latest=null;
@@ -263,6 +264,7 @@ async function createRegisteredOptions(entries,article,open,progress=()=>{}){
  }catch(e){if(result?.doc)Merge.close(result.doc,ID);if(generation===session)latest=null;throw e;}
 }
 async function create(raw,plan,progress){
+    require('./active-design-set').assertUnregistered();
     const generation=session;
     // A failed new attempt must never silently export the previous successful document.
     latest=null;

@@ -194,3 +194,6 @@ A visually uniform TITLE whose sample differs only by language may inherit its r
 ## Bounded content Typography Auto-fit
 
 Registered Production may proportionally reduce BODY up to10% and SUBTITLE up to4%, only after actual content overset; full content/geometry and source Fidelity remain mandatory. All BODY Stories share a ratio, preserving per-character relative sizes and style/language. Auto leading and tracking remain unchanged. Runtime diagnostics record source and permitted typography; adjusted content still requires native overset0 and strict checks. See [policy and actual Host results](BOUNDED_AUTO_FIT.md).
+# Active source identity
+
+New registrations store model metadata.sourceFilename/sourceSha256 and descriptor.provenance: designSetId, designSetVersion, sourceFilename, sourceSha256, sourcePageIds, sourceSpreadIds, pageSetId, fingerprint. The active selection stores an explicit sources allowlist. General native load/recommendation/Production and combined OPTION checks validate these fields; equal page IDs do not transfer prior roles or approvals. Source frame/image geometry and fitting remain in the extracted model and existing computed profile. No source geometry or role is inferred from an archived registration.

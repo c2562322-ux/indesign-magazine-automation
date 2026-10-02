@@ -44,6 +44,7 @@ function restoreStoryReferences(scoped,produced,optionId){
  for(const {source,story} of pending){story.insertLabel(N.KEY,source);if(F.ref(story)!==source)throw new Error('OPTION_STORY_LABEL_WRITE_FAILED: '+source);}
 }
 function validate(doc,option,ID,progress=()=>{}){
+ require('./active-design-set').assertOption(option);
  progress(option.row.optionId+' registered.options.scope');
  const scoped=scope(doc,option),context=bind(doc,option);progress(option.row.optionId+' registered.options.fidelity.start');const issues=N.check(context,ID);progress(option.row.optionId+' registered.options.fidelity.success');
  const cmp=F.compare(option.pageState,pageState(F.list(scoped.pages)),ID);
@@ -73,7 +74,7 @@ function prepared(made,ID){
  const context={...made.context,contentChecks:made.context.contentChecks.map(c=>({...c,overrides:c.overrides?Object.fromEntries(Object.entries(c.overrides).map(([k,v])=>[k,F.value(v)])):undefined}))};
  return {...made,context,pageIds:pages.map(F.ref),masterIds,pageState:pageState(pages),produced:F.capture(made.doc,made.context.entry.descriptor.pageIds,undefined,ID)};
 }
-function manifest(batch){return batch.rows.map(r=>({optionId:r.optionId,designId:r.designId,sourceId:r.sourceId,pageIds:r.pageIds,pageRange:r.pageRange||null,status:r.status}));}
+function manifest(batch){return batch.rows.map(r=>({optionId:r.optionId,designId:r.designId,sourceId:r.sourceId,provenance:r.provenance||null,pageIds:r.pageIds,pageRange:r.pageRange||null,status:r.status}));}
 function close(doc,ID){if(doc?.isValid)doc.close(ID.SaveOptions.NO);}
 function combine(successful,rows,ID,progress,guard=()=>{}){
  const old=ID.app.scriptPreferences.measurementUnit;ID.app.scriptPreferences.measurementUnit=ID.MeasurementUnits.POINTS;

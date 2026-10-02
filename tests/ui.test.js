@@ -34,6 +34,17 @@ function setup(native=false,overrides={},omit=[]){
  return {app,e:elements,saved,calls,adapter,document};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
+test('active registered-only UI starts without legacy plans and retains DOCX loading',async()=>{
+ let catalogReads=0;
+ const x=setup(true,{registeredOnly:true,designs:async()=>{catalogReads++;return [];},load:async()=>({article:{title:'DOCX',body:'본문',images:[{source:'docx',path:'photo.jpg'}]}})});
+ assert.equal(x.app.disposed,false);
+ for(const id of ['legacyDesignTools','btnPrepare','btnCreateAuto','modeLegacy'])assert.equal(x.e[id].style.display,'none');
+ assert.equal(x.e.candidateList.children.length,0);
+ x.e.btnLoadAuto.click();await tick();
+ assert.equal(x.app.read().article.title,'DOCX');assert.equal(x.app.read().article.images.length,1);
+ assert.equal(x.e.candidateList.children.length,0);assert.equal(catalogReads,0);
+ assert.throws(()=>x.app.prepare(),/활성 등록/);
+});
 test('registered proof/production uses common check-save-PDF state and proof cannot enable PDF',async()=>{
  const calls=[],entry={descriptor:{id:'ref',name:'Reference'},profile:{name:'Reference'},original:{metadata:{sourceSha256:'hash'}}};
  const x=setup(true,{createRegistered:async(e,a,p,mode)=>{calls.push(mode);return {pageCount:1,errors:[],warnings:[],outputReady:mode!=='proof',fidelity:{phase:mode==='proof'?'FIDELITY_PASSED':'CONTENT_APPLIED',proofOnly:mode==='proof'}};}});

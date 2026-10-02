@@ -1397,3 +1397,10 @@ Read-only22-unit/source-proof13-first table completed. Source-bound absent/optio
 ## 2026-10-02 — Bounded typography Auto-fit
 
 Implemented bounded relative CONTENT Auto-fit after actual overflow only, preserving full text/geometry/styles and mixed-size relationships; shared BODY ratio, Auto leading/tracking unchanged, authenticated expected typography ledger for post-Fidelity. Actual same-DOCX21.4.1.4 panel-path test: 3 attempts, 0 PASS, all bounded minima still overset; mismatch0, no merge. Node360/Python18. See docs/BOUNDED_AUTO_FIT.md.
+# 2026-10-02 — Replace active source with fresh SHA5583 registration
+
+- Preserved working changes and untracked INDD. Re-extracted the authorized IDML and registered31 pages as22 page-sets with no previous descriptor/approval input. Archived previous active selection; old source data retained.
+- Added common active-source provenance checks at load/recommend/native Production/final OPTION; removed legacy fallback and hid legacy native preview/creation routes. Existing Production, Auto-fit, image fitting and option merge algorithms retained.
+- Actual InDesign21.4.1.4 proof through registration UI batch:22 reports,13 PASS,7 FAIL,2 unsupported; no cancellation/mock approval. Native job completed after wrapper timeout; no overlapping job started. Full data private; aggregate source audit in docs/ACTIVE_SOURCE_5583.md.
+- Source/input identity helper and regressions from the preceding interrupted work are preserved alongside this work; helper reuses existing DOCX extraction/normalization and does not replace parser.
+- Tests: Node367/367, Python18/18; active-only UI startup/load regression, source mismatch and final OPTION mismatch regressions. General UDT panel reload still requires user confirmation; current-source DOCX Production/merge is the next milestone, not verified here.

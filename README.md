@@ -127,3 +127,6 @@ DOCX 로드 후 자동 추천 → «이 디자인으로 제작». 원본 Fidelit
 
 ### Registered three-option Production
 The action tries the full safe ranked pool until three actual Production PASS results, then combines and rechecks them. Failed trials remain in diagnostics; exhaustion reports incomplete N/3. Native general UI leaves inspected results open for InDesign's own Save/Export. See [sequential Production evidence and current limitations](docs/SEQUENTIAL_PRODUCTION.md); automatic tests do not certify three Adobe PASS results.
+# Current native design source
+
+The local native panel uses the explicit `assets/templates/working/active-design-set.private.json` selection and its source filename/SHA allowlist. Archived libraries and generic preview/creation modes are excluded from the general native flow. Reload → DOCX → active registered recommendations. Missing/broken selection reports an error without legacy fallback. Private source/model/Library files remain local. Current source and actual Adobe proof counts: [docs/ACTIVE_SOURCE_5583.md](docs/ACTIVE_SOURCE_5583.md).
