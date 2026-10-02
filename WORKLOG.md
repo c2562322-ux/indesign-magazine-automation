@@ -1420,3 +1420,8 @@ Implemented bounded relative CONTENT Auto-fit after actual overflow only, preser
 - Confirmed thumbnail finally releases pending. Identified unmet manual-proof gate misreported as busy and duplicate manual production action in general gallery UI.
 - Changed only registration UI guard messaging and button parent. Added load success/failure lock-release tests and developer gate separation regression.
 - Full Studio wrapper actual Host u3356 direct choice PASS, both locks clear, source5583fa2b..., BODY92%/878chars, overset0. Node374/Python18. Original source/Library/Production safety unchanged.
+
+## 2026-10-02 — Unify gallery entry guards and expose false conditions
+- User selected design12, whereas prior Host evidence selected design07. Audited actual current Library: design12 has role/image/Typography BLOCKs; design07 eligible. No override of design12.
+- Gallery.gate now computes exact identity/article/assessment booleans from selected entry; refresh and click share it. Exact rejection appears in UI/log. Regression covers stale cached boolean and changed article/source.
+- Actual Studio load/selection/Production handler: blocked design12 never calls engine; design07 alone PASS, full878 BODY and image,92% Auto-fit/overflow0. Node376/Python18; source/geometry/Fidelity unchanged.

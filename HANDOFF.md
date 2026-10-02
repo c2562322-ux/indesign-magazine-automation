@@ -712,3 +712,7 @@ Adobe에서 새 이미지/고정객체 보존/overflow/INDD/PDF 성공은 아직
 ## Latest gallery busy/gate correction
 - Manual-proof ‘선택한 등록 디자인으로 제작’ moved to developer area in gallery mode. General path uses ‘선택한 디자인으로 제작’; unmet proof gate no longer says another operation is busy.
 - Actual Host tested full Studio DOCX-load/production wrapper plus gallery handlers: busy false after load/selection/Production; exact u3356 PASS, BODY92%, title22/BODY878/image applied/overflow0/errors0. New visible document167 left open. Node374/Python18. No engine/Library/thumbnail-lock change. See docs/TEMPLATE_GALLERY.md.
+
+## Latest gallery guard diagnosis
+- Current selection entry/article now drives the same common guard for button enablement and Production click. Exact false guard/reasons shown in UI and GALLERY_GUARD progress log; stale galleryCanProduce cannot authorize or block by itself.
+- Actual full Studio handler: design12 structurally BLOCK (assessment=false), no Production call; design07 u3356 all true, Production PASS/title22/BODY878/image/92%/overset0. Visible document168 left open. Node376/Python18. User still needs UDT click confirmation. No safety/Library/engine changes.

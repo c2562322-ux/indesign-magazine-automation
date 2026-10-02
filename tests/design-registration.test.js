@@ -331,3 +331,12 @@ test('gallery manual proof button stays in developer controls and unmet gate is 
  const walk=e=>[e,...e.children.flatMap(walk)];assert.ok(walk(developer).includes(manual));assert.equal(manual.registrationDisabled,true);assert.equal(x.studio.state.busy,false);assert.equal(x.ui.state.busy,false);await manual.handlers.click();assert.ok(x.nodes().some(n=>n.textContent.includes('개발자 검증용 제작')));assert.equal(x.nodes().some(n=>n.textContent.includes('다른 작업이 진행 중')),false);
  const produce=x.nodes().find(n=>n.textContent==='선택한 디자인으로 제작');assert.equal(produce.disabled,false);
 });
+
+test('gallery entry-derived guard explains structural failure and ignores a stale cached canProduce flag',async()=>{
+ const x=gallerySetup([galleryEntry('safe'),galleryEntry('blocked',true)]);let calls=0;x.studio.createRegistered=async e=>{calls++;return {errors:[],warnings:[],outputReady:true,fidelity:{phase:'CONTENT_APPLIED',designId:e.descriptor.id,provenance:e.descriptor.provenance}};};
+ await x.ui.articleLoaded();await x.nodes().find(n=>n.attributes['aria-label']==='디자인 01 선택').click();x.ui.state.galleryCanProduce=false;await x.click('선택한 디자인으로 제작');assert.equal(calls,1);assert.equal(x.ui.state.galleryGate.allowed,true);
+ await x.nodes().find(n=>n.attributes['aria-label']==='디자인 02 선택').click();const b=x.nodes().find(n=>n.textContent==='선택한 디자인으로 제작');await b.handlers.click();assert.equal(calls,1);assert.equal(x.ui.state.galleryGate.guards.selectedEntry,true);assert.equal(x.ui.state.galleryGate.guards.galleryIdentity,true);assert.equal(x.ui.state.galleryGate.guards.productionAssessment,false);assert.match(b.blockReason,/역할 확인 필요/);assert.match(b.blockReason,/"productionAssessment":false/);
+});
+test('gallery guard rejects a changed article or selected source identity before Production',async()=>{
+ const x=gallerySetup([galleryEntry('safe')]);await x.ui.articleLoaded();await x.nodes().find(n=>n.attributes['aria-label']==='디자인 01 선택').click();const G=require('../src/registered-gallery');assert.equal(G.gate(x.ui.state.selected,article).allowed,true);assert.equal(G.gate(x.ui.state.selected,{...article,body:'changed'}).guards.articleUnchanged,false);assert.equal(G.gate({...x.ui.state.selected,galleryIdentity:'other'},article).guards.sourceIdentity,false);
+});
