@@ -25,6 +25,12 @@ function noPaint(color,doc){
  return ['None','[None]','$ID/None','없음','[없음]'].includes(color.name);
 }
 const FIT=['autoFit','leftCrop','topCrop','rightCrop','bottomCrop','fittingOnEmptyFrame','fittingAlignment'];
+function processWhite(color,tint,ID){
+ if(!color||!ID.ColorModel?.PROCESS||!enumEqual(color.model,ID.ColorModel.PROCESS))return false;
+ if(tint===0)return true;
+ const channels=color.colorValue?Array.from(color.colorValue,Number):[],space=['CMYK','RGB','HSB','LAB'].find(k=>ID.ColorSpace?.[k]!==undefined&&enumEqual(color.space,ID.ColorSpace[k]));
+ return space==='CMYK'&&channels.length===4&&channels.every(v=>v===0)||space==='RGB'&&channels.length===3&&channels.every(v=>v===255)||space==='HSB'&&channels.length===3&&channels[1]===0&&channels[2]===100||space==='LAB'&&channels.length===3&&channels[0]===100&&channels[1]===0&&channels[2]===0;
+}
 // entirePath uses [x,y], including Bezier control points, in ruler coordinates.
 // Page removal can move the page origin without changing its artwork.
 function pagePath(path,pageBounds){
@@ -47,8 +53,10 @@ function frameSnapshot(f,progress=()=>{},doc,ID={}){
  }
  const fill=get(f,'fillColor'),stroke=get(f,'strokeColor'),weight=get(f,'strokeWeight'),fillAbsent=noPaint(fill,doc),strokeAbsent=noPaint(stroke,doc)||weight===0;
  const appearance={...R(f,OBJECT),fillColor:V(fill),strokeColor:V(stroke),strokeWeight:V(weight)};
- for(const key of ['fillTint','overprintFill'])appearance[key]=fillAbsent?na('fillColor=None'):V(get(f,key));
- for(const key of ['strokeTint','strokeType','overprintStroke'])appearance[key]=strokeAbsent?na('strokeColor=None or strokeWeight=0'):V(get(f,key));
+ appearance.fillTint=fillAbsent?na('fillColor=None'):V(get(f,'fillTint'));
+ appearance.overprintFill=fillAbsent?na('fillColor=None'):processWhite(fill,appearance.fillTint,ID)?na('process white paint: Adobe overprint unavailable'):V(get(f,'overprintFill'));
+ for(const key of ['strokeTint','strokeType'])appearance[key]=strokeAbsent?na('strokeColor=None or strokeWeight=0'):V(get(f,key));
+ appearance.overprintStroke=strokeAbsent?na('strokeColor=None or strokeWeight=0'):processWhite(stroke,appearance.strokeTint,ID)?na('process white paint: Adobe overprint unavailable'):V(get(f,'overprintStroke'));
  const textFrame=['TextFrame','EndnoteTextFrame'].includes(f.constructor&&f.constructor.name);
  const result={page:ref(page),bounds:[b[0]-p[0],b[1]-p[1],b[2]-p[0],b[3]-p[1]],object:appearance,layer:V(get(f,'itemLayer')),group:ref(get(f,'parent')),objectStyle:V(get(f,'appliedObjectStyle')),
   fitting:textFrame?na('text frame: graphic fitting inactive'):R(get(f,'frameFittingOptions'),FIT),paths:list(get(f,'paths')).map(path=>pagePath(V(get(path,'entirePath')),p)),
@@ -221,6 +229,13 @@ function directCompare(source,properties,ID,model,doc){
   else if(k==='KinsokuSet'){expected[k]=kinsokuValue(v,ID);actual[k]=kinsokuValue(got,ID);}
   else if(['FillColor','StrokeColor'].includes(k)&&model){expected[k]=colorExpected(model,v);actual[k]=colorActual(got,ID,doc);}
   else if(originTypes[k]){expected[k]=originValue(k,v,ID);actual[k]=originValue(k,got,ID);}
+  else if(k==='StrokeAlignment'){
+   const names={CenterAlignment:'CENTER_ALIGNMENT',InsideAlignment:'INSIDE_ALIGNMENT',OutsideAlignment:'OUTSIDE_ALIGNMENT'};
+   const native=ID.TextStrokeAlign||ID.StrokeAlignment||{};
+   if(!names[v]||native[names[v]]===undefined)throw new Error('UNSUPPORTED direct override enum: StrokeAlignment / '+v);
+   expected[k]=v;actual[k]=Object.keys(names).find(name=>native[names[name]]!==undefined&&enumEqual(got,native[names[name]]));
+   if(actual[k]===undefined)throw new Error('UNSUPPORTED direct override readback: StrokeAlignment');
+  }
   else if(k==='AppliedFont'){expected[k]=v;actual[k]=got&&got.fontFamily;}
   else if(k==='AppliedLanguage'||k==='KerningMethod'||k==='Composer'){const pair=canonicalPair(k,v,got,ID);expected[k]=pair.expected;actual[k]=pair.actual;}
   else if(k==='Justification'){expected[k]=v;actual[k]=Object.keys(Model.ALIGN).find(n=>enumEqual(got,(ID.Justification||{})[Model.ALIGN[n]]));}

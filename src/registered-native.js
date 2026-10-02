@@ -5,6 +5,8 @@
 // with the v1 coordinate renderer. No original file is opened or written.
 const Model=require('./design-model'),Match=require('./design-matching'),Package=require('./package-xml'),IDML=require('./idml-package'),F=require('./registered-fidelity'),Trace=require('./registered-dom-trace');
 const Markers=require('./idml-markers'),TextPolicy=require('./registered-text-policy'),Graphics=require('./registered-graphics'),Colors=require('./design-color-slots');
+const Geometry=require('./registered-geometry');
+const Effects=require('./registered-effects');
 const KEY='MagazineStudioSourceRef',local=n=>n.tag.replace(/^\{[^}]+\}/,'');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function validatePageStories(entry){
@@ -71,7 +73,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
   const expected={children:children.map(e=>e.id).sort(),parent:group.groupId||group.spreadId||null},actual={children:(snap.children||[]).slice().sort(),parent:snap.group};
   if(group.pageBounds&&group.pageBounds[snap.page]){expected.bounds=group.pageBounds[snap.page];actual.bounds=snap.bounds;}
   for(const key of ['Visible','Locked'])if(group.properties[key]!==undefined){expected[key]=group.properties[key];actual[key]=snap.object[key[0].toLowerCase()+key.slice(1)];}
-  const effects=Object.keys(group.details||{}).filter(k=>/Transparency|Shadow|Glow|Feather|Bevel|Satin/.test(k));if(effects.length){expected.effects='supported';actual.effects='UNSUPPORTED: '+effects.join(', ');}
+  try{const effects=Effects.compare(group,f);if(effects){expected.effects=effects.expected;actual.effects=effects.actual;}}catch(error){expected.effects='supported';actual.effects='UNSUPPORTED: '+error.message;}
   record('group',group.id,expected,actual);
  }
  for(const pageId of entry.descriptor.pageIds){const expected=entry.original.pages.find(p=>p.id===pageId),page=pages.find(p=>p.extractLabel(KEY)===pageId);record('page',pageId,{width:expected.width,height:expected.height},page?{width:page.bounds[3]-page.bounds[1],height:page.bounds[2]-page.bounds[0]}:null);}
@@ -82,7 +84,7 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
    if((e.image||[]).length&&!ignoreStories.includes('image:'+e.id))externalAssets.push(...Graphics.assets(e,f,ID).filter(a=>a.state!=='AVAILABLE'));
    const hostPage=F.ref(f.parentPage);
    if(!e.pageCandidates.includes(hostPage))throw new Error('원본 page-set 밖 객체 Parent: '+e.id);
-   const expected={bounds:e.pageBounds[hostPage],page:hostPage},actual={bounds:relative(f),page:hostPage};
+   const expected={bounds:Geometry.bounds(e,entry.original.pages.find(p=>p.id===hostPage)),page:hostPage},actual={bounds:relative(f),page:hostPage};
    const props=F.objectProperties(entry.original,e);expected.appearance={};actual.appearance={};
    for(const [key,v] of Object.entries(props)){expected.appearance[key]=/Color$/.test(key)?F.colorExpected(entry.original,v):v;const inactive=(key==='FillTint'&&props.FillColor==='Swatch/None'&&F.noPaint(f.fillColor,doc))||(key==='StrokeTint'&&(props.StrokeColor==='Swatch/None'||props.StrokeWeight===0)&&(F.noPaint(f.strokeColor,doc)||f.strokeWeight===0));if(inactive){expected.appearance[key]=F.na('source and generated paint inactive');actual.appearance[key]=F.na('source and generated paint inactive');continue;}const got=f[key[0].toLowerCase()+key.slice(1)];actual.appearance[key]=/Color$/.test(key)?F.colorActual(got,ID,doc):got;}
    if(colorOverrides[e.id]){expected.appearance.FillColor=colorOverrides[e.id];actual.appearance.FillColor=F.colorActual(f.fillColor,ID,doc);}
@@ -93,11 +95,9 @@ function diagnostics(entry,doc,ID,{ignoreStories=[],colorOverrides={}}={}){
    const fitting=e.details&&e.details.FrameFittingOption||{};expected.crop={};actual.crop={};
    if(!ignoreStories.includes('image:'+e.id))for(const k of ['LeftCrop','TopCrop','RightCrop','BottomCrop'])if(fitting[k]!==undefined){expected.crop[k]=fitting[k];actual.crop[k]=f.frameFittingOptions&&f.frameFittingOptions[k[0].toLowerCase()+k.slice(1)];}
    if(fitting.FittingOnEmptyFrame!==undefined){const options={None:'NONE',Proportionally:'PROPORTIONALLY',FillProportionally:'FILL_PROPORTIONALLY',ContentToFrame:'CONTENT_TO_FRAME'},key=options[fitting.FittingOnEmptyFrame],got=f.frameFittingOptions.fittingOnEmptyFrame;expected.fittingPolicy=fitting.FittingOnEmptyFrame;actual.fittingPolicy=key&&ID.EmptyFrameFittingOptions?.[key]!==undefined&&sameEnum(got,ID.EmptyFrameFittingOptions[key])?fitting.FittingOnEmptyFrame:String(got);}
-   const unsupported=[];
    if((e.image||[]).length&&!ignoreStories.includes('image:'+e.id)){const graphic=Graphics.compare(entry.original,e,f,ID);expected.graphics=graphic.expected;actual.graphics=graphic.actual;}
-   for(const [k,v] of Object.entries(e.details||{}))if(/Transparency|Shadow|Glow|Feather|Bevel|Satin/.test(k))unsupported.push(k);
+   const effects=Effects.compare(e,f);if(effects){expected.effects=effects.expected;actual.effects=effects.actual;}
 
-   if(unsupported.length){expected.supported=true;actual.supported='UNSUPPORTED: '+unsupported.join(', ');}
    if(e.textFrame){
     expected.story=e.textFrame.storyRef;actual.story=F.ref(f.parentStory);
     const pref=Match.framePreferences(entry.original,e).effective;expected.frame={};actual.frame={};
@@ -150,7 +150,7 @@ function support(entry){
  const unknown=(m.metadata.packageInventory||[]).filter(x=>!m.sourceXml?.[x.name]&&!['mimetype','META-INF/container.xml'].includes(x.name));if(unknown.length)fidelity.push('원본 바이너리 리소스 미보존: '+unknown.map(x=>x.name).join(', '));
  for(const e of m.elements.filter(e=>e.pageCandidates.length===1&&entry.descriptor.pageIds.includes(e.pageCandidates[0]))){
   for(const g of e.image||[]){const why=Graphics.reason(g);if(why)fidelity.push(why);}
-  if(Object.keys(e.details||{}).some(k=>/Transparency|Shadow|Glow|Feather|Bevel|Satin/.test(k)))fidelity.push('graphic effect readback 미지원');
+  try{Effects.plan(e);}catch(error){fidelity.push(error.message);}
   const role=entry.descriptor.roles[e.id]?.role;
   if(e.textFrame&&['title','subtitle','body','caption'].includes(role)){
    const story=m.stories.find(s=>s.id===e.textFrame.storyRef),runs=story?.paragraphs.flatMap(p=>p.runs)||[];

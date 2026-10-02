@@ -623,3 +623,8 @@ Group source pages by actual shared/Story/Group relationships; do not duplicate 
 
 ## 2026-10-02 — execution evidence is required for verification export
 A registered inventory with NOT_RUN states and no reports is not actual Adobe validation evidence. Reject empty verification exports instead of reporting success. Scope batch to the latest explicitly loaded Library while preserving legacy entries. Partial, failed and unsupported-skip records remain exportable; neither static support reasons nor missing evidence establishes a source-design defect or Production PASS.
+
+## 2026-10-02 — actual Host recovery and strict visual readback
+Use existing COM-to-UXP route outside the restricted sandbox, falling back to the registered server when running-object attachment is unavailable. A fresh complete result is required after asynchronous DoScript; timeout never means PASS or automatic process termination. Source Fidelity and Production are independent milestones.
+
+Process-white overprint alone is inapplicable, with process model/space/tint proven and other paint fields retained; spot/colored/unknown paint stays strict. Compare native text stroke enums and exact cubic bounds without changing tolerance. Explicit object opacity is compared numerically from source; other effects/gradient name-only comparisons remain unsupported. Full-source overset with installed fonts is a designer source-composition issue; missing semantic mapping/gradient definitions is engine/registration work. Never turn these limitations into a fabricated three-PASS result.

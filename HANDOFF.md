@@ -1,3 +1,13 @@
+# Actual Adobe Host restored and latest22 verified — 2026-10-02
+
+- Started from85dcc9e. Outside-sandbox registered COM server connection works with InDesign21.4.1.4 and real UXP scripts; GetActiveObject still reports0x800401E3. Previous0x80080005 not reproduced here; no registry repair/restart or engine replacement. tools/adobe-host.ps1 waits for fresh complete JSON because DoScript return is asynchronous.
+- Existing registration UI handlers + actual Adobe full batch/opacity followup: modeproof,total22,reports22,NOT_RUN0,PASS13/FAIL7/UNSUPPORTED2. Twenty actual inspections; two preflight skips. Raw evidence: ignored assets/templates/working/latest-batch-verified-host.private.json. This is source Fidelity, not Production Ready.
+- Common fixes: process-white-only overprint applicability, native text StrokeAlignment comparison, exact cubic bounds, numeric source object opacity comparison. Unknown/spot overprint, differing enums/geometry/opacity, gradients and complex effects remain strict. No original/library/parser/binding/fitting policy change.
+- Failures: source overset5 units + unsupported gradient2 units. Entire31-page source before cleanup confirms13 overset Stories in6 units with installed fonts (one of these remains unsupported). Table ua829 and shared-object uafe5+uafe6 remain unsupported. Detailed22 table and source-frame IDs: docs/ADOBE_HOST_RECOVERY.md.
+- Same Desktop02_소아근시_매거진.docx:22/75/878 chars, one440x349 image. Actual UI recommendation0; existing Production calls for role-ready5 units:0PASS. u3356 mixed BODY; u9615 mixed BODY+no image slot; u9ba6 no image slot; uaa27 needs4 images; u92a9 source overset. No three-new-design production/merge/output PASS claim.
+- Role confirmation17 and mixed typography14 remain; gradient support requires source stop definitions, not name equality. Next prioritize TITLE roles on source-safe u8e19 and BODY policy on u3356; u9496+u94f4 also needs gradient support. Never fabricate semantics or alter the article/photo count to achieve3.
+- Node341/341, Python18/18. Source IDML/DOCX hashes unchanged; original unsaved document16 remains31 pages/modified. Latest read-only inventory has four open documents; no subsequent close/save of those documents. Existing untracked sample/magazine-design.indd preserved.
+
 # Latest batch export has no execution evidence — 2026-10-02
 
 - User Desktop export created 2026-10-02T01:31:20.883Z contains 77 NOT_RUN entries, reports0/groups0, run.mode=manual. Latest22 are all NOT_RUN. Actual source/Production PASS or designer repair requirements cannot be inferred.

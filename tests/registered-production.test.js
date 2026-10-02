@@ -295,6 +295,31 @@ test('None applicability uses builtin swatch identity, not an arbitrary named co
  const F=require('../src/registered-fidelity'),doc={swatches:{item:()=>({id:0,name:'localized'})}};
  assert.equal(F.noPaint({id:0,name:'localized'},doc),true);assert.equal(F.noPaint({id:99,name:'None'},doc),false);
 });
+test('text stroke alignment compares native enums without hiding a different alignment',()=>{
+ const F=require('../src/registered-fidelity'),center={},outside={},ID={TextStrokeAlign:{CENTER_ALIGNMENT:center,OUTSIDE_ALIGNMENT:outside}};
+ assert.equal(F.directCompare({strokeAlignment:center},{StrokeAlignment:'CenterAlignment'},ID).comparison.equal,true);
+ assert.equal(F.directCompare({strokeAlignment:outside},{StrokeAlignment:'CenterAlignment'},ID).comparison.equal,false);
+ assert.throws(()=>F.directCompare({strokeAlignment:{}},{StrokeAlignment:'CenterAlignment'},ID),/UNSUPPORTED direct override readback/);
+});
+test('curved path Fidelity uses Bezier extrema rather than anchor-only bounds',()=>{
+ const G=require('../src/registered-geometry'),M=require('../src/design-model'),p={id:'p',transform:[1,0,0,1,10,20],bounds:[0,0,100,100]},e={spreadTransform:[1,0,0,1,10,20],pageBounds:{p:[0,0,0,10]},paths:[{open:true,points:[{Anchor:[0,0],LeftDirection:[0,0],RightDirection:[0,10]},{Anchor:[10,0],LeftDirection:[10,10],RightDirection:[10,0]}]}]};
+ const b=G.bounds(e,p);assert.deepEqual(b,[0,0,7.5,10]);assert.equal(M.compare(b,[0,0,7.6,10]).equal,false);
+ e.spreadTransform=[1,0,0,1,15,23];assert.deepEqual(G.bounds(e,p),[3,5,10.5,15]);
+});
+test('source object opacity is compared strictly; other effects remain unsupported',()=>{
+ const E=require('../src/registered-effects'),M=require('../src/design-model'),e={details:{TransparencySetting:{children:[{tag:'BlendingSetting',attributes:{Opacity:'47'},children:[]}]}}},frame={transparencySettings:{blendingSettings:{opacity:47}}};
+ const first=E.compare(e,frame);assert.equal(M.compare(first.expected,first.actual).equal,true);frame.transparencySettings.blendingSettings.opacity=48;const changed=E.compare(e,frame);assert.equal(M.compare(changed.expected,changed.actual).equal,false);
+ e.details.TransparencySetting.children[0].attributes.BlendMode='Multiply';assert.throws(()=>E.plan(e),/미지원/);delete e.details.TransparencySetting.children[0].attributes.BlendMode;e.details.TransparencySetting.children[0].attributes.Opacity='NaN';assert.throws(()=>E.plan(e),/Invalid source/);
+});
+test('process white overprint is inapplicable but paint, tint, and spot overprint remain required',()=>{
+ const F=require('../src/registered-fidelity'),h=host(fixture()),f=h.frames[0],process={},spot={},rgb={},cmyk={};h.ID.ColorModel={PROCESS:process,SPOT:spot};h.ID.ColorSpace={};Object.defineProperties(h.ID.ColorSpace,{RGB:{value:rgb},CMYK:{value:cmyk}});
+ f.fillColor={id:100,name:'white',model:process,space:rgb,colorValue:[255,255,255]};f.fillTint=-1;
+ Object.defineProperty(f,'overprintFill',{get(){throw new Error('white overprint unavailable');},configurable:true});
+ const before=F.frameSnapshot(f,undefined,h.doc,h.ID);assert.equal(before.object.overprintFill.status,'NOT_APPLICABLE');assert.equal(before.object.fillTint,-1);
+ f.fillColor={id:101,name:'black',model:process,space:cmyk,colorValue:[0,0,0,100]};f.fillTint=0;assert.equal(F.frameSnapshot(f,undefined,h.doc,h.ID).object.overprintFill.status,'NOT_APPLICABLE');
+ f.fillTint=1;assert.throws(()=>F.frameSnapshot(f,undefined,h.doc,h.ID),/white overprint unavailable/);
+ f.fillColor={id:102,name:'spot white',model:spot,space:rgb,colorValue:[255,255,255]};f.fillTint=100;assert.throws(()=>F.frameSnapshot(f,undefined,h.doc,h.ID),/white overprint unavailable/);
+});
 
 test('production rechecks native fidelity even after a successful separate proof, before any DOCX edits',async()=>{
  const e=fixture(),proof=host(e);assert.equal((await N.create(e,null,{...proof.env,mode:'proof'})).phase,'FIDELITY_PASSED');
